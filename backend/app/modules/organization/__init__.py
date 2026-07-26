@@ -1,0 +1,1 @@
+from app.modules.organization.models import Hospital
