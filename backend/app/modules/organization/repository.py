@@ -100,6 +100,13 @@ class HospitalRepository:
     # Transaction Operations
     # ------------------------------------------------------------------
 
+    def flush(self) -> None:
+        """
+        Flush pending changes to the database without committing.
+        """
+
+        self.db.flush()
+
     def save(self) -> None:
         """
         Commit all pending database changes.
@@ -119,7 +126,7 @@ class HospitalRepository:
 
     def rollback(self) -> None:
         """
-        Roll back the current transaction.
+       Roll back the current transaction.
         """
 
         self.db.rollback()

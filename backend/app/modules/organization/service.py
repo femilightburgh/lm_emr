@@ -14,6 +14,7 @@ Business logic for Organization management.
 from sqlalchemy.orm import Session
 
 from app.common.exceptions import DuplicateResourceException
+from app.modules.identity.role_seeder import seed_default_roles
 from app.modules.organization.models import Hospital
 from app.modules.organization.repository import HospitalRepository
 from app.modules.organization.schemas import HospitalCreate
@@ -41,8 +42,7 @@ class HospitalService:
 
         if existing:
             raise DuplicateResourceException(
-                "A hospital with code "
-                f"'{request.code}' already exists."
+                f"A hospital with code '{request.code}' already exists."
             )
 
         hospital = Hospital(
@@ -62,10 +62,22 @@ class HospitalService:
             license_number=request.license_number,
         )
 
-        self.repository.create_hospital(hospital)
+        try:
+            self.repository.create_hospital(hospital)
 
-        self.repository.save()
+            self.repository.flush()
 
-        self.repository.refresh(hospital)
+            seed_default_roles(
+                db=self.repository.db,
+                hospital_id=hospital.id,
+            )
 
-        return hospital
+            self.repository.save()
+
+            self.repository.refresh(hospital)
+
+            return hospital
+
+        except Exception:
+            self.repository.rollback()
+            raise
