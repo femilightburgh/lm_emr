@@ -45,11 +45,11 @@ from fastapi import APIRouter
 # ============================================================================
 
 from app.modules.identity.router import router as identity_router
+from app.modules.organization.router import router as organization_router
 from app.modules.staff.router import router as staff_router
 from app.modules.patients.api.patient_router import router as patient_router
 
 # Future modules
-# from app.modules.organization.router import router as organization_router
 # from app.modules.appointments.router import router as appointment_router
 # from app.modules.laboratory.router import router as laboratory_router
 # from app.modules.radiology.router import router as radiology_router
@@ -67,6 +67,7 @@ api_router = APIRouter()
 # ============================================================================
 
 api_router.include_router(identity_router)
+api_router.include_router(organization_router)
 api_router.include_router(staff_router)
 api_router.include_router(patient_router)
 
@@ -74,7 +75,6 @@ api_router.include_router(patient_router)
 # Future Modules
 # ============================================================================
 
-# api_router.include_router(organization_router)
 # api_router.include_router(appointment_router)
 # api_router.include_router(laboratory_router)
 # api_router.include_router(radiology_router)

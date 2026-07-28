@@ -24,7 +24,7 @@ Responsibilities
 ========================================================================
 """
 
-from dataclasses import Field
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -82,10 +82,10 @@ class UserSummary(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
+    id: UUID
 
     email: EmailStr
 
-    hospital_id: str
+    hospital_id: UUID
 
     is_superuser: bool

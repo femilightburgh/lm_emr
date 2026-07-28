@@ -33,6 +33,8 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
+from app.common.exceptions import InvalidCredentialsException
+from app.core.config import settings
 from app.core.security.hashing import verify_password
 from app.core.security.tokens import (
     create_access_token,
@@ -41,8 +43,6 @@ from app.core.security.tokens import (
 from app.modules.identity.enums import AccountStatus
 from app.modules.identity.repository import IdentityRepository
 from app.modules.organization.repository import OrganizationRepository
-from app.core.config import settings
-from app.common.exceptions import InvalidCredentialsException
 
 
 class AuthenticationService:
@@ -72,9 +72,8 @@ class AuthenticationService:
 
         Returns
         -------
-        dict | None
-            Token pair on success.
-            None if authentication fails.
+        dict
+            JWT access and refresh tokens.
         """
 
         # --------------------------------------------------------------
@@ -119,13 +118,10 @@ class AuthenticationService:
 
             user.failed_login_attempts += 1
 
-            if (
-                user.failed_login_attempts
-                >= self.MAX_FAILED_ATTEMPTS
-            ):
+            if user.failed_login_attempts >= self.MAX_FAILED_ATTEMPTS:
                 user.status = AccountStatus.LOCKED
 
-            self.db.commit()
+            self.identity_repository.save()
 
             raise InvalidCredentialsException()
 
@@ -138,7 +134,8 @@ class AuthenticationService:
         user.failed_login_attempts = 0
         user.last_login_at = datetime.now(UTC)
 
-        self.db.commit()
+        self.identity_repository.save()
+        self.identity_repository.refresh(user)
 
         # --------------------------------------------------------------
         # Step 6:

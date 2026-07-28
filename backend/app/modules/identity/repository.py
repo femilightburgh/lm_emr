@@ -28,6 +28,7 @@ Business decisions belong inside service.py.
 """
 
 from uuid import UUID
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -74,25 +75,43 @@ class IdentityRepository:
         user: UserAccount,
     ) -> UserAccount:
         """
-        Persist a newly created user account.
+        Add a newly created user to the current database session.
+
+        This method intentionally does NOT commit the transaction.
+        The service layer is responsible for deciding when the
+        transaction should be committed.
+
+        Returns
+        -------
+        UserAccount
+            The newly added user entity.
         """
 
         self.db.add(user)
-        self.db.commit()
-        self.db.refresh(user)
-
         return user
 
-    def save(self):
+    def save(self) -> None:
         """
-        Commit pending database changes.
+        Commit all pending database changes.
         """
 
         self.db.commit()
 
-    def refresh(self, entity):
+    def refresh(
+        self,
+        entity: Any,
+    ) -> None:
         """
         Reload an entity from the database.
         """
 
         self.db.refresh(entity)
+
+    def rollback(self) -> None:
+        """
+        Roll back the current transaction.
+
+        Services should call this when a transaction fails.
+        """
+
+        self.db.rollback()
