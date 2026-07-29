@@ -6,22 +6,6 @@ LIGHTBURGH EMR
 Identity Schemas
 
 ========================================================================
-
-Purpose
--------
-
-Pydantic schemas define the structure of data entering and leaving
-the Identity module.
-
-Responsibilities
-----------------
-
-• Validate incoming API requests
-• Validate outgoing API responses
-• Generate OpenAPI / Swagger documentation
-• Prevent invalid data from reaching business logic
-
-========================================================================
 """
 
 from uuid import UUID
@@ -66,16 +50,24 @@ class TokenResponse(BaseModel):
 
 
 # ============================================================================
-# Administrator Creation
+# User Creation
 # ============================================================================
 
 
-class CreateAdministratorRequest(BaseModel):
+class CreateUserRequest(BaseModel):
     """
-    Creates the first administrator for a hospital.
+    Generic request for creating a user and assigning an initial role.
 
-    This endpoint is intended to be used only during
-    initial hospital onboarding.
+    This schema is intentionally generic so it can be reused for:
+
+    • Hospital Administrator
+    • Doctor
+    • Nurse
+    • Pharmacist
+    • Cashier
+    • Laboratory Scientist
+    • Radiographer
+    • Any future staff role
     """
 
     hospital_code: str = Field(
@@ -90,11 +82,23 @@ class CreateAdministratorRequest(BaseModel):
     password: str = Field(
         ...,
         min_length=8,
-        description="Administrator password.",
+        description="User password.",
+    )
+
+    role_name: str = Field(
+        ...,
+        min_length=2,
+        max_length=100,
+        description="Role to assign.",
     )
 
 
-class UserSummary(BaseModel):
+# ============================================================================
+# Responses
+# ============================================================================
+
+
+class UserResponse(BaseModel):
     """
     Minimal user information returned by APIs.
     """
@@ -105,11 +109,4 @@ class UserSummary(BaseModel):
     email: EmailStr
     hospital_id: UUID
     is_superuser: bool
-
-
-class AdministratorResponse(UserSummary):
-    """
-    Response returned after creating the first administrator.
-    """
-
-    pass
+    status: str

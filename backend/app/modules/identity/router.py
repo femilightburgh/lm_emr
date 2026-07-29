@@ -22,7 +22,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.modules.identity.repository import IdentityRepository
+from app.modules.identity.user_service import UserService
 from app.modules.identity.schemas import (
+    CreateUserRequest,
+    UserResponse,
     LoginRequest,
     TokenResponse,
 )
@@ -33,6 +37,37 @@ router = APIRouter(
     tags=["Authentication"],
 )
 
+@router.post(
+    "/users",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a user",
+)
+def create_user(
+    request: CreateUserRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Create a new user account.
+
+    This endpoint only creates the user.
+    Role assignment is handled separately.
+    """
+
+    repository = IdentityRepository(db)
+    service = UserService(repository)
+
+    user = service.create_user(
+        hospital_code=request.hospital_code,
+        email=request.email,
+        password=request.password,
+        role_name=request.role_name,
+    )
+
+    repository.save()
+    repository.refresh(user)
+
+    return UserResponse.model_validate(user)
 
 @router.post(
     "/login",

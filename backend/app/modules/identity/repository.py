@@ -18,11 +18,12 @@ Responsibilities include:
 
 • Retrieving users
 • Creating users
-• Updating users
-• Loading roles
+• Retrieving hospitals
+• Retrieving roles
+• Assigning roles
 • Loading permissions
 
-Business decisions belong inside service.py.
+Business decisions belong inside the service layer.
 
 ========================================================================
 """
@@ -33,20 +34,47 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.modules.identity.models import UserAccount
+from app.modules.identity.models import (
+    Role,
+    UserAccount,
+    UserRole,
+)
+from app.modules.organization.models import Hospital
 
 
 class IdentityRepository:
     """
-    Repository responsible for all database operations related
-    to authentication and authorization.
+    Repository responsible for database access for the
+    Identity module.
 
-    Services should communicate with the database only through
-    this repository.
+    This repository intentionally contains NO business logic.
     """
 
     def __init__(self, db: Session):
         self.db = db
+
+    # ==========================================================
+    # Hospital
+    # ==========================================================
+
+    def get_hospital_by_code(
+        self,
+        hospital_code: str,
+    ) -> Hospital | None:
+        """
+        Retrieve a hospital using its unique hospital code.
+        """
+
+        statement = (
+            select(Hospital)
+            .where(Hospital.code == hospital_code)
+        )
+
+        return self.db.scalar(statement)
+
+    # ==========================================================
+    # Users
+    # ==========================================================
 
     def get_user_by_email(
         self,
@@ -56,8 +84,7 @@ class IdentityRepository:
         """
         Retrieve a user using hospital and email.
 
-        Because LIGHTBURGH is multi-tenant, email addresses
-        are only unique inside a hospital.
+        Emails are unique only within a hospital.
         """
 
         statement = (
@@ -75,24 +102,81 @@ class IdentityRepository:
         user: UserAccount,
     ) -> UserAccount:
         """
-        Add a newly created user to the current database session.
+        Add a user to the current session.
 
-        This method intentionally does NOT commit the transaction.
-        The service layer is responsible for deciding when the
-        transaction should be committed.
-
-        Returns
-        -------
-        UserAccount
-            The newly added user entity.
+        Does NOT commit.
         """
 
         self.db.add(user)
         return user
+    
+    def get_user_by_id(
+        self,
+        user_id: UUID,
+    ) -> UserAccount | None:
+        """
+        Retrieve a user by ID.
+        """
+
+        statement = (
+            select(UserAccount)
+            .where(UserAccount.id == user_id)
+        )
+
+        return self.db.scalar(statement)
+
+    # ==========================================================
+    # Roles
+    # ==========================================================
+
+    def get_role_by_name(
+        self,
+        hospital_id: UUID,
+        role_name: str,
+    ) -> Role | None:
+        """
+        Retrieve a role by hospital and name.
+        """
+
+        statement = (
+            select(Role)
+            .where(
+                Role.hospital_id == hospital_id,
+                Role.name == role_name,
+            )
+        )
+
+        return self.db.scalar(statement)
+
+    def create_user_role(
+        self,
+        user_role: UserRole,
+    ) -> UserRole:
+        """
+        Add a user-role assignment to the current session.
+
+        Does NOT commit.
+        """
+
+        self.db.add(user_role)
+        return user_role
+
+    # ==========================================================
+    # Transaction helpers
+    # ==========================================================
+
+    def flush(self) -> None:
+        """
+        Flush pending changes without committing.
+
+        Useful when IDs are required before commit.
+        """
+
+        self.db.flush()
 
     def save(self) -> None:
         """
-        Commit all pending database changes.
+        Commit the current transaction.
         """
 
         self.db.commit()
@@ -102,7 +186,7 @@ class IdentityRepository:
         entity: Any,
     ) -> None:
         """
-        Reload an entity from the database.
+        Refresh an entity from the database.
         """
 
         self.db.refresh(entity)
@@ -110,8 +194,6 @@ class IdentityRepository:
     def rollback(self) -> None:
         """
         Roll back the current transaction.
-
-        Services should call this when a transaction fails.
         """
 
         self.db.rollback()
