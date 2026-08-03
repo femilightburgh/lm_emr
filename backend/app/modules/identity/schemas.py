@@ -6,11 +6,24 @@ LIGHTBURGH EMR
 Identity Schemas
 
 ========================================================================
+
+Request and response schemas for the Identity module.
+
+Responsibilities
+----------------
+• User authentication
+• User creation
+• API response models
+
+========================================================================
 """
 
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+from app.modules.identity.models import AccountStatus
 
 
 # ============================================================================
@@ -39,14 +52,17 @@ class LoginRequest(BaseModel):
     )
 
 
-class TokenResponse(BaseModel):
+class LoginResponse(BaseModel):
     """
     Response returned after successful authentication.
+
+    Contains the JWT access token, refresh token,
+    and token type required for authenticated requests.
     """
 
     access_token: str
     refresh_token: str
-    token_type: str = "Bearer"
+    token_type: Literal["bearer"] = "bearer"
 
 
 # ============================================================================
@@ -56,7 +72,8 @@ class TokenResponse(BaseModel):
 
 class CreateUserRequest(BaseModel):
     """
-    Generic request for creating a user and assigning an initial role.
+    Request payload for creating a user account and assigning
+    an initial role.
 
     This schema is intentionally generic so it can be reused for:
 
@@ -100,7 +117,7 @@ class CreateUserRequest(BaseModel):
 
 class UserResponse(BaseModel):
     """
-    Minimal user information returned by APIs.
+    Minimal user information returned by Identity APIs.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -109,4 +126,4 @@ class UserResponse(BaseModel):
     email: EmailStr
     hospital_id: UUID
     is_superuser: bool
-    status: str
+    status: AccountStatus

@@ -96,6 +96,7 @@ class IdentityRepository:
         )
 
         return self.db.scalar(statement)
+    
 
     def create_user(
         self,
@@ -160,6 +161,25 @@ class IdentityRepository:
 
         self.db.add(user_role)
         return user_role
+    
+    def get_user_role_names(
+        self,
+        user_id: UUID,
+    ) -> list[str]:
+        """
+        Retrieve all role names assigned to a user.
+        """
+
+        statement = (
+            select(Role.name)
+            .join(
+                UserRole,
+                UserRole.role_id == Role.id,
+            )
+            .where(UserRole.user_account_id == user_id)
+        )
+
+        return list(self.db.scalars(statement).all())
 
     # ==========================================================
     # Transaction helpers

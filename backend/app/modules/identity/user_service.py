@@ -105,7 +105,7 @@ class UserService:
             hospital_id=hospital_id,
             email=email.lower(),
             password_hash=hash_password(password),
-            status=AccountStatus.PENDING,
+            status=AccountStatus.ACTIVE,
             is_superuser=False,
         )
 

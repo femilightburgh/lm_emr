@@ -12,8 +12,7 @@ Purpose
 
 This module preserves backwards compatibility for existing imports.
 
-AuthenticationService now lives in
-`authentication_service.py`.
+AuthService now lives in `auth_service.py`.
 
 Future services (UserService, RoleService, PermissionService)
 will live in their own modules.
@@ -21,8 +20,8 @@ will live in their own modules.
 ========================================================================
 """
 
-from app.modules.identity.authentication_service import AuthenticationService
+from app.modules.identity.auth_service import AuthService
 
 __all__ = [
-    "AuthenticationService",
+    "AuthService",
 ]
