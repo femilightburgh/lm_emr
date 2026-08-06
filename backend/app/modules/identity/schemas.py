@@ -127,3 +127,41 @@ class UserResponse(BaseModel):
     hospital_id: UUID
     is_superuser: bool
     status: AccountStatus
+
+
+# ============================================================================
+# Role Permission Management
+# ============================================================================
+
+
+class AssignPermissionRequest(BaseModel):
+    """
+    Request payload for assigning a permission to a role.
+    """
+
+    permission_code: str = Field(
+        ...,
+        min_length=3,
+        max_length=100,
+        description="Platform permission code.",
+    )
+
+
+class PermissionResponse(BaseModel):
+    """
+    Permission returned by the API.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    code: str
+    name: str
+    description: str
+
+
+class RolePermissionsResponse(BaseModel):
+    """
+    Permissions assigned to a role.
+    """
+
+    permissions: list[PermissionResponse]

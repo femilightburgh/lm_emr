@@ -35,7 +35,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.modules.identity.models import (
+    Permission,
     Role,
+    RolePermission,
     UserAccount,
     UserRole,
 )
@@ -180,6 +182,66 @@ class IdentityRepository:
         )
 
         return list(self.db.scalars(statement).all())
+    
+    def user_has_role(
+        self,
+        *,
+        user_id: UUID,
+        role_name: str,
+    ) -> bool:
+        """
+        Determine whether a user possesses an active role.
+        """
+
+        statement = (
+            select(UserRole.id)
+            .join(
+                Role,
+                Role.id == UserRole.role_id,
+            )
+            .where(
+                UserRole.user_account_id == user_id,
+                UserRole.is_active.is_(True),
+                Role.name == role_name,
+            )
+        )
+
+        return self.db.scalar(statement) is not None
+    
+    def get_user_permission_codes(
+        self,
+        user_id: UUID,
+    ) -> list[str]:
+        """
+        Retrieve all permission codes assigned to a user.
+
+        Permissions are inherited through the user's roles.
+        """
+
+        statement = (
+            select(Permission.code)
+            .join(
+                RolePermission,
+                RolePermission.permission_id == Permission.id,
+            )
+            .join(
+                Role,
+                Role.id == RolePermission.role_id,
+            )
+            .join(
+                UserRole,
+                UserRole.role_id == Role.id,
+            )
+            .where(
+                UserRole.user_account_id == user_id,
+                UserRole.is_active.is_(True),
+            )
+            .distinct()
+        )
+
+        return list(
+            self.db.scalars(statement).all()
+        )
 
     # ==========================================================
     # Transaction helpers

@@ -157,8 +157,7 @@ def oauth2_token(
     #
     #     WTH001|admin@lightburgh.com
     #
-    
-    print("USERNAME RECEIVED:", repr(form_data.username))
+
 
     try:
         hospital_code, email = form_data.username.split("|", maxsplit=1)

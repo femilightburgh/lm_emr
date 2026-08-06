@@ -18,17 +18,42 @@ Instead, they should be registered through app.api.router.
 ========================================================================
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 import app.models
 from app.api.router import api_router
+from app.bootstrap.startup import bootstrap_application
 from app.core.exception_handlers import register_exception_handlers
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application startup and shutdown lifecycle.
+    """
+
+    # --------------------------------------------------------------
+    # Startup
+    # --------------------------------------------------------------
+
+    bootstrap_application()
+
+    yield
+
+    # --------------------------------------------------------------
+    # Shutdown
+    # --------------------------------------------------------------
+
+    # Future cleanup goes here.
 
 
 app = FastAPI(
     title="LIGHTBURGH EMR API",
     version="1.0.0",
     description="Backend API",
+    lifespan=lifespan,
 )
 
 register_exception_handlers(app)

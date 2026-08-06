@@ -3,6 +3,7 @@
 LIGHTBURGH EMR
 
 Central API Router
+
 ==============================================================================
 
 Purpose
@@ -18,7 +19,8 @@ main.py
     │
     ▼
 api_router
-    ├── Identity
+    ├── Authentication
+    ├── Authorization
     ├── Organization
     ├── Staff
     ├── Patients
@@ -35,21 +37,51 @@ Adding a new module requires only:
 2. Register it with `api_router`.
 
 No other application files need to change.
+
 ==============================================================================
 """
 
 from fastapi import APIRouter
 
 # ============================================================================
-# Module Routers
+# Identity
 # ============================================================================
 
-from app.modules.identity.router import router as identity_router
-from app.modules.organization.router import router as organization_router
-from app.modules.staff.router import router as staff_router
-from app.modules.patients.api.patient_router import router as patient_router
+from app.modules.identity.router import (
+    router as identity_router,
+)
+from app.modules.identity.authorization_router import (
+    router as authorization_router,
+)
 
-# Future modules
+# ============================================================================
+# Organization
+# ============================================================================
+
+from app.modules.organization.router import (
+    router as organization_router,
+)
+
+# ============================================================================
+# Staff
+# ============================================================================
+
+from app.modules.staff.router import (
+    router as staff_router,
+)
+
+# ============================================================================
+# Patients
+# ============================================================================
+
+from app.modules.patients.api.patient_router import (
+    router as patient_router,
+)
+
+# ============================================================================
+# Future Modules
+# ============================================================================
+
 # from app.modules.appointments.router import router as appointment_router
 # from app.modules.laboratory.router import router as laboratory_router
 # from app.modules.radiology.router import router as radiology_router
@@ -66,9 +98,17 @@ api_router = APIRouter()
 # Registered Modules
 # ============================================================================
 
+# Identity
 api_router.include_router(identity_router)
+api_router.include_router(authorization_router)
+
+# Organization
 api_router.include_router(organization_router)
+
+# Staff
 api_router.include_router(staff_router)
+
+# Patients
 api_router.include_router(patient_router)
 
 # ============================================================================

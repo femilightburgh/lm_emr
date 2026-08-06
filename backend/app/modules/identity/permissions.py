@@ -1,0 +1,69 @@
+"""
+========================================================================
+
+LIGHTBURGH EMR
+
+System Permissions
+
+========================================================================
+
+Purpose
+-------
+
+Defines the canonical permission codes supported by LIGHTBURGH.
+
+Permissions are platform capabilities.
+
+Hospitals assign these permissions to their own custom roles.
+
+Do NOT hard-code role names throughout the application.
+
+========================================================================
+"""
+
+
+class Permissions:
+    """
+    Canonical permission codes.
+
+    Permission naming convention:
+
+        <resource>.<action>
+    """
+
+    # ------------------------------------------------------------------
+    # Patients
+    # ------------------------------------------------------------------
+
+    PATIENT_READ = "patient.read"
+    PATIENT_CREATE = "patient.create"
+    PATIENT_UPDATE = "patient.update"
+    PATIENT_DELETE = "patient.delete"
+
+    # ------------------------------------------------------------------
+    # Staff
+    # ------------------------------------------------------------------
+
+    STAFF_READ = "staff.read"
+    STAFF_CREATE = "staff.create"
+    STAFF_UPDATE = "staff.update"
+    STAFF_DELETE = "staff.delete"
+
+    # ------------------------------------------------------------------
+    # Identity
+    # ------------------------------------------------------------------
+
+    ROLE_READ = "role.read"
+    ROLE_CREATE = "role.create"
+    ROLE_UPDATE = "role.update"
+    ROLE_DELETE = "role.delete"
+
+    PERMISSION_ASSIGN = "permission.assign"
+
+    # ------------------------------------------------------------------
+    # Hospital
+    # ------------------------------------------------------------------
+
+    HOSPITAL_SETTINGS_UPDATE = (
+        "hospital.settings.update"
+    )

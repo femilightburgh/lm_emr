@@ -67,3 +67,24 @@ class ExpiredTokenError(Exception):
 
     def __init__(self):
         super().__init__("Authentication token has expired.")
+
+
+class PermissionDeniedError(Exception):
+    """
+    Raised when a user attempts to perform an action
+    without the required permission or role.
+    """
+
+    def __init__(self):
+        super().__init__(
+            "You do not have permission to perform this action."
+        )
+
+
+class PermissionNotFoundError(IdentityError):
+    """
+    Raised when a permission cannot be found.
+    """
+
+    status_code = 404
+    error_code = "PERMISSION_NOT_FOUND"

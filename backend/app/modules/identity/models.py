@@ -213,6 +213,7 @@ class UserAccount(BaseEntity):
     hospital = relationship(
         "Hospital",
         back_populates="user_accounts",
+        lazy="selectin",
     )
 
     # Collection of role assignments for this user.
@@ -223,11 +224,13 @@ class UserAccount(BaseEntity):
         back_populates="user_account",
         foreign_keys="UserRole.user_account_id",
         cascade="all, delete-orphan",
+        lazy="selectin",
     )
 
     staff_profile: Mapped["Staff | None"] = relationship(
         back_populates="user_account",
         uselist=False,
+        lazy="selectin",
     )
 
 
@@ -239,24 +242,28 @@ class Role(BaseEntity):
     Roles simplify authorization by grouping related permissions
     together.
 
-    Instead of assigning individual permissions directly to users,
-    LIGHTBURGH assigns roles.
+    Rather than assigning permissions directly to users,
+    LIGHTBURGH assigns permissions to roles.
+
+    Hospitals are free to create, modify, rename, or delete
+    roles according to their organizational structure.
 
     Examples
     --------
-    - Doctor
-    - Nurse
-    - Pharmacist
-    - Receptionist
-    - Medical Director
-    - Laboratory Manager
+    - Consultant
+    - Resident
+    - Medical Officer
+    - Senior Nurse
+    - Ward Manager
+    - Clinical Coordinator
 
     Architectural Notes
     -------------------
     Roles belong to individual hospitals (tenants).
 
-    A hospital may create its own custom roles in addition to
-    LIGHTBURGH system roles.
+    LIGHTBURGH provides optional default role templates during
+    hospital onboarding, but authorization is driven entirely by
+    permissions rather than role names.
 
     Permissions are linked through the RolePermission entity
     rather than a direct many-to-many relationship to allow
@@ -270,11 +277,10 @@ class Role(BaseEntity):
     __tablename__ = "roles"
 
     # ------------------------------------------------------------------
-# Database Constraints
-# ------------------------------------------------------------------
-#
-# Prevents duplicate role names within the same hospital.
-#
+    # Database Constraints
+    # ------------------------------------------------------------------
+
+    # Prevent duplicate role names within a hospital.
     __table_args__ = (
         UniqueConstraint(
             "hospital_id",
@@ -297,10 +303,11 @@ class Role(BaseEntity):
 
     # Human-readable role name.
     #
-    # Example:
-    # "Doctor"
-    # "Receptionist"
-    # "Medical Director"
+    # Examples:
+    # - Consultant
+    # - Resident
+    # - Receptionist
+    # - Clinical Coordinator
     name: Mapped[str] = mapped_column(
         String(100),
         nullable=False,
@@ -312,12 +319,12 @@ class Role(BaseEntity):
         nullable=True,
     )
 
-    # Indicates whether this role is provided by the
-    # LIGHTBURGH platform itself.
+    # Indicates whether this role was created automatically by
+    # LIGHTBURGH during hospital provisioning.
     #
-    # System roles should generally not be modified by
-    # hospital administrators.
-    is_system_role: Mapped[bool] = mapped_column(
+    # Template roles serve only as starting templates.
+    # Hospitals remain free to rename, modify or delete them.
+    is_template: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
         nullable=False,
@@ -331,70 +338,65 @@ class Role(BaseEntity):
     hospital = relationship(
         "Hospital",
         back_populates="roles",
+        lazy="selectin",
     )
 
     # Users assigned to this role.
-    #
-    # The relationship returns UserRole entities rather than
-    # UserAccount objects because UserRole represents the
-    # assignment event itself.
     user_roles = relationship(
         "UserRole",
         back_populates="role",
         cascade="all, delete-orphan",
+        lazy="selectin",
     )
 
-    # Collection of permission assignments for this role.
-    # NOTE:
-    # This relationship returns RolePermission entities rather
-    # than Permission entities because the assignment itself
-    # is modeled as a first-class business object.
+    # Permissions assigned to this role.
     role_permissions = relationship(
         "RolePermission",
         back_populates="role",
         cascade="all, delete-orphan",
-        )
+        lazy="selectin",
+    )
 
 
 
 class Permission(BaseEntity):
     """
-    Represents a single system capability within LIGHTBURGH.
+    Represents a platform capability.
 
-    Permissions are the smallest unit of authorization.
+    Permissions define the actions supported by the LIGHTBURGH
+    platform.
 
-    They are assigned to Roles through the RolePermission entity.
-    User accounts inherit permissions through their assigned roles.
+    Unlike roles, permissions are platform-owned and remain
+    consistent across all hospitals.
+
+    Hospitals grant permissions to their own custom roles to
+    implement their preferred authorization model.
 
     Examples
     --------
-    patient.read
-
-    patient.create
-
-    patient.update
-
-    laboratory.verify_result
-
-    theatre.schedule.create
-
-    billing.invoice.approve
+    - patient.read
+    - patient.create
+    - patient.update
+    - laboratory.request
+    - billing.invoice.create
 
     Architectural Notes
     -------------------
-    Permissions are global across the LIGHTBURGH platform.
+    Permission codes are globally unique.
 
-    Hospitals do not authenticate against permissions directly.
+    The module can always be derived from the permission code.
 
-    Instead:
+    Example:
+        patient.read
 
-        User
-            ↓
-        Role
-            ↓
-        Permission
+    Module:
+        patient
 
-    This greatly simplifies authorization management.
+    Action:
+        read
+
+    Permissions are linked to roles through the RolePermission
+    entity to support future auditing and extensibility.
     """
 
     # ------------------------------------------------------------------
@@ -404,52 +406,53 @@ class Permission(BaseEntity):
     __tablename__ = "permissions"
 
     # ------------------------------------------------------------------
+    # Database Constraints
+    # ------------------------------------------------------------------
+
+    __table_args__ = (
+        UniqueConstraint(
+            "code",
+            name="uq_permission_code",
+        ),
+    )
+
+    # ------------------------------------------------------------------
     # Columns
     # ------------------------------------------------------------------
 
-    # Machine-readable permission code.
+    # Globally unique permission code.
     #
     # Examples:
-    #
     # patient.read
-    # patient.update
-    # laboratory.verify
+    # laboratory.request
+    # billing.invoice.create
     code: Mapped[str] = mapped_column(
         String(150),
         nullable=False,
-        unique=True,
         index=True,
     )
 
     # Human-readable permission name.
+    #
+    # Example:
+    # Read Patients
     name: Mapped[str] = mapped_column(
         String(150),
         nullable=False,
     )
 
-    # Optional explanation of the permission.
+    # Optional description explaining the permission.
     description: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
     )
 
-    # Functional module that owns this permission.
-    #
-    # Examples:
-    # Identity
-    # Patients
-    # Laboratory
-    # Billing
-    module: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False,
-    )
-
     # Indicates whether this permission is provided by
     # the LIGHTBURGH platform.
     #
-    # System permissions cannot normally be deleted.
-    is_system_permission: Mapped[bool] = mapped_column(
+    # Future marketplace plugins may introduce additional
+    # permissions that are not part of the core platform.
+    is_platform_permission: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
         nullable=False,
@@ -459,11 +462,15 @@ class Permission(BaseEntity):
     # Relationships
     # ------------------------------------------------------------------
 
-    # Role assignments that include this permission.
+    # Roles granted this permission.
+    #
+    # The assignment itself is represented by the
+    # RolePermission entity.
     role_permissions = relationship(
         "RolePermission",
         back_populates="permission",
         cascade="all, delete-orphan",
+        lazy="selectin",
     )
     
 
@@ -568,6 +575,7 @@ class UserRole(BaseEntity):
     role = relationship(
         "Role",
         back_populates="user_roles",
+        lazy="selectin",
     )
 
     # Administrator who granted the role.
@@ -579,26 +587,22 @@ class UserRole(BaseEntity):
 
 class RolePermission(BaseEntity):
     """
-    Represents the assignment of a Permission to a Role.
+    Associates a role with a platform permission.
 
-    Rather than using a simple many-to-many table,
-    LIGHTBURGH models this relationship as an explicit
-    entity.
+    This entity represents a permission assignment rather than
+    using a direct many-to-many relationship.
 
-    This provides flexibility for future enhancements such as:
-
-    - Permission auditing
-    - Approval workflows
-    - Expiring permissions
-    - Delegated administration
+    Modeling the assignment explicitly allows LIGHTBURGH to
+    support future auditing, approval workflows, metadata,
+    and effective-dating without redesigning the database.
 
     Architectural Notes
     -------------------
-    A Role may contain many permissions.
+    A role may have many permissions.
 
-    A Permission may belong to many roles.
+    A permission may belong to many roles.
 
-    This entity represents the assignment itself.
+    Each (role, permission) pair may exist only once.
     """
 
     # ------------------------------------------------------------------
@@ -631,7 +635,7 @@ class RolePermission(BaseEntity):
         index=True,
     )
 
-    # Permission assigned to the role.
+    # Platform permission assigned to the role.
     permission_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("permissions.id", ondelete="CASCADE"),
@@ -643,14 +647,17 @@ class RolePermission(BaseEntity):
     # Relationships
     # ------------------------------------------------------------------
 
-    # Role that owns this permission assignment.
+    # Role receiving the permission.
     role = relationship(
         "Role",
         back_populates="role_permissions",
+        lazy="selectin",
     )
 
-    # Permission included in the role.
+    # Permission granted to the role.
     permission = relationship(
         "Permission",
         back_populates="role_permissions",
+        lazy="selectin",
     )
+    
