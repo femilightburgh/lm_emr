@@ -1,38 +1,47 @@
-# 🏥 LIGHTBURGH EMR
+# 🏥 LIGHTBURGH MEDICALS EMR
 
-An enterprise-grade Electronic Medical Record (EMR) system built with FastAPI, PostgreSQL, and modern software engineering principles.
+> An enterprise-grade Electronic Medical Record (EMR) platform designed for modern healthcare institutions.
 
-## Vision
+LIGHTBURGH MEDICALS EMR is a modular, scalable, and secure healthcare information system built using modern software engineering principles. It is designed to support hospitals, specialist clinics, diagnostic centers, and healthcare networks with reliable clinical and administrative workflows.
 
-LIGHTBURGH EMR aims to provide a scalable, secure, and modular healthcare information system suitable for hospitals, clinics, specialist centers, and healthcare networks.
-
-The project is being designed with enterprise architecture in mind, emphasizing maintainability, extensibility, security, and high performance.
+The project emphasizes clean architecture, maintainability, extensibility, and long-term scalability.
 
 ---
 
-## Current Status
+# Project Status
 
-🚧 Active Development
+🚧 **Active Development**
 
-Current milestone:
+Current Version: **Pre-Alpha**
 
-- ✅ Project bootstrap
-- ✅ PostgreSQL integration
+Completed Modules:
+
+- ✅ Project Bootstrap
+- ✅ PostgreSQL Configuration
 - ✅ SQLAlchemy ORM
-- ✅ Alembic database migrations
-- ✅ Hospital module
-- ✅ Staff module
-- 🚧 Patient module (in progress)
+- ✅ Alembic Database Migrations
+- ✅ Hospital Module
+- ✅ Staff Module
+
+Current Development:
+
+- 🚧 Patient Module
 
 ---
 
-## Planned Features
+# Vision
 
-### Core EMR
+To build one of Africa's leading enterprise healthcare information systems that simplifies clinical workflows, improves patient care, and enables hospitals to operate efficiently using modern digital technologies.
 
-- Patient Registration
+---
+
+# Core Features
+
+## Clinical
+
 - Electronic Medical Records
-- Outpatient Clinic
+- Patient Registration
+- Outpatient Management
 - Inpatient Management
 - Emergency Department
 - Theatre Management
@@ -40,41 +49,29 @@ Current milestone:
 - Pharmacy
 - Laboratory
 - Radiology
-- Billing
-- Appointment Scheduling
+- Clinical Documentation
 
-### Administration
+## Administration
 
 - Hospital Management
 - Staff Management
-- Departments
-- User Authentication
+- Department Management
+- Authentication
 - Role-Based Access Control (RBAC)
 - Audit Logs
 
-### Clinical
+## Reporting
 
-- Diagnoses (ICD-10)
-- Procedures
-- Prescriptions
-- Allergies
-- Clinical Notes
-- Vital Signs
-- Medical History
-- Referrals
-
-### Reporting
-
-- Operational Dashboards
 - Clinical Reports
+- Operational Reports
 - Financial Reports
 - Public Health Reporting
 
 ---
 
-## Technology Stack
+# Technology Stack
 
-### Backend
+## Backend
 
 - Python
 - FastAPI
@@ -82,11 +79,11 @@ Current milestone:
 - Alembic
 - PostgreSQL
 
-### Frontend
+## Frontend
 
-- React (planned)
+- React (Planned)
 
-### Infrastructure
+## Infrastructure
 
 - Docker
 - Git
@@ -94,38 +91,16 @@ Current milestone:
 
 ---
 
-## Project Structure
-
-```
-lm_emr/
-
-├── backend/
-│   ├── app/
-│   ├── alembic/
-│   ├── scripts/
-│   └── requirements.txt
-│
-├── frontend/
-│
-├── docs/
-│
-└── README.md
-```
-
----
-
-## Architecture
-
-The project follows a layered architecture.
+# Project Architecture
 
 ```
 HTTP Request
       │
       ▼
-Router
+FastAPI Router
       │
       ▼
-Dependencies
+Dependency Injection
       │
       ▼
 Service Layer
@@ -140,57 +115,102 @@ SQLAlchemy ORM
 PostgreSQL
 ```
 
-This separation improves maintainability, testing, and scalability.
+The project follows a layered architecture to improve maintainability, testability, and scalability.
 
 ---
 
-## Design Principles
+# Engineering Principles
 
 - Clean Architecture
-- Domain-Driven Design (DDD)
 - SOLID Principles
 - Repository Pattern
 - Dependency Injection
 - Modular Design
+- Domain-Driven Design (DDD)
 - Enterprise Security
+- RESTful API Design
 
 ---
 
-## Roadmap
+# Roadmap
 
-### Phase 1
-- Hospital Module
-- Staff Module
-- Patient Module
+## Phase 1 — Foundation
 
-### Phase 2
+- Hospital
+- Staff
+- Patient
 - Authentication
-- Role-Based Access Control (RBAC)
-- Appointments
-- Clinical Encounters
+- RBAC
 
-### Phase 3
+## Phase 2 — Clinical
+
+- Appointments
+- Encounters
+- Diagnoses
+- Procedures
+- Vital Signs
+- Clinical Notes
+
+## Phase 3 — Hospital Operations
+
 - Laboratory
 - Radiology
 - Pharmacy
-- Billing
-
-### Phase 4
-- Inventory
 - Theatre
+- Admissions
+
+## Phase 4 — Enterprise
+
+- Billing
+- Inventory
 - Reporting
 - Analytics
+- Telemedicine
 
 ---
 
-## Author
+# Repository Structure
 
-**Oluwafemi Farinloye**
+```
+lm_emr/
+
+├── backend/
+├── frontend/
+├── docs/
+├── README.md
+└── .gitignore
+```
 
 ---
 
-## License
+# Documentation
 
-This project is currently under development.
+Additional documentation can be found in the `docs/` directory.
 
-License will be added before public release.
+- Product Vision
+- Architecture
+- Database Design
+- API Guide
+- Roadmap
+- Contributing Guide
+
+---
+
+# 👨‍💻 Project Leadership
+
+## Founder & Lead Software Engineer
+
+**Dr. Oluwafemi Farinloye**
+
+LIGHTBURGH MEDICALS EMR is an independent software engineering initiative focused on building enterprise-grade healthcare information systems for hospitals, clinics, and healthcare networks.
+
+GitHub:
+https://github.com/femilightburgh
+
+---
+
+# License
+
+This project is currently under active development.
+
+A suitable open-source or commercial license will be selected before the first public release.
