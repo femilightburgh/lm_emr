@@ -1,7 +1,31 @@
-from datetime import date
+"""
+==============================================================================
+LIGHTBURGH EMR
 
-from sqlalchemy import Date, Enum, String
-from sqlalchemy.orm import Mapped, mapped_column
+Patient Model
+
+==============================================================================
+
+Represents a patient receiving care within a hospital.
+
+Patients are tenant-owned entities. Every patient belongs to exactly one
+hospital and may have multiple Episodes of Care throughout their lifetime.
+
+Responsibilities
+----------------
+• Store patient demographic information.
+• Support patient identification.
+• Own the patient's healthcare journey.
+
+==============================================================================
+"""
+
+from datetime import date
+from typing import TYPE_CHECKING
+from uuid import UUID
+
+from sqlalchemy import Date, Enum, ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_entity import BaseEntity
 from app.modules.patients.enums import (
@@ -11,24 +35,42 @@ from app.modules.patients.enums import (
     Relationship,
     Sex,
 )
+from app.modules.episode.models import Episode
+
+if TYPE_CHECKING:
+    from app.modules.organization.models import Hospital
 
 
 class Patient(BaseEntity):
+    """
+    Represents a patient receiving healthcare services.
+    """
+
     __tablename__ = "patients"
 
-    # ==========================
+    # ------------------------------------------------------------------
+    # Ownership
+    # ------------------------------------------------------------------
+
+    hospital_id: Mapped[UUID] = mapped_column(
+        ForeignKey("hospitals.id"),
+        nullable=False,
+        index=True,
+    )
+
+    # ------------------------------------------------------------------
     # Hospital Information
-    # ==========================
+    # ------------------------------------------------------------------
 
     hospital_number: Mapped[str] = mapped_column(
         String(20),
-        unique=True,
         nullable=False,
+        unique=True,
     )
 
-    # ==========================
+    # ------------------------------------------------------------------
     # Personal Information
-    # ==========================
+    # ------------------------------------------------------------------
 
     first_name: Mapped[str] = mapped_column(
         String(100),
@@ -55,9 +97,9 @@ class Patient(BaseEntity):
         nullable=False,
     )
 
-    # ==========================
+    # ------------------------------------------------------------------
     # Contact Information
-    # ==========================
+    # ------------------------------------------------------------------
 
     phone_number: Mapped[str | None] = mapped_column(
         String(20),
@@ -66,8 +108,8 @@ class Patient(BaseEntity):
 
     email: Mapped[str | None] = mapped_column(
         String(255),
-        unique=True,
         nullable=True,
+        unique=True,
     )
 
     address: Mapped[str | None] = mapped_column(
@@ -75,9 +117,9 @@ class Patient(BaseEntity):
         nullable=True,
     )
 
-    # ==========================
+    # ------------------------------------------------------------------
     # Demographics
-    # ==========================
+    # ------------------------------------------------------------------
 
     occupation: Mapped[str | None] = mapped_column(
         String(150),
@@ -104,9 +146,9 @@ class Patient(BaseEntity):
         nullable=True,
     )
 
-    # ==========================
+    # ------------------------------------------------------------------
     # Next of Kin
-    # ==========================
+    # ------------------------------------------------------------------
 
     next_of_kin_name: Mapped[str | None] = mapped_column(
         String(200),
@@ -126,4 +168,17 @@ class Patient(BaseEntity):
     next_of_kin_address: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
+    )
+
+    # ------------------------------------------------------------------
+    # Relationships
+    # ------------------------------------------------------------------
+
+    hospital: Mapped["Hospital"] = relationship(
+        back_populates="patients",
+    )
+
+    episodes: Mapped[list["Episode"]] = relationship(
+        back_populates="patient",
+        cascade="all, delete-orphan",
     )

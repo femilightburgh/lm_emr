@@ -1,29 +1,21 @@
 """
-========================================================================
-
+==============================================================================
 LIGHTBURGH EMR
 
 Patient API Router
 
-========================================================================
+==============================================================================
 
 Purpose
 -------
 
 Defines the HTTP endpoints for patient management.
 
-Responsibilities
-----------------
+Business logic belongs in PatientService.
 
-• Register new patients
-• Retrieve a patient by ID
-• List all patients
-• Update patient information
+HTTP concerns belong here.
 
-The router is responsible only for HTTP request/response handling.
-Business logic is delegated to the PatientService.
-
-========================================================================
+==============================================================================
 """
 
 from uuid import UUID
@@ -31,16 +23,23 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
+from app.core.context import (
+    RequestContext,
+    get_request_context,
+)
 from app.db.session import get_db
-from app.modules.patients.repositories.patient_repository import PatientRepository
+from app.modules.patients.repositories.patient_repository import (
+    PatientRepository,
+)
 from app.modules.patients.schemas.patient_schema import (
     CreatePatientRequest,
     PatientListResponse,
     PatientResponse,
     UpdatePatientRequest,
 )
-from app.modules.patients.services.patient_service import PatientService
-
+from app.modules.patients.services.patient_service import (
+    PatientService,
+)
 
 router = APIRouter(
     prefix="/patients",
@@ -48,24 +47,27 @@ router = APIRouter(
 )
 
 
-# ----------------------------------------------------------------------
+# ------------------------------------------------------------------
 # Dependency Injection
-# ----------------------------------------------------------------------
+# ------------------------------------------------------------------
 
 def get_patient_service(
     db: Session = Depends(get_db),
 ) -> PatientService:
     """
-    Create a PatientService instance with its required dependencies.
+    Build a PatientService.
     """
 
     repository = PatientRepository(db)
-    return PatientService(repository)
+
+    return PatientService(
+        repository=repository,
+    )
 
 
-# ----------------------------------------------------------------------
+# ------------------------------------------------------------------
 # Create Patient
-# ----------------------------------------------------------------------
+# ------------------------------------------------------------------
 
 @router.post(
     "",
@@ -75,45 +77,56 @@ def get_patient_service(
 )
 async def create_patient(
     request: CreatePatientRequest,
-    service: PatientService = Depends(get_patient_service),
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: PatientService = Depends(
+        get_patient_service,
+    ),
 ):
     """
-    Register a new patient.
+    Register a new Patient.
     """
 
-    return service.create_patient(request)
+    return service.create_patient(
+        context=context,
+        request=request,
+    )
 
 
-# ----------------------------------------------------------------------
+# ------------------------------------------------------------------
 # List Patients
-# ----------------------------------------------------------------------
+# ------------------------------------------------------------------
 
 @router.get(
     "",
     response_model=PatientListResponse,
-    summary="List or search patients",
+    summary="List patients",
 )
 async def list_patients(
     hospital_number: str | None = Query(
         default=None,
-        description="Search by hospital number",
     ),
     name: str | None = Query(
         default=None,
-        description="Search by patient's first name, last name, or full name",
     ),
-    service: PatientService = Depends(get_patient_service),
+    service: PatientService = Depends(
+        get_patient_service,
+    ),
 ):
     """
-    Retrieve all patients or search by hospital number or name.
+    List or search Patients.
     """
 
     if hospital_number or name:
+
         patients = service.search_patients(
             hospital_number=hospital_number,
             name=name,
         )
+
     else:
+
         patients = service.list_patients()
 
     return PatientListResponse(
@@ -122,42 +135,48 @@ async def list_patients(
     )
 
 
-# ----------------------------------------------------------------------
+# ------------------------------------------------------------------
 # Get Patient
-# ----------------------------------------------------------------------
+# ------------------------------------------------------------------
 
 @router.get(
     "/{patient_id}",
     response_model=PatientResponse,
-    summary="Get patient by ID",
+    summary="Retrieve a Patient",
 )
 async def get_patient(
     patient_id: UUID,
-    service: PatientService = Depends(get_patient_service),
+    service: PatientService = Depends(
+        get_patient_service,
+    ),
 ):
     """
-    Retrieve a patient by their unique identifier.
+    Retrieve a Patient.
     """
 
-    return service.get_patient(patient_id)
+    return service.get_patient(
+        patient_id,
+    )
 
 
-# ----------------------------------------------------------------------
+# ------------------------------------------------------------------
 # Update Patient
-# ----------------------------------------------------------------------
+# ------------------------------------------------------------------
 
 @router.patch(
     "/{patient_id}",
     response_model=PatientResponse,
-    summary="Update patient",
+    summary="Update Patient",
 )
 async def update_patient(
     patient_id: UUID,
     request: UpdatePatientRequest,
-    service: PatientService = Depends(get_patient_service),
+    service: PatientService = Depends(
+        get_patient_service,
+    ),
 ):
     """
-    Update an existing patient's information.
+    Update an existing Patient.
     """
 
     return service.update_patient(

@@ -8,20 +8,22 @@ Organization Models
 
 This module contains ORM models representing healthcare organizations.
 
-The Hospital model is the root entity for LIGHTBURGH's multi-tenant
+The Hospital model is the root aggregate of LIGHTBURGH's multi-tenant
 architecture.
 
-Every business entity—including staff, patients, appointments,
-laboratory results, pharmacy orders, and billing records—belongs
-to exactly one hospital.
+Every business entity—including patients, staff, user accounts, Episodes of
+Care, Clinical Events, laboratory requests, radiology studies, pharmacy
+dispensing, billing records and future modules—belongs to exactly one
+hospital.
 
 Responsibilities
 ----------------
 • Store hospital profile information.
 • Support multi-tenancy.
-• Own user accounts.
+• Own patient records.
 • Own staff members.
-• Own roles and permissions.
+• Own user accounts.
+• Own roles.
 
 ==============================================================================
 """
@@ -36,9 +38,11 @@ from app.modules.organization.enums import (
     HospitalOwnership,
     HospitalType,
 )
+from app.modules.episode.models import Episode
 
 if TYPE_CHECKING:
     from app.modules.identity.models import Role, UserAccount
+    from app.modules.patients.models import Patient
     from app.modules.staff.models import Staff
 
 
@@ -46,8 +50,9 @@ class Hospital(BaseEntity):
     """
     Represents a healthcare organization.
 
-    Every clinical and administrative record belongs to exactly
-    one hospital, making this the root aggregate for multi-tenancy.
+    Every clinical and administrative record belongs to exactly one
+    hospital, making Hospital the root aggregate for LIGHTBURGH's
+    multi-tenant architecture.
     """
 
     __tablename__ = "hospitals"
@@ -152,6 +157,16 @@ class Hospital(BaseEntity):
     # Relationships
     # ------------------------------------------------------------------
 
+    patients: Mapped[list["Patient"]] = relationship(
+        back_populates="hospital",
+        cascade="all, delete-orphan",
+    )
+
+    staff_members: Mapped[list["Staff"]] = relationship(
+        back_populates="hospital",
+        cascade="all, delete-orphan",
+    )
+
     user_accounts: Mapped[list["UserAccount"]] = relationship(
         back_populates="hospital",
         cascade="all, delete-orphan",
@@ -162,7 +177,7 @@ class Hospital(BaseEntity):
         cascade="all, delete-orphan",
     )
 
-    staff_members: Mapped[list["Staff"]] = relationship(
+    episodes: Mapped[list["Episode"]] = relationship(
         back_populates="hospital",
         cascade="all, delete-orphan",
     )
