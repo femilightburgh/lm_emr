@@ -65,18 +65,26 @@ class EpisodeRepository:
         episode_id: UUID,
     ) -> Episode | None:
         """
-        Retrieve an Episode by its identifier within a Hospital.
+        Retrieve an Episode by its primary key.
+
+        The primary key lookup is performed using SQLAlchemy's
+        Session.get() identity lookup. The returned Episode is then
+        verified against the authenticated Hospital to preserve
+        tenant isolation.
         """
 
-        statement = (
-            select(Episode)
-            .where(
-                Episode.id == episode_id,
-                Episode.hospital_id == hospital_id,
-            )
+        episode = self.db.get(
+            Episode,
+            episode_id,
         )
 
-        return self.db.scalar(statement)
+        if episode is None:
+            return None
+
+        if episode.hospital_id != hospital_id:
+            return None
+
+        return episode
 
     # ------------------------------------------------------------------
     # Episode Number

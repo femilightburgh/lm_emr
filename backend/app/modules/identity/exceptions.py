@@ -69,11 +69,14 @@ class ExpiredTokenError(Exception):
         super().__init__("Authentication token has expired.")
 
 
-class PermissionDeniedError(Exception):
+class PermissionDeniedError(IdentityError):
     """
     Raised when a user attempts to perform an action
     without the required permission or role.
     """
+
+    status_code = 403
+    error_code = "PERMISSION_DENIED"
 
     def __init__(self):
         super().__init__(

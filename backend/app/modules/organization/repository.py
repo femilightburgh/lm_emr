@@ -1,22 +1,21 @@
 """
-==============================================================================
 LIGHTBURGH EMR
 
 Organization Repository
 
-==============================================================================
+===============================================================================
 
 Repository layer for Organization module.
 
 Responsibilities
-----------------
+
 • Retrieve hospitals
 • Persist hospitals
 • Manage database transactions
 
 Business rules belong in the service layer.
 
-==============================================================================
+===============================================================================
 """
 
 from uuid import UUID
@@ -126,7 +125,7 @@ class HospitalRepository:
 
     def rollback(self) -> None:
         """
-       Roll back the current transaction.
+        Roll back the current transaction.
         """
 
         self.db.rollback()

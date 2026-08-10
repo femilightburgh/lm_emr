@@ -51,6 +51,13 @@ from app.modules.episode.services.episode_service import (
 from app.modules.patients.repositories.patient_repository import (
     PatientRepository,
 )
+from app.modules.episode.exceptions import (
+    EpisodeAlreadyCancelledError,
+    EpisodeAlreadyClosedError,
+    EpisodeAlreadyExistsError,
+    EpisodeNotFoundError,
+    PatientNotFoundError,
+)
 
 router = APIRouter(
     prefix="/episodes",
@@ -175,6 +182,133 @@ def get_episode(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Episode not found.",
+        ) from exc
+
+
+# ============================================================================
+# Close Episode
+# ============================================================================
+
+
+@router.post(
+    "/{episode_id}/close",
+    response_model=EpisodeResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Close an Episode of Care",
+)
+def close_episode(
+    episode_id: UUID,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: EpisodeService = Depends(
+        get_episode_service,
+    ),
+):
+    """
+    Close an open Episode of Care.
+
+    The Episode must belong to the authenticated Hospital
+    and must currently have an OPEN status.
+
+    Once closed, the Episode receives a closed_at timestamp
+    and cannot be closed again.
+    """
+
+    try:
+
+        episode = service.close_episode(
+            context=context,
+            episode_id=episode_id,
+        )
+
+        return EpisodeResponse.model_validate(
+            episode,
+        )
+
+    except EpisodeNotFoundError as exc:
+
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Episode not found.",
+        ) from exc
+
+    except EpisodeAlreadyClosedError as exc:
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Episode is already closed.",
+        ) from exc
+
+    except EpisodeAlreadyCancelledError as exc:
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cancelled episodes cannot be closed.",
+        ) from exc
+
+
+# ============================================================================
+# Cancel Episode
+# ============================================================================
+
+
+@router.post(
+    "/{episode_id}/cancel",
+    response_model=EpisodeResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Cancel an Episode of Care",
+)
+def cancel_episode(
+    episode_id: UUID,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: EpisodeService = Depends(
+        get_episode_service,
+    ),
+):
+    """
+    Cancel an open Episode of Care.
+
+    The Episode must belong to the authenticated Hospital
+    and must currently have an OPEN status.
+
+    Once cancelled, the Episode receives a CANCELLED status.
+    The closed_at timestamp remains unset because cancellation
+    is distinct from completing the Episode.
+    """
+
+    try:
+
+        episode = service.cancel_episode(
+            context=context,
+            episode_id=episode_id,
+        )
+
+        return EpisodeResponse.model_validate(
+            episode,
+        )
+
+    except EpisodeNotFoundError as exc:
+
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Episode not found.",
+        ) from exc
+
+    except EpisodeAlreadyClosedError as exc:
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Closed episodes cannot be cancelled.",
+        ) from exc
+
+    except EpisodeAlreadyCancelledError as exc:
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Episode is already cancelled.",
         ) from exc
 
 

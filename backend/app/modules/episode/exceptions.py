@@ -38,3 +38,14 @@ class PatientNotFoundError(EpisodeError):
     """
     Raised when the specified Patient does not exist.
     """
+
+class EpisodeAlreadyClosedError(EpisodeError):
+    """
+    Raised when an already closed Episode is modified.
+    """
+
+
+class EpisodeAlreadyCancelledError(EpisodeError):
+    """
+    Raised when an already cancelled Episode is modified.
+    """
