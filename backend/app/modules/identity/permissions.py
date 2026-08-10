@@ -50,6 +50,15 @@ class Permissions:
     STAFF_DELETE = "staff.delete"
 
     # ------------------------------------------------------------------
+    # Departments
+    # ------------------------------------------------------------------
+
+    DEPARTMENT_READ = "department.read"
+    DEPARTMENT_CREATE = "department.create"
+    DEPARTMENT_UPDATE = "department.update"
+    DEPARTMENT_DELETE = "department.delete"
+
+    # ------------------------------------------------------------------
     # Identity
     # ------------------------------------------------------------------
 

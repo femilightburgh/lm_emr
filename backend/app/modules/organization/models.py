@@ -30,11 +30,13 @@ Responsibilities
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum, String
+from sqlalchemy import Enum, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_entity import BaseEntity
 from app.modules.organization.enums import (
+    DepartmentCategory,
+    DepartmentStatus,
     HospitalOwnership,
     HospitalType,
 )
@@ -180,4 +182,79 @@ class Hospital(BaseEntity):
     episodes: Mapped[list["Episode"]] = relationship(
         back_populates="hospital",
         cascade="all, delete-orphan",
+    )
+
+    departments: Mapped[list["Department"]] = relationship(
+        back_populates="hospital",
+        cascade="all, delete-orphan",
+    )
+
+
+class Department(BaseEntity):
+    """
+    Represents an organizational department within a hospital.
+
+    Departments belong to exactly one hospital. They are retained
+    historically even when no longer operational, so historical
+    staff
+    assignments can continue to reference them.
+    """
+
+    __tablename__ = "departments"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "hospital_id",
+            "code",
+            name="uq_department_hospital_code",
+        ),
+    )
+
+    # ------------------------------------------------------------------
+    # Ownership
+    # ------------------------------------------------------------------
+
+    hospital_id: Mapped[str] = mapped_column(
+        ForeignKey("hospitals.id"),
+        nullable=False,
+        index=True,
+    )
+
+    # ------------------------------------------------------------------
+    # Identity
+    # ------------------------------------------------------------------
+
+    name: Mapped[str] = mapped_column(
+        String(200),
+        nullable=False,
+    )
+
+    code: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+    )
+
+    category: Mapped[DepartmentCategory] = mapped_column(
+        Enum(
+            DepartmentCategory,
+            name="department_category_enum",
+        ),
+        nullable=False,
+    )
+
+    status: Mapped[DepartmentStatus] = mapped_column(
+        Enum(
+            DepartmentStatus,
+            name="department_status_enum",
+        ),
+        nullable=False,
+        default=DepartmentStatus.ACTIVE,
+    )
+
+    # ------------------------------------------------------------------
+    # Relationships
+    # ------------------------------------------------------------------
+
+    hospital: Mapped["Hospital"] = relationship(
+        back_populates="departments",
     )

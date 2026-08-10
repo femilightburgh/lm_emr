@@ -42,25 +42,17 @@ class StaffRepository:
         """
         self.session = session
 
-    def create(self, staff: Staff) -> Staff:
+    def create(
+        self,
+        staff: Staff,
+    ) -> Staff:
         """
-        Persist a new staff member.
+        Add a new Staff entity to the current transaction.
 
-        Parameters
-        ----------
-        staff:
-            The Staff entity to persist.
-
-        Returns
-        -------
-        Staff
-            The persisted Staff entity with generated fields populated.
+        The caller is responsible for committing the transaction.
         """
 
         self.session.add(staff)
-        self.session.commit()
-        self.session.refresh(staff)
-
         return staff
 
     def get_by_id(
@@ -151,3 +143,26 @@ class StaffRepository:
         except Exception:
             self.session.rollback()
             raise
+
+
+    def commit(self) -> None:
+        """
+        Commit the current database transaction.
+        """
+
+        self.session.commit()
+
+
+    def refresh(self, staff: Staff) -> Staff:
+        """
+        Refresh a Staff entity from the database.
+        """
+
+        self.session.refresh(staff)
+        return staff
+
+    def flush(self) -> None:
+        """
+        Flush pending changes without committing the transaction.
+        """
+        self.session.flush()

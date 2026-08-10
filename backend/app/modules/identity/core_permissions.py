@@ -84,6 +84,34 @@ PERMISSIONS: list[PermissionDefinition] = [
     ),
 
     # ==============================================================
+    # Departments
+    # ==============================================================
+
+    PermissionDefinition(
+        code=Permissions.DEPARTMENT_READ,
+        name="Read Departments",
+        description="Allows viewing hospital departments.",
+    ),
+
+    PermissionDefinition(
+        code=Permissions.DEPARTMENT_CREATE,
+        name="Create Departments",
+        description="Allows creating hospital departments.",
+    ),
+
+    PermissionDefinition(
+        code=Permissions.DEPARTMENT_UPDATE,
+        name="Update Departments",
+        description="Allows modifying hospital departments.",
+    ),
+
+    PermissionDefinition(
+        code=Permissions.DEPARTMENT_DELETE,
+        name="Delete Departments",
+        description="Allows deleting hospital departments.",
+    ),
+
+    # ==============================================================
     # Identity
     # ==============================================================
 

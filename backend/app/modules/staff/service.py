@@ -52,13 +52,21 @@ from app.modules.staff.exceptions import (
     DuplicateStaffNumberError,
     HospitalNotFoundError,
     InvalidEmploymentDateError,
+    NoCurrentEmploymentError,
     StaffNotFoundError,
 )
-from app.modules.staff.models import Staff
 from app.modules.staff.repository import StaffRepository
 from app.modules.staff.schemas import (
     StaffCreate,
+    StaffEmploymentClose,
     StaffUpdate,
+)
+from app.modules.staff.employment_repository import (
+    StaffEmploymentRepository,
+)
+from app.modules.staff.models import (
+    Staff,
+    StaffEmployment,
 )
 
 
@@ -71,9 +79,11 @@ class StaffService:
         self,
         repository: StaffRepository,
         hospital_repository: HospitalRepository,
+        employment_repository: StaffEmploymentRepository,
     ) -> None:
         self.repository = repository
         self.hospital_repository = hospital_repository
+        self.employment_repository = employment_repository
 
     # ======================================================================
     # Public API
@@ -81,19 +91,45 @@ class StaffService:
 
     def create_staff(self, data: StaffCreate) -> Staff:
         """
-        Register a new staff member.
+        Register a new staff member and create their initial
+        employment period.
+
+        Staff identity and employment history are persisted
+        within the same database transaction.
         """
 
         self._validate_hospital(data.hospital_id)
+
         self._validate_staff_number(
             hospital_id=data.hospital_id,
             staff_number=data.staff_number,
         )
+
         self._validate_dates(data)
 
         staff = self._build_staff(data)
 
-        return self.repository.create(staff)
+        self.repository.create(staff)
+
+        # Flush so the Staff UUID is available before creating
+        # the related employment record.
+        self.repository.flush()
+
+        employment = StaffEmployment(
+            staff_id=staff.id,
+            profession=data.profession,
+            employment_status=data.employment_status,
+            employment_type=data.employment_type,
+            date_employed=data.date_employed,
+            date_left=data.date_left,
+        )
+
+        self.employment_repository.create(employment)
+
+        self.repository.commit()
+        self.repository.refresh(staff)
+
+        return staff
 
     def get_staff(self, staff_id: UUID) -> Staff:
         """
@@ -108,6 +144,72 @@ class StaffService:
             )
 
         return staff
+
+    def list_employment_history(
+        self,
+        staff_id: UUID,
+    ) -> list[StaffEmployment]:
+        """
+        Retrieve the complete employment history for a staff member.
+
+        Results are ordered from most recent employment period
+        to oldest.
+        """
+
+        # Ensure the staff member exists first.
+        self.get_staff(staff_id)
+
+        return self.employment_repository.list_by_staff(
+            staff_id,
+        )
+
+    def get_current_employment(
+        self,
+        staff_id: UUID,
+    ) -> StaffEmployment | None:
+        """
+        Retrieve the current employment record for a staff member.
+        """
+
+        self.get_staff(staff_id)
+
+        return self.employment_repository.get_current(
+            staff_id,
+        )
+
+    def close_current_employment(
+        self,
+        staff_id: UUID,
+        data: StaffEmploymentClose,
+    ) -> StaffEmployment:
+        """
+        Close the current employment period for a staff member.
+        """
+
+        staff = self.get_staff(staff_id)
+
+        employment = self.employment_repository.get_current(
+            staff_id,
+        )
+
+        if employment is None:
+            raise NoCurrentEmploymentError(
+                f"Staff '{staff_id}' has no current employment."
+            )
+
+        if data.date_left < employment.date_employed:
+            raise InvalidEmploymentDateError(
+                "Date left cannot be before employment date."
+            )
+
+        employment.date_left = data.date_left
+        employment.employment_status = data.employment_status
+
+        self.employment_repository.save(employment)
+        self.repository.commit()
+        self.repository.refresh(staff)
+
+        return employment
 
     def list_staff(
         self,
@@ -153,7 +255,7 @@ class StaffService:
         Ensure the hospital exists.
         """
 
-        hospital = self.hospital_repository.get_by_id(
+        hospital = self.hospital_repository.get_hospital_by_id(
             hospital_id
         )
 

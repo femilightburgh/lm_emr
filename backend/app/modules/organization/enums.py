@@ -129,3 +129,19 @@ class TheatreType(str, Enum):
     LABOUR = "Labour Ward Theatre"
     CARDIAC = "Cardiac"
     ORTHOPAEDIC = "Orthopaedic"
+
+
+# ----------------------------------------------------------------------
+# Department Status
+# ----------------------------------------------------------------------
+
+class DepartmentStatus(str, Enum):
+    """
+    Lifecycle status of a hospital department.
+
+    Inactive departments remain in the database so that historical
+    records and department assignments remain intact.
+    """
+
+    ACTIVE = "Active"
+    INACTIVE = "Inactive"

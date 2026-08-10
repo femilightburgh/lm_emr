@@ -176,3 +176,89 @@ class Staff(BaseEntity):
     user_account: Mapped["UserAccount | None"] = relationship(
         back_populates="staff_profile",
     )
+
+    employments: Mapped[list["StaffEmployment"]] = relationship(
+        back_populates="staff",
+    )
+
+
+
+
+
+class StaffEmployment(BaseEntity):
+    """
+    Represents one employment period for a staff member.
+
+    A staff member may have multiple employment periods with the
+    hospital over their lifetime. Employment periods are retained
+    historically and are never treated as disposable records.
+
+    Examples
+    --------
+    A staff member may:
+
+    - begin employment in 2026,
+    - leave in 2030,
+    - return in 2034.
+
+    These are represented as two separate StaffEmployment records
+    belonging to the same Staff record.
+    """
+
+    __tablename__ = "staff_employments"
+
+    # ------------------------------------------------------------------
+    # Relationships
+    # ------------------------------------------------------------------
+
+    staff_id: Mapped[str] = mapped_column(
+        ForeignKey("staff.id"),
+        nullable=False,
+        index=True,
+    )
+
+    # ------------------------------------------------------------------
+    # Employment
+    # ------------------------------------------------------------------
+
+    profession: Mapped[Profession] = mapped_column(
+        Enum(
+            Profession,
+            name="staff_employment_profession_enum",
+        ),
+        nullable=False,
+    )
+
+    employment_status: Mapped[EmploymentStatus] = mapped_column(
+        Enum(
+            EmploymentStatus,
+            name="staff_employment_status_enum",
+        ),
+        nullable=False,
+        default=EmploymentStatus.ACTIVE,
+    )
+
+    employment_type: Mapped[EmploymentType] = mapped_column(
+        Enum(
+            EmploymentType,
+            name="staff_employment_type_enum",
+        ),
+        nullable=False,
+    )
+
+    date_employed: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
+
+    date_left: Mapped[date | None] = mapped_column(
+        Date,
+    )
+
+    # ------------------------------------------------------------------
+    # ORM Relationships
+    # ------------------------------------------------------------------
+
+    staff: Mapped["Staff"] = relationship(
+        back_populates="employments",
+    )

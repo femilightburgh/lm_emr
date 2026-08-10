@@ -43,7 +43,10 @@ and added to __all__.
 # Organization
 # ============================================================================
 
-from app.modules.organization.models import Hospital
+from app.modules.organization.models import (
+    Department,
+    Hospital,
+)
 
 
 # ============================================================================
@@ -70,7 +73,10 @@ from app.modules.patients.models import Patient
 # Staff
 # ============================================================================
 
-from app.modules.staff.models import Staff
+from app.modules.staff.models import (
+    Staff,
+    StaffEmployment,
+)
 
 
 # ============================================================================
@@ -80,6 +86,7 @@ from app.modules.staff.models import Staff
 __all__ = [
     # Organization
     "Hospital",
+    "Department",
 
     # Identity
     "UserAccount",
@@ -93,4 +100,5 @@ __all__ = [
 
     # Staff
     "Staff",
+    "StaffEmployment",
 ]

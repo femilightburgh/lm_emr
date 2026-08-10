@@ -40,3 +40,10 @@ class HospitalNotFoundError(StaffError):
 
 class InvalidEmploymentDateError(StaffError):
     """Raised when employment dates violate business rules."""
+
+
+class NoCurrentEmploymentError(StaffError):
+    """
+    Raised when an operation requires an active employment period
+    but none exists.
+    """

@@ -215,3 +215,31 @@ class StaffListResponse(BaseSchema):
 
     items: list[StaffResponse]
     total: int
+
+
+class StaffEmploymentResponse(BaseSchema):
+    """
+    Response schema representing one employment period.
+    """
+
+    id: UUID
+    staff_id: UUID
+
+    profession: Profession
+    employment_status: EmploymentStatus
+    employment_type: EmploymentType
+
+    date_employed: date
+    date_left: date | None
+
+    created_at: datetime
+    updated_at: datetime
+
+
+class StaffEmploymentClose(BaseSchema):
+    """
+    Request schema used to close the current employment period.
+    """
+
+    date_left: date
+    employment_status: EmploymentStatus

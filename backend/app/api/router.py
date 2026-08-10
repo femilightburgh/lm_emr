@@ -68,6 +68,10 @@ from app.modules.organization.router import (
     router as organization_router,
 )
 
+from app.modules.organization.department_router import (
+    router as department_router,
+)
+
 # ============================================================================
 # Staff
 # ============================================================================
@@ -145,6 +149,8 @@ api_router.include_router(
 api_router.include_router(
     organization_router,
 )
+
+api_router.include_router(department_router)
 
 # ============================================================================
 # Staff
