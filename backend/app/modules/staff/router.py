@@ -36,6 +36,7 @@ from app.modules.staff.dependencies import get_staff_service
 from app.modules.staff.schemas import (
     StaffCreate,
     StaffEmploymentClose,
+    StaffEmploymentCreate,
     StaffEmploymentResponse,
     StaffListResponse,
     StaffResponse,
@@ -233,6 +234,45 @@ def get_current_employment(
 
     if employment is None:
         return None
+
+    return StaffEmploymentResponse.model_validate(
+        employment,
+    )
+
+
+# ============================================================================
+# Start Employment
+# ============================================================================
+
+@router.post(
+    "/{staff_id}/employments",
+    response_model=StaffEmploymentResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Start staff employment",
+    description=(
+        "Start a new employment period for a staff member. "
+        "Requires the staff.update permission."
+    ),
+    dependencies=[
+        Depends(require_permission(Permissions.STAFF_UPDATE)),
+    ],
+)
+def start_employment(
+    staff_id: UUID,
+    payload: StaffEmploymentCreate,
+    service: StaffService = Depends(get_staff_service),
+) -> StaffEmploymentResponse:
+    """
+    Start a new employment period for a staff member.
+
+    Requires:
+        staff.update
+    """
+
+    employment = service.start_employment(
+        staff_id=staff_id,
+        data=payload,
+    )
 
     return StaffEmploymentResponse.model_validate(
         employment,

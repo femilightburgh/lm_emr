@@ -49,6 +49,7 @@ from uuid import UUID
 
 from app.modules.organization.repository import HospitalRepository
 from app.modules.staff.exceptions import (
+    CurrentEmploymentExistsError,
     DuplicateStaffNumberError,
     HospitalNotFoundError,
     InvalidEmploymentDateError,
@@ -59,6 +60,7 @@ from app.modules.staff.repository import StaffRepository
 from app.modules.staff.schemas import (
     StaffCreate,
     StaffEmploymentClose,
+    StaffEmploymentCreate,
     StaffUpdate,
 )
 from app.modules.staff.employment_repository import (
@@ -105,7 +107,11 @@ class StaffService:
             staff_number=data.staff_number,
         )
 
-        self._validate_dates(data)
+        self._validate_employment_dates(
+            date_employed=data.date_employed,
+            date_left=data.date_left,
+            date_of_birth=data.date_of_birth,
+        )
 
         staff = self._build_staff(data)
 
@@ -177,6 +183,52 @@ class StaffService:
             staff_id,
         )
 
+    def start_employment(
+        self,
+        staff_id: UUID,
+        data: StaffEmploymentCreate,
+    ) -> StaffEmployment:
+        """
+        Start a new employment period for an existing staff member.
+
+        A staff member cannot have more than one current
+        employment period.
+        """
+
+        staff = self.get_staff(staff_id)
+
+        current = self.employment_repository.get_current(
+            staff_id,
+        )
+
+        if current is not None:
+            raise CurrentEmploymentExistsError(
+                f"Staff '{staff_id}' already has current employment."
+            )
+
+        self._validate_employment_dates(
+            date_employed=data.date_employed,
+            date_left=None,
+            date_of_birth=staff.date_of_birth,
+        )
+
+        employment = StaffEmployment(
+            staff_id=staff.id,
+            profession=data.profession,
+            employment_status=data.employment_status,
+            employment_type=data.employment_type,
+            date_employed=data.date_employed,
+            date_left=None,
+        )
+
+        self.employment_repository.create(employment)
+
+        self.repository.flush()
+        self.repository.commit()
+        self.employment_repository.save(employment)
+
+        return employment
+    
     def close_current_employment(
         self,
         staff_id: UUID,
@@ -229,17 +281,15 @@ class StaffService:
         data: StaffUpdate,
     ) -> Staff:
         """
-        Update an existing staff member.
+        Update permanent Staff information.
         """
 
         staff = self.get_staff(staff_id)
 
         for field, value in data.model_dump(
-            exclude_unset=True
+            exclude_unset=True,
         ).items():
             setattr(staff, field, value)
-
-        self._validate_dates(staff)
 
         return self.repository.save(staff)
 
@@ -285,36 +335,36 @@ class StaffService:
                 f"Staff number '{staff_number}' already exists."
             )
 
-    def _validate_dates(
+    def _validate_employment_dates(
         self,
-        data: StaffCreate | Staff,
+        date_employed,
+        date_left,
+        date_of_birth=None,
     ) -> None:
         """
-        Validate employment dates.
+        Validate employment period dates.
         """
 
         if (
-            data.date_of_birth
-            and data.date_employed
-            and data.date_employed < data.date_of_birth
+            date_of_birth
+            and date_employed < date_of_birth
         ):
             raise InvalidEmploymentDateError(
                 "Employment date cannot be before date of birth."
             )
 
         if (
-            data.date_left
-            and data.date_employed
-            and data.date_left < data.date_employed
+            date_left
+            and date_left < date_employed
         ):
             raise InvalidEmploymentDateError(
                 "Date left cannot be before employment date."
             )
 
         if (
-            data.date_left
-            and data.date_of_birth
-            and data.date_left < data.date_of_birth
+            date_left
+            and date_of_birth
+            and date_left < date_of_birth
         ):
             raise InvalidEmploymentDateError(
                 "Date left cannot be before date of birth."
@@ -330,6 +380,9 @@ class StaffService:
     ) -> Staff:
         """
         Create a Staff ORM object.
+
+        Employment information is stored separately in
+        StaffEmployment.
         """
 
         return Staff(
@@ -342,9 +395,4 @@ class StaffService:
             date_of_birth=data.date_of_birth,
             phone_number=data.phone_number,
             email=data.email,
-            profession=data.profession,
-            employment_status=data.employment_status,
-            employment_type=data.employment_type,
-            date_employed=data.date_employed,
-            date_left=data.date_left,
         )

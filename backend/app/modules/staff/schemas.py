@@ -74,20 +74,10 @@ from app.modules.staff.enums import (
 
 class StaffBase(BaseSchema):
     """
-    Base schema shared by Staff request and response models.
+    Base schema containing permanent Staff attributes.
 
-    This schema defines the common staff attributes used throughout
-    the Staff module.
-
-    It is inherited by:
-
-    • StaffCreate
-    • StaffResponse
-
-    Notes
-    -----
-    This schema should not be used directly as an API request or
-    response model.
+    Employment history is represented separately by
+    StaffEmployment records.
     """
 
     hospital_id: UUID
@@ -106,6 +96,20 @@ class StaffBase(BaseSchema):
 
     email: EmailStr | None = None
 
+
+# ==============================================================================
+# Create Schema
+# ==============================================================================
+
+
+class StaffCreate(StaffBase):
+    """
+    Request schema used when registering a new staff member.
+
+    Initial employment information is required because staff
+    registration creates the first StaffEmployment record.
+    """
+
     profession: Profession
 
     employment_status: EmploymentStatus
@@ -116,30 +120,6 @@ class StaffBase(BaseSchema):
 
     date_left: date | None = None
 
-
-# ==============================================================================
-# Create Schema
-# ==============================================================================
-
-
-class StaffCreate(StaffBase):
-    """
-    Request schema used when creating a new staff member.
-
-    This schema represents the payload accepted by the Staff API when
-    registering a new employee.
-
-    Validation
-    ----------
-    Performs structural validation only.
-
-    Business rules such as duplicate staff numbers, hospital existence,
-    and employment policies are enforced by the StaffService.
-    """
-
-    pass
-
-
 # ==============================================================================
 # Update Schema
 # ==============================================================================
@@ -147,11 +127,10 @@ class StaffCreate(StaffBase):
 
 class StaffUpdate(BaseSchema):
     """
-    Request schema used when updating an existing staff member.
+    Request schema used when updating permanent Staff information.
 
-    All fields are optional to support partial updates (PATCH).
-
-    Business rules are enforced by the StaffService.
+    Employment history must be modified through the
+    StaffEmployment operations.
     """
 
     first_name: str | None = None
@@ -165,16 +144,6 @@ class StaffUpdate(BaseSchema):
     phone_number: str | None = None
 
     email: EmailStr | None = None
-
-    profession: Profession | None = None
-
-    employment_status: EmploymentStatus | None = None
-
-    employment_type: EmploymentType | None = None
-
-    date_employed: date | None = None
-
-    date_left: date | None = None
 
 
 # ==============================================================================
@@ -234,6 +203,20 @@ class StaffEmploymentResponse(BaseSchema):
 
     created_at: datetime
     updated_at: datetime
+
+class StaffEmploymentCreate(BaseSchema):
+    """
+    Request schema used to start a new employment period
+    for an existing staff member.
+    """
+
+    profession: Profession
+
+    employment_status: EmploymentStatus = EmploymentStatus.ACTIVE
+
+    employment_type: EmploymentType
+
+    date_employed: date
 
 
 class StaffEmploymentClose(BaseSchema):

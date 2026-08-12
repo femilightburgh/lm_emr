@@ -31,15 +31,30 @@ class StaffNotFoundError(StaffError):
 
 
 class DuplicateStaffNumberError(StaffError):
-    """Raised when a staff number already exists within a hospital."""
+    """
+    Raised when a staff number already exists within a hospital.
+    """
 
+    status_code = 409
+    error_code = "DUPLICATE_STAFF_NUMBER"
 
 class HospitalNotFoundError(StaffError):
-    """Raised when the specified hospital does not exist."""
+    """
+    Raised when the specified hospital does not exist.
+    """
 
+    status_code = 404
+    error_code = "HOSPITAL_NOT_FOUND"
 
 class InvalidEmploymentDateError(StaffError):
     """Raised when employment dates violate business rules."""
+
+
+class CurrentEmploymentExistsError(StaffError):
+    """
+    Raised when an operation attempts to start a new employment
+    period while the staff member already has current employment.
+    """
 
 
 class NoCurrentEmploymentError(StaffError):

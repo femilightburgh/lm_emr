@@ -18,6 +18,7 @@ the EMR.
 
 from datetime import date
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from sqlalchemy import (
     Date,
@@ -69,12 +70,12 @@ class Staff(BaseEntity):
     # Relationships
     # ------------------------------------------------------------------
 
-    hospital_id: Mapped[str] = mapped_column(
+    hospital_id: Mapped[UUID] = mapped_column(
         ForeignKey("hospitals.id"),
         nullable=False,
     )
 
-    user_account_id: Mapped[str | None] = mapped_column(
+    user_account_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("user_accounts.id"),
         nullable=True,
         unique=True,
@@ -128,42 +129,6 @@ class Staff(BaseEntity):
         String(255),
     )
 
-    # ------------------------------------------------------------------
-    # Employment
-    # ------------------------------------------------------------------
-
-    profession: Mapped[Profession] = mapped_column(
-        Enum(
-            Profession,
-            name="staff_profession_enum",
-        ),
-        nullable=False,
-    )
-
-    employment_status: Mapped[EmploymentStatus] = mapped_column(
-        Enum(
-            EmploymentStatus,
-            name="employment_status_enum",
-        ),
-        nullable=False,
-        default=EmploymentStatus.ACTIVE,
-    )
-
-    employment_type: Mapped[EmploymentType] = mapped_column(
-        Enum(
-            EmploymentType,
-            name="employment_type_enum",
-        ),
-        nullable=False,
-    )
-
-    date_employed: Mapped[date | None] = mapped_column(
-        Date,
-    )
-
-    date_left: Mapped[date | None] = mapped_column(
-        Date,
-    )
 
     # ------------------------------------------------------------------
     # ORM Relationships
@@ -180,9 +145,6 @@ class Staff(BaseEntity):
     employments: Mapped[list["StaffEmployment"]] = relationship(
         back_populates="staff",
     )
-
-
-
 
 
 class StaffEmployment(BaseEntity):
@@ -211,7 +173,7 @@ class StaffEmployment(BaseEntity):
     # Relationships
     # ------------------------------------------------------------------
 
-    staff_id: Mapped[str] = mapped_column(
+    staff_id: Mapped[UUID] = mapped_column(
         ForeignKey("staff.id"),
         nullable=False,
         index=True,

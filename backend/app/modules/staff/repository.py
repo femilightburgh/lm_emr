@@ -132,17 +132,15 @@ class StaffRepository:
 
     def save(self, staff: Staff) -> Staff:
         """
-        Persist changes made to an existing staff member.
+        Persist changes to an existing Staff entity.
+
+        The caller is responsible for committing the transaction.
         """
 
-        try:
-            self.session.commit()
-            self.session.refresh(staff)
-            return staff
+        self.session.flush()
+        self.session.refresh(staff)
 
-        except Exception:
-            self.session.rollback()
-            raise
+        return staff
 
 
     def commit(self) -> None:
