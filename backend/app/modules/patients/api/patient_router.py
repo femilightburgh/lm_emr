@@ -1,20 +1,18 @@
+
 """
 ==============================================================================
 LIGHTBURGH EMR
 
 Patient API Router
-
 ==============================================================================
 
 Purpose
 -------
-
 Defines the HTTP endpoints for patient management.
 
 Business logic belongs in PatientService.
 
 HTTP concerns belong here.
-
 ==============================================================================
 """
 
@@ -40,6 +38,7 @@ from app.modules.patients.schemas.patient_schema import (
 from app.modules.patients.services.patient_service import (
     PatientService,
 )
+
 
 router = APIRouter(
     prefix="/patients",
@@ -85,7 +84,7 @@ async def create_patient(
     ),
 ):
     """
-    Register a new Patient.
+    Register a new patient.
     """
 
     return service.create_patient(
@@ -110,24 +109,27 @@ async def list_patients(
     name: str | None = Query(
         default=None,
     ),
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
     service: PatientService = Depends(
         get_patient_service,
     ),
 ):
     """
-    List or search Patients.
+    List or search patients within the current hospital.
     """
 
     if hospital_number or name:
-
         patients = service.search_patients(
+            context=context,
             hospital_number=hospital_number,
             name=name,
         )
-
     else:
-
-        patients = service.list_patients()
+        patients = service.list_patients(
+            context=context,
+        )
 
     return PatientListResponse(
         total=len(patients),
@@ -142,20 +144,24 @@ async def list_patients(
 @router.get(
     "/{patient_id}",
     response_model=PatientResponse,
-    summary="Retrieve a Patient",
+    summary="Retrieve a patient",
 )
 async def get_patient(
     patient_id: UUID,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
     service: PatientService = Depends(
         get_patient_service,
     ),
 ):
     """
-    Retrieve a Patient.
+    Retrieve a patient within the current hospital.
     """
 
     return service.get_patient(
-        patient_id,
+        context=context,
+        patient_id=patient_id,
     )
 
 
@@ -166,20 +172,24 @@ async def get_patient(
 @router.patch(
     "/{patient_id}",
     response_model=PatientResponse,
-    summary="Update Patient",
+    summary="Update patient",
 )
 async def update_patient(
     patient_id: UUID,
     request: UpdatePatientRequest,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
     service: PatientService = Depends(
         get_patient_service,
     ),
 ):
     """
-    Update an existing Patient.
+    Update an existing patient within the current hospital.
     """
 
     return service.update_patient(
-        patient_id,
-        request,
+        context=context,
+        patient_id=patient_id,
+        request=request,
     )

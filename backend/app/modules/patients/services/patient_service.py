@@ -1,30 +1,28 @@
+
 """
 ==============================================================================
 LIGHTBURGH EMR
 
 Patient Service
-
 ==============================================================================
 
 Purpose
 -------
-
-Contains the business logic for patient management.
+Contains business logic for Patient management.
 
 Responsibilities
 ----------------
-• Register patients.
-• Prevent duplicate hospital numbers.
-• Retrieve patients.
-• Search patients.
-• Update patient demographics.
+- Register patients
+- Prevent duplicate hospital numbers
+- Retrieve patients
+- Search patients
+- Update patient demographics
 
 Business rules belong here.
 
 Persistence belongs in repositories.
 
 HTTP concerns belong in routers.
-
 ==============================================================================
 """
 
@@ -54,10 +52,6 @@ class PatientService:
     ) -> None:
         self.repository = repository
 
-    # ------------------------------------------------------------------
-    # Create
-    # ------------------------------------------------------------------
-
     def create_patient(
         self,
         *,
@@ -65,10 +59,11 @@ class PatientService:
         request: CreatePatientRequest,
     ) -> Patient:
         """
-        Register a new patient.
+        Register a new patient within the current hospital.
         """
 
         existing_patient = self.repository.get_by_hospital_number(
+            hospital_id=context.hospital_id,
             hospital_number=request.hospital_number,
         )
 
@@ -83,24 +78,21 @@ class PatientService:
             **request.model_dump(),
         )
 
-        return self.repository.create(
-            patient,
-        )
-
-    # ------------------------------------------------------------------
-    # Retrieve
-    # ------------------------------------------------------------------
+        return self.repository.create(patient)
 
     def get_patient(
         self,
+        *,
+        context: RequestContext,
         patient_id: UUID,
     ) -> Patient:
         """
-        Retrieve a Patient.
+        Retrieve a patient within the current hospital.
         """
 
         patient = self.repository.get_by_id(
-            patient_id,
+            hospital_id=context.hospital_id,
+            patient_id=patient_id,
         )
 
         if patient is None:
@@ -111,53 +103,50 @@ class PatientService:
 
         return patient
 
-    # ------------------------------------------------------------------
-    # List
-    # ------------------------------------------------------------------
-
     def list_patients(
         self,
+        *,
+        context: RequestContext,
     ) -> list[Patient]:
         """
-        Retrieve all Patients.
+        Retrieve all patients within the current hospital.
         """
 
-        return self.repository.get_all()
-
-    # ------------------------------------------------------------------
-    # Search
-    # ------------------------------------------------------------------
+        return self.repository.get_all(
+            hospital_id=context.hospital_id,
+        )
 
     def search_patients(
         self,
         *,
+        context: RequestContext,
         hospital_number: str | None = None,
         name: str | None = None,
     ) -> list[Patient]:
         """
-        Search Patients.
+        Search patients within the current hospital.
         """
 
         return self.repository.search(
+            hospital_id=context.hospital_id,
             hospital_number=hospital_number,
             name=name,
         )
 
-    # ------------------------------------------------------------------
-    # Update
-    # ------------------------------------------------------------------
-
     def update_patient(
         self,
+        *,
+        context: RequestContext,
         patient_id: UUID,
         request: UpdatePatientRequest,
     ) -> Patient:
         """
-        Update an existing Patient.
+        Update an existing patient within the current hospital.
         """
 
         patient = self.get_patient(
-            patient_id,
+            context=context,
+            patient_id=patient_id,
         )
 
         update_data = request.model_dump(
@@ -171,6 +160,4 @@ class PatientService:
                 value,
             )
 
-        return self.repository.update(
-            patient,
-        )
+        return self.repository.update(patient)

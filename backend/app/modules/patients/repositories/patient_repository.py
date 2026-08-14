@@ -1,3 +1,4 @@
+
 """
 ==============================================================================
 LIGHTBURGH EMR
@@ -15,17 +16,14 @@ Responsibilities
 - Retrieve patients
 - Update patients
 - Delete patients
-
-Business rules such as duplicate checks and validation belong in the
-Patient Service, not in this repository.
+- Enforce hospital-scoped patient queries
 ==============================================================================
 """
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
-from sqlalchemy import select, or_, func
 
 from app.modules.patients.models import Patient
 
@@ -47,48 +45,67 @@ class PatientRepository:
         self.db.refresh(patient)
         return patient
 
-    def get_by_id(self, patient_id: UUID) -> Patient | None:
+    def get_by_id(
+        self,
+        hospital_id: UUID,
+        patient_id: UUID,
+    ) -> Patient | None:
         """
-        Retrieve a patient by their unique identifier.
+        Retrieve a patient by ID within a specific hospital.
         """
         result = self.db.execute(
-            select(Patient).where(Patient.id == patient_id)
+            select(Patient).where(
+                Patient.id == patient_id,
+                Patient.hospital_id == hospital_id,
+            )
         )
         return result.scalar_one_or_none()
 
     def get_by_hospital_number(
         self,
+        hospital_id: UUID,
         hospital_number: str,
     ) -> Patient | None:
         """
-        Retrieve a patient by hospital number.
+        Retrieve a patient by hospital number within a specific hospital.
         """
         result = self.db.execute(
             select(Patient).where(
-                Patient.hospital_number == hospital_number
+                Patient.hospital_id == hospital_id,
+                Patient.hospital_number == hospital_number,
             )
         )
         return result.scalar_one_or_none()
 
-    def get_all(self) -> list[Patient]:
+    def get_all(
+        self,
+        hospital_id: UUID,
+    ) -> list[Patient]:
         """
-        Retrieve all patients ordered by last name.
+        Retrieve all patients belonging to a specific hospital.
         """
         result = self.db.execute(
-            select(Patient).order_by(Patient.last_name)
+            select(Patient)
+            .where(Patient.hospital_id == hospital_id)
+            .order_by(
+                Patient.last_name,
+                Patient.first_name,
+            )
         )
         return list(result.scalars().all())
-    
+
     def search(
         self,
+        hospital_id: UUID,
         hospital_number: str | None = None,
         name: str | None = None,
     ) -> list[Patient]:
         """
-        Search patients by hospital number or name.
+        Search patients by hospital number or name within a hospital.
         """
-
-        query = select(Patient)
+        query = select(Patient).where(
+            Patient.hospital_id == hospital_id
+        )
 
         if hospital_number:
             query = query.where(
