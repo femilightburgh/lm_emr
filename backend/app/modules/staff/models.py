@@ -39,6 +39,7 @@ from .enums import (
 )
 
 if TYPE_CHECKING:
+    from app.modules.encounter.models import Encounter
     from app.modules.identity.models import UserAccount
     from app.modules.organization.models import Hospital
 
@@ -146,6 +147,9 @@ class Staff(BaseEntity):
         back_populates="staff",
     )
 
+    encounters: Mapped[list["Encounter"]] = relationship(
+        back_populates="staff",
+    )
 
 class StaffEmployment(BaseEntity):
     """

@@ -47,16 +47,72 @@ def cleanup_hospital(db: Session, hospital_id) -> None:
     """
     Remove all test records belonging to a hospital.
 
-    Cleanup order follows the foreign-key relationships:
+    Cleanup follows the foreign-key dependency graph:
+
+        encounters
+          ↓
+        episodes
+          ↓
+        patients
 
         staff_employments
-              ↓
-            staff
-              ↓
-         departments
-              ↓
-           hospital
+          ↓
+        staff
+
+        departments
+          ↓
+        hospital
     """
+
+    # ------------------------------------------------------------------
+    # Encounters
+    # ------------------------------------------------------------------
+
+    db.execute(
+        text(
+            """
+            DELETE FROM encounters
+            WHERE episode_id IN (
+                SELECT id
+                FROM episodes
+                WHERE hospital_id = :hospital_id
+            )
+            """
+        ),
+        {"hospital_id": hospital_id},
+    )
+
+    # ------------------------------------------------------------------
+    # Episodes
+    # ------------------------------------------------------------------
+
+    db.execute(
+        text(
+            """
+            DELETE FROM episodes
+            WHERE hospital_id = :hospital_id
+            """
+        ),
+        {"hospital_id": hospital_id},
+    )
+
+    # ------------------------------------------------------------------
+    # Patients
+    # ------------------------------------------------------------------
+
+    db.execute(
+        text(
+            """
+            DELETE FROM patients
+            WHERE hospital_id = :hospital_id
+            """
+        ),
+        {"hospital_id": hospital_id},
+    )
+
+    # ------------------------------------------------------------------
+    # Staff Employment History
+    # ------------------------------------------------------------------
 
     db.execute(
         text(
@@ -72,6 +128,10 @@ def cleanup_hospital(db: Session, hospital_id) -> None:
         {"hospital_id": hospital_id},
     )
 
+    # ------------------------------------------------------------------
+    # Staff
+    # ------------------------------------------------------------------
+
     db.execute(
         text(
             """
@@ -82,6 +142,10 @@ def cleanup_hospital(db: Session, hospital_id) -> None:
         {"hospital_id": hospital_id},
     )
 
+    # ------------------------------------------------------------------
+    # Departments
+    # ------------------------------------------------------------------
+
     db.execute(
         text(
             """
@@ -91,6 +155,10 @@ def cleanup_hospital(db: Session, hospital_id) -> None:
         ),
         {"hospital_id": hospital_id},
     )
+
+    # ------------------------------------------------------------------
+    # Hospital
+    # ------------------------------------------------------------------
 
     db.execute(
         text(

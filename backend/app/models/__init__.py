@@ -80,6 +80,12 @@ from app.modules.staff.models import (
 
 
 # ============================================================================
+# Encounter
+# ============================================================================
+
+from app.modules.encounter.models import Encounter, EncounterStatus
+
+# ============================================================================
 # Public Exports
 # ============================================================================
 
@@ -101,4 +107,8 @@ __all__ = [
     # Staff
     "Staff",
     "StaffEmployment",
+
+    # Encounter
+    "Encounter",
+    "EncounterStatus",
 ]

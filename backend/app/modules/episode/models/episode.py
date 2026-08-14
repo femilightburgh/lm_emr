@@ -1,5 +1,4 @@
 """
-==============================================================================
 LIGHTBURGH EMR
 
 Episode Model
@@ -38,8 +37,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_entity import BaseEntity
 
-
 if TYPE_CHECKING:
+    from app.modules.encounter.models import Encounter
     from app.modules.organization.models import Hospital
     from app.modules.patients.models import Patient
 
@@ -140,4 +139,8 @@ class Episode(BaseEntity):
 
     patient: Mapped["Patient"] = relationship(
         back_populates="episodes",
+    )
+
+    encounters: Mapped[list["Encounter"]] = relationship(
+        back_populates="episode",
     )
