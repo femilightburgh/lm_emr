@@ -93,6 +93,7 @@ class EpisodeService:
         """
 
         patient = self.patient_repository.get_by_id(
+            hospital_id=context.hospital_id,
             patient_id=patient_id,
         )
 
