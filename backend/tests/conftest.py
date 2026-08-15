@@ -173,8 +173,33 @@ def cleanup_hospital(db: Session, hospital_id) -> None:
     db.commit()
 
 
+def cleanup_hospital_by_code(
+    db: Session,
+    code: str,
+) -> None:
+    """
+    Remove an existing test hospital identified by its code.
+    """
+
+    hospital = (
+        db.query(Hospital)
+        .filter(Hospital.code == code)
+        .one_or_none()
+    )
+
+    if hospital is not None:
+        cleanup_hospital(
+            db,
+            hospital.id,
+        )
+
 @pytest.fixture
 def hospital(db: Session) -> Hospital:
+    cleanup_hospital_by_code(
+        db,
+        "TEST-HOSP",
+    )
+
     hospital = Hospital(
         name="Test General Hospital",
         code="TEST-HOSP",
@@ -198,6 +223,11 @@ def hospital(db: Session) -> Hospital:
 
 @pytest.fixture
 def hospital_two(db: Session) -> Hospital:
+    cleanup_hospital_by_code(
+        db,
+        "TEST-HOSP-2",
+    )
+
     hospital = Hospital(
         name="Second Test Hospital",
         code="TEST-HOSP-2",

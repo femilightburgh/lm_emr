@@ -24,7 +24,7 @@ from datetime import date
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import Date, Enum, ForeignKey, String
+from sqlalchemy import Date, Enum, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_entity import BaseEntity
@@ -48,6 +48,14 @@ class Patient(BaseEntity):
 
     __tablename__ = "patients"
 
+    __table_args__ = (
+        UniqueConstraint(
+            "hospital_id",
+            "hospital_number",
+            name="uq_patients_hospital_hospital_number",
+        ),
+    )
+
     # ------------------------------------------------------------------
     # Ownership
     # ------------------------------------------------------------------
@@ -65,7 +73,7 @@ class Patient(BaseEntity):
     hospital_number: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
-        unique=True,
+        index=True,
     )
 
     # ------------------------------------------------------------------
