@@ -1,22 +1,52 @@
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.main import app
 from datetime import date
 from uuid import uuid4
 
-from app.core.context import RequestContext
-from app.modules.episode.repositories.episode_repository import EpisodeRepository
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+from app.core.context import (
+    RequestContext,
+    get_request_context,
+)
+from app.db.session import get_db
+from app.main import app
+
+from app.modules.encounter.models import EncounterStatus
+
+from app.modules.episode.repositories.episode_repository import (
+    EpisodeRepository,
+)
 from app.modules.episode.services.episode_number_generator import (
     EpisodeNumberGenerator,
 )
-from app.modules.episode.services.episode_service import EpisodeService
-from app.modules.patients.repositories.patient_repository import PatientRepository
-from app.modules.patients.schemas.patient_schema import CreatePatientRequest
-from app.modules.patients.services.patient_service import PatientService
-from app.modules.staff.employment_repository import StaffEmploymentRepository
+from app.modules.episode.services.episode_service import (
+    EpisodeService,
+)
+
+from app.modules.events.repositories import (
+    ClinicalEventRepository,
+)
+from app.modules.events.services.event_service import (
+    ClinicalEventService,
+)
+
+from app.modules.organization.repository import HospitalRepository
+
+from app.modules.patients.repositories.patient_repository import (
+    PatientRepository,
+)
+from app.modules.patients.schemas.patient_schema import (
+    CreatePatientRequest,
+)
+from app.modules.patients.services.patient_service import (
+    PatientService,
+)
+
+from app.modules.staff.employment_repository import (
+    StaffEmploymentRepository,
+)
 from app.modules.staff.enums import (
     EmploymentStatus,
     EmploymentType,
@@ -26,12 +56,19 @@ from app.modules.staff.enums import (
 from app.modules.staff.repository import StaffRepository
 from app.modules.staff.schemas import StaffCreate
 from app.modules.staff.service import StaffService
-from app.modules.organization.repository import HospitalRepository
-from app.core.context import RequestContext, get_request_context
+from app.modules.encounter.repositories.encounter_repository import EncounterRepository
+
+
+# ============================================================================
+# Test Client
+# ============================================================================
 
 
 @pytest.fixture
-def client(db: Session, hospital):
+def client(
+    db: Session,
+    hospital,
+):
     def override_get_db():
         yield db
 
@@ -50,6 +87,12 @@ def client(db: Session, hospital):
     yield TestClient(app)
 
     app.dependency_overrides.clear()
+
+
+# ============================================================================
+# Create Encounter
+# ============================================================================
+
 
 def test_create_encounter_endpoint(
     client,
@@ -107,6 +150,11 @@ def test_create_encounter_endpoint(
         number_generator=EpisodeNumberGenerator(
             repository=episode_repository,
         ),
+        encounter_repository=EncounterRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+        staff_repository=StaffRepository(db),
     )
 
     episode = episode_service.create_episode(
@@ -135,6 +183,12 @@ def test_create_encounter_endpoint(
     assert body["started_at"] is not None
     assert body["ended_at"] is None
     assert "id" in body
+
+
+# ============================================================================
+# Get Encounter
+# ============================================================================
+
 
 def test_get_encounter_endpoint(
     client,
@@ -192,6 +246,11 @@ def test_get_encounter_endpoint(
         number_generator=EpisodeNumberGenerator(
             repository=episode_repository,
         ),
+        encounter_repository=EncounterRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+        staff_repository=StaffRepository(db),
     )
 
     episode = episode_service.create_episode(
@@ -227,6 +286,12 @@ def test_get_encounter_endpoint(
     assert body["title"] == "Nurse Consultation"
     assert body["status"] == "OPEN"
     assert body["ended_at"] is None
+
+
+# ============================================================================
+# Close Encounter
+# ============================================================================
+
 
 def test_close_encounter_endpoint(
     client,
@@ -284,6 +349,11 @@ def test_close_encounter_endpoint(
         number_generator=EpisodeNumberGenerator(
             repository=episode_repository,
         ),
+        encounter_repository=EncounterRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+        staff_repository=StaffRepository(db),
     )
 
     episode = episode_service.create_episode(
@@ -316,6 +386,12 @@ def test_close_encounter_endpoint(
     assert body["id"] == encounter_id
     assert body["status"] == "CLOSED"
     assert body["ended_at"] is not None
+
+
+# ============================================================================
+# Close Encounter Twice
+# ============================================================================
+
 
 def test_close_encounter_twice_returns_conflict(
     client,
@@ -373,6 +449,11 @@ def test_close_encounter_twice_returns_conflict(
         number_generator=EpisodeNumberGenerator(
             repository=episode_repository,
         ),
+        encounter_repository=EncounterRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+        staff_repository=StaffRepository(db),
     )
 
     episode = episode_service.create_episode(

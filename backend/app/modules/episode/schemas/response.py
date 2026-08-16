@@ -3,7 +3,6 @@
 LIGHTBURGH EMR
 
 Episode Response Schemas
-
 ==============================================================================
 
 Response DTOs for Episode operations.
@@ -33,6 +32,8 @@ class EpisodeResponse(BaseModel):
     hospital_id: UUID
 
     patient_id: UUID
+
+    managing_doctor_id: UUID | None
 
     episode_number: str
 

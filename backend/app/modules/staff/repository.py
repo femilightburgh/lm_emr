@@ -8,22 +8,22 @@ Staff Repository
 
 Purpose
 -------
-Provides data access operations for the Staff entity.
+Provides data access operations for Staff and StaffEmployment entities.
 
-The repository is responsible only for persistence and retrieval of Staff
-records. It contains no business rules or application logic.
+The repository is responsible only for persistence and retrieval.
 
-Business decisions belong in the StaffService.
+Business decisions belong in services.
 
 ==============================================================================
 """
 
+from datetime import date
 from uuid import UUID
 
-from sqlalchemy.orm import Session
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from .models import Staff
+from .models import Staff, StaffEmployment
 
 
 class StaffRepository:
@@ -31,7 +31,10 @@ class StaffRepository:
     Repository for Staff persistence operations.
     """
 
-    def __init__(self, session: Session):
+    def __init__(
+        self,
+        session: Session,
+    ) -> None:
         """
         Initialize the repository.
 
@@ -40,7 +43,12 @@ class StaffRepository:
         session:
             Active SQLAlchemy database session.
         """
+
         self.session = session
+
+    # =========================================================================
+    # Create
+    # =========================================================================
 
     def create(
         self,
@@ -53,73 +61,66 @@ class StaffRepository:
         """
 
         self.session.add(staff)
+
         return staff
+
+    # =========================================================================
+    # Retrieve Staff
+    # =========================================================================
 
     def get_by_id(
         self,
         staff_id: UUID,
-        ) -> Staff | None:
+    ) -> Staff | None:
         """
-        Retrieve a staff member by its unique identifier.
-
-        Parameters
-        ----------
-        staff_id:
-            Unique identifier of the staff member.
-
-        Returns
-        -------
-        Staff | None
-            The matching Staff entity if found; otherwise None.
+        Retrieve a Staff member by its unique identifier.
         """
 
-        statement = select(Staff).where(
-            Staff.id == staff_id,
+        statement = (
+            select(Staff)
+            .where(
+                Staff.id == staff_id,
+            )
         )
 
-        return self.session.scalar(statement)
+        return self.session.scalar(
+            statement,
+        )
 
     def get_by_staff_number(
         self,
         hospital_id: UUID,
         staff_number: str,
-        ) -> Staff | None:
+    ) -> Staff | None:
         """
-        Retrieve a staff member by hospital and staff number.
-
-        Parameters
-        ----------
-        hospital_id:
-            Identifier of the hospital.
-
-        staff_number:
-            Staff number assigned within the hospital.
-
-        Returns
-        -------
-        Staff | None
-            Matching staff member if found; otherwise None.
+        Retrieve a Staff member by hospital and staff number.
         """
 
         statement = (
             select(Staff)
-            .where(Staff.hospital_id == hospital_id)
-            .where(Staff.staff_number == staff_number)
+            .where(
+                Staff.hospital_id == hospital_id,
+                Staff.staff_number == staff_number,
+            )
         )
 
-        return self.session.scalar(statement)
+        return self.session.scalar(
+            statement,
+        )
 
     def list_staff(
         self,
         hospital_id: UUID,
-        ) -> list[Staff]:
+    ) -> list[Staff]:
         """
-        Retrieve all staff members belonging to a hospital.
+        Retrieve all Staff members belonging to a Hospital.
         """
 
         statement = (
             select(Staff)
-            .where(Staff.hospital_id == hospital_id)
+            .where(
+                Staff.hospital_id == hospital_id,
+            )
             .order_by(
                 Staff.last_name,
                 Staff.first_name,
@@ -127,10 +128,68 @@ class StaffRepository:
         )
 
         return list(
-            self.session.scalars(statement)
+            self.session.scalars(
+                statement,
+            )
         )
 
-    def save(self, staff: Staff) -> Staff:
+    # =========================================================================
+    # Employment
+    # =========================================================================
+
+    def get_active_employment(
+        self,
+        staff_id: UUID,
+        *,
+        as_of: date | None = None,
+    ) -> StaffEmployment | None:
+        """
+        Retrieve the active employment period for a Staff member.
+
+        An employment is considered active when:
+
+            date_employed <= as_of
+
+        and:
+
+            date_left IS NULL
+
+        If ``as_of`` is not supplied, today's date is used.
+
+        Employment history is retained, so this method deliberately
+        selects the employment period that is active at the requested
+        point in time rather than assuming the first or last employment
+        record is current.
+        """
+
+        if as_of is None:
+            as_of = date.today()
+
+        statement = (
+            select(StaffEmployment)
+            .where(
+                StaffEmployment.staff_id == staff_id,
+                StaffEmployment.date_employed <= as_of,
+                StaffEmployment.date_left.is_(None),
+            )
+            .order_by(
+                StaffEmployment.date_employed.desc(),
+            )
+            .limit(1)
+        )
+
+        return self.session.scalar(
+            statement,
+        )
+
+    # =========================================================================
+    # Persistence
+    # =========================================================================
+
+    def save(
+        self,
+        staff: Staff,
+    ) -> Staff:
         """
         Persist changes to an existing Staff entity.
 
@@ -138,10 +197,11 @@ class StaffRepository:
         """
 
         self.session.flush()
-        self.session.refresh(staff)
+        self.session.refresh(
+            staff,
+        )
 
         return staff
-
 
     def commit(self) -> None:
         """
@@ -150,17 +210,23 @@ class StaffRepository:
 
         self.session.commit()
 
-
-    def refresh(self, staff: Staff) -> Staff:
+    def refresh(
+        self,
+        staff: Staff,
+    ) -> Staff:
         """
         Refresh a Staff entity from the database.
         """
 
-        self.session.refresh(staff)
+        self.session.refresh(
+            staff,
+        )
+
         return staff
 
     def flush(self) -> None:
         """
         Flush pending changes without committing the transaction.
         """
+
         self.session.flush()

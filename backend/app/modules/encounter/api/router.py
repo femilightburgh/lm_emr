@@ -1,4 +1,5 @@
 """
+==============================================================================
 LIGHTBURGH EMR
 
 Encounter API Router
@@ -7,7 +8,7 @@ Encounter API Router
 
 Exposes HTTP endpoints for managing professional Encounters.
 
-Business logic belongs in EncounterService.
+Business logic belongs in services.
 Database access belongs in repositories.
 HTTP concerns remain in this router.
 
@@ -24,6 +25,7 @@ from app.core.context import (
     get_request_context,
 )
 from app.db.session import get_db
+
 from app.modules.encounter.exceptions import (
     EncounterAlreadyClosedError,
     EncounterNotFoundError,
@@ -32,15 +34,39 @@ from app.modules.encounter.exceptions import (
     StaffHospitalMismatchError,
     StaffNotFoundError,
 )
+
 from app.modules.encounter.repositories.encounter_repository import (
     EncounterRepository,
 )
-from app.modules.encounter.schemas.request import CreateEncounterRequest
-from app.modules.encounter.schemas.response import EncounterResponse
-from app.modules.encounter.services.encounter_service import EncounterService
+
+from app.modules.encounter.schemas.request import (
+    CreateEncounterRequest,
+)
+
+from app.modules.encounter.schemas.response import (
+    EncounterResponse,
+)
+
+from app.modules.encounter.services.encounter_service import (
+    EncounterService,
+)
+
+from app.modules.encounter.services.encounter_timeline_service import (
+    EncounterTimelineService,
+)
+
 from app.modules.episode.repositories.episode_repository import (
     EpisodeRepository,
 )
+
+from app.modules.events.repositories import (
+    ClinicalEventRepository,
+)
+
+from app.modules.events.schemas import (
+    ClinicalEventResponse,
+)
+
 from app.modules.staff.repository import StaffRepository
 
 
@@ -53,6 +79,7 @@ router = APIRouter(
 # ============================================================================
 # Dependencies
 # ============================================================================
+
 
 def get_encounter_service(
     db: Session = Depends(get_db),
@@ -68,9 +95,23 @@ def get_encounter_service(
     )
 
 
+def get_encounter_timeline_service(
+    db: Session = Depends(get_db),
+) -> EncounterTimelineService:
+    """
+    Build an EncounterTimelineService with its required repositories.
+    """
+
+    return EncounterTimelineService(
+        encounter_repository=EncounterRepository(db),
+        event_repository=ClinicalEventRepository(db),
+    )
+
+
 # ============================================================================
 # Create Encounter
 # ============================================================================
+
 
 @router.post(
     "",
@@ -85,6 +126,11 @@ def create_encounter(
 ):
     """
     Start a new professional Encounter.
+
+    Encounters may be created for Episodes that are currently
+    OPEN or ADMITTED.
+
+    CLOSED and CANCELLED Episodes cannot receive new Encounters.
     """
 
     try:
@@ -95,7 +141,9 @@ def create_encounter(
             title=request.title,
         )
 
-        return EncounterResponse.model_validate(encounter)
+        return EncounterResponse.model_validate(
+            encounter,
+        )
 
     except EpisodeNotFoundError as exc:
         raise HTTPException(
@@ -106,7 +154,10 @@ def create_encounter(
     except EpisodeNotOpenError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Encounters can only be created for open episodes.",
+            detail=(
+                "Encounters cannot be created for closed or "
+                "cancelled episodes."
+            ),
         ) from exc
 
     except StaffNotFoundError as exc:
@@ -118,13 +169,58 @@ def create_encounter(
     except StaffHospitalMismatchError as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Staff member does not belong to the authenticated Hospital.",
+            detail=(
+                "Staff member does not belong to the "
+                "authenticated Hospital."
+            ),
+        ) from exc
+
+
+# ============================================================================
+# Encounter Timeline
+# ============================================================================
+
+
+@router.get(
+    "/{encounter_id}/timeline",
+    response_model=list[ClinicalEventResponse],
+    summary="Retrieve Encounter Clinical Timeline",
+)
+def get_encounter_timeline(
+    encounter_id: UUID,
+    context: RequestContext = Depends(get_request_context),
+    service: EncounterTimelineService = Depends(
+        get_encounter_timeline_service,
+    ),
+):
+    """
+    Retrieve the chronological Clinical Events belonging to an Encounter.
+    """
+
+    try:
+        events = service.get_timeline(
+            context=context,
+            encounter_id=encounter_id,
+        )
+
+        return [
+            ClinicalEventResponse.model_validate(
+                event,
+            )
+            for event in events
+        ]
+
+    except EncounterNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Encounter not found.",
         ) from exc
 
 
 # ============================================================================
 # Retrieve Encounter
 # ============================================================================
+
 
 @router.get(
     "/{encounter_id}",
@@ -146,7 +242,9 @@ def get_encounter(
             encounter_id=encounter_id,
         )
 
-        return EncounterResponse.model_validate(encounter)
+        return EncounterResponse.model_validate(
+            encounter,
+        )
 
     except EncounterNotFoundError as exc:
         raise HTTPException(
@@ -158,6 +256,7 @@ def get_encounter(
 # ============================================================================
 # Close Encounter
 # ============================================================================
+
 
 @router.post(
     "/{encounter_id}/close",
@@ -180,7 +279,9 @@ def close_encounter(
             encounter_id=encounter_id,
         )
 
-        return EncounterResponse.model_validate(encounter)
+        return EncounterResponse.model_validate(
+            encounter,
+        )
 
     except EncounterNotFoundError as exc:
         raise HTTPException(
@@ -198,6 +299,7 @@ def close_encounter(
 # ============================================================================
 # Episode Encounters
 # ============================================================================
+
 
 @router.get(
     "/episode/{episode_id}",
@@ -220,6 +322,8 @@ def list_episode_encounters(
     )
 
     return [
-        EncounterResponse.model_validate(encounter)
+        EncounterResponse.model_validate(
+            encounter,
+        )
         for encounter in encounters
     ]

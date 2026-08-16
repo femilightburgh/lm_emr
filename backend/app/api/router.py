@@ -104,6 +104,26 @@ from app.modules.encounter.api.router import (
     router as encounter_router,
 )
 
+from app.modules.events.api.router import (
+    router as clinical_event_router,
+)
+
+# ============================================================================
+# Vitals
+# ============================================================================
+
+from app.modules.vitals.api.router import (
+    router as vitals_router,
+)
+
+# ============================================================================
+# Clinical Documents
+# ============================================================================
+
+from app.modules.clinical_documents.api.router import (
+    router as clinical_documents_router,
+)
+
 # ============================================================================
 # Future Modules
 # ============================================================================
@@ -190,6 +210,30 @@ api_router.include_router(
 
 api_router.include_router(
     encounter_router,
+)
+
+# ============================================================================
+# Clinical Events
+# ============================================================================
+
+api_router.include_router(
+    clinical_event_router,
+)
+
+# ============================================================================
+# Vitals
+# ============================================================================
+
+api_router.include_router(
+    vitals_router,
+)
+
+# ============================================================================
+# Clinical Documents
+# ============================================================================
+
+api_router.include_router(
+    clinical_documents_router,
 )
 
 # ============================================================================

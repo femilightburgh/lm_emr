@@ -35,7 +35,9 @@ from app.db.base_entity import BaseEntity
 
 if TYPE_CHECKING:
     from app.modules.episode.models import Episode
+    from app.modules.events.models import ClinicalEvent
     from app.modules.staff.models import Staff
+    from app.modules.clinical_documents.models import ClinicalDocument
 
 
 class EncounterStatus(str, Enum):
@@ -113,4 +115,14 @@ class Encounter(BaseEntity):
 
     staff: Mapped["Staff"] = relationship(
         back_populates="encounters",
+    )
+
+    events: Mapped[list["ClinicalEvent"]] = relationship(
+        back_populates="encounter",
+        cascade="all, delete-orphan",
+    )
+
+    clinical_documents: Mapped[list["ClinicalDocument"]] = relationship(
+        back_populates="encounter",
+        cascade="all, delete-orphan",
     )

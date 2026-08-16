@@ -1,4 +1,5 @@
 """
+==============================================================================
 LIGHTBURGH EMR
 
 Encounter Service
@@ -11,22 +12,16 @@ Database access belongs in EncounterRepository.
 
 HTTP concerns belong in the API router.
 
+An Encounter may be created while its Episode is OPEN or ADMITTED.
+
+An Episode that is CLOSED or CANCELLED cannot receive new Encounters.
 ==============================================================================
 """
 
 from datetime import UTC, datetime
-from app.modules.encounter.repositories.encounter_repository import (
-    EncounterRepository,
-)
 from uuid import UUID
 
 from app.core.context import RequestContext
-from app.modules.encounter.models import Encounter, EncounterStatus
-from app.modules.episode.repositories.episode_repository import (
-    EpisodeRepository,
-)
-from app.modules.staff.repository import StaffRepository
-from app.modules.episode.models import EpisodeStatus
 from app.modules.encounter.exceptions import (
     EncounterAlreadyClosedError,
     EncounterNotFoundError,
@@ -35,6 +30,18 @@ from app.modules.encounter.exceptions import (
     StaffHospitalMismatchError,
     StaffNotFoundError,
 )
+from app.modules.encounter.models import (
+    Encounter,
+    EncounterStatus,
+)
+from app.modules.encounter.repositories.encounter_repository import (
+    EncounterRepository,
+)
+from app.modules.episode.models import EpisodeStatus
+from app.modules.episode.repositories.episode_repository import (
+    EpisodeRepository,
+)
+from app.modules.staff.repository import StaffRepository
 
 
 class EncounterService:
@@ -69,8 +76,11 @@ class EncounterService:
 
         A newly created Encounter starts OPEN.
 
-        The Episode must belong to the authenticated Hospital
-        and must itself be OPEN.
+        The Episode must:
+        - belong to the authenticated Hospital;
+        - be OPEN or ADMITTED.
+
+        CLOSED and CANCELLED Episodes cannot receive new Encounters.
         """
 
         # --------------------------------------------------------------
@@ -85,8 +95,19 @@ class EncounterService:
         if episode is None:
             raise EpisodeNotFoundError()
 
-        if episode.status != EpisodeStatus.OPEN:
+        # --------------------------------------------------------------
+        # Validate Episode lifecycle
+        # --------------------------------------------------------------
+
+        if episode.status not in (
+            EpisodeStatus.OPEN,
+            EpisodeStatus.ADMITTED,
+        ):
             raise EpisodeNotOpenError()
+
+        # --------------------------------------------------------------
+        # Validate Staff
+        # --------------------------------------------------------------
 
         staff = self.staff_repository.get_by_id(
             staff_id,
@@ -159,6 +180,7 @@ class EncounterService:
         encounter.ended_at = datetime.now(UTC)
 
         self.repository.save()
+
         self.repository.refresh(
             encounter,
         )

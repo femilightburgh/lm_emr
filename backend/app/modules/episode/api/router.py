@@ -30,7 +30,14 @@ from app.core.context import (
     get_request_context,
 )
 from app.db.session import get_db
+
+from app.modules.encounter.repositories.encounter_repository import (
+    EncounterRepository,
+)
+
 from app.modules.episode.exceptions import (
+    EpisodeAlreadyCancelledError,
+    EpisodeAlreadyClosedError,
     EpisodeAlreadyExistsError,
     EpisodeNotFoundError,
     PatientNotFoundError,
@@ -48,16 +55,22 @@ from app.modules.episode.services.episode_number_generator import (
 from app.modules.episode.services.episode_service import (
     EpisodeService,
 )
+
+from app.modules.events.repositories import (
+    ClinicalEventRepository,
+)
+from app.modules.events.services.event_service import (
+    ClinicalEventService,
+)
+
 from app.modules.patients.repositories.patient_repository import (
     PatientRepository,
 )
-from app.modules.episode.exceptions import (
-    EpisodeAlreadyCancelledError,
-    EpisodeAlreadyClosedError,
-    EpisodeAlreadyExistsError,
-    EpisodeNotFoundError,
-    PatientNotFoundError,
+
+from app.modules.staff.repository import (
+    StaffRepository,
 )
+
 
 router = APIRouter(
     prefix="/episodes",
@@ -74,7 +87,8 @@ def get_episode_service(
     db: Session = Depends(get_db),
 ) -> EpisodeService:
     """
-    Build an EpisodeService with its required dependencies.
+    Build the EpisodeService with its complete production
+    dependency graph.
     """
 
     repository = EpisodeRepository(db)
@@ -85,10 +99,23 @@ def get_episode_service(
         repository=repository,
     )
 
+    encounter_repository = EncounterRepository(db)
+
+    event_service = ClinicalEventService(
+        repository=ClinicalEventRepository(db),
+    )
+
+    staff_repository = StaffRepository(
+        session=db,
+    )
+
     return EpisodeService(
         repository=repository,
         patient_repository=patient_repository,
         number_generator=number_generator,
+        encounter_repository=encounter_repository,
+        event_service=event_service,
+        staff_repository=staff_repository,
     )
 
 
@@ -117,7 +144,6 @@ def create_episode(
     """
 
     try:
-
         episode = service.create_episode(
             context=context,
             patient_id=request.patient_id,
@@ -129,14 +155,12 @@ def create_episode(
         )
 
     except PatientNotFoundError as exc:
-
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Patient not found.",
         ) from exc
 
     except EpisodeAlreadyExistsError as exc:
-
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Episode already exists.",
@@ -167,7 +191,6 @@ def get_episode(
     """
 
     try:
-
         episode = service.get_episode(
             context=context,
             episode_id=episode_id,
@@ -178,7 +201,6 @@ def get_episode(
         )
 
     except EpisodeNotFoundError as exc:
-
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Episode not found.",
@@ -216,7 +238,6 @@ def close_episode(
     """
 
     try:
-
         episode = service.close_episode(
             context=context,
             episode_id=episode_id,
@@ -227,21 +248,18 @@ def close_episode(
         )
 
     except EpisodeNotFoundError as exc:
-
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Episode not found.",
         ) from exc
 
     except EpisodeAlreadyClosedError as exc:
-
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Episode is already closed.",
         ) from exc
 
     except EpisodeAlreadyCancelledError as exc:
-
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Cancelled episodes cannot be closed.",
@@ -280,7 +298,6 @@ def cancel_episode(
     """
 
     try:
-
         episode = service.cancel_episode(
             context=context,
             episode_id=episode_id,
@@ -291,21 +308,18 @@ def cancel_episode(
         )
 
     except EpisodeNotFoundError as exc:
-
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Episode not found.",
         ) from exc
 
     except EpisodeAlreadyClosedError as exc:
-
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Closed episodes cannot be cancelled.",
         ) from exc
 
     except EpisodeAlreadyCancelledError as exc:
-
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Episode is already cancelled.",

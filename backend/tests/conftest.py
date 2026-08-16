@@ -65,6 +65,69 @@ def cleanup_hospital(db: Session, hospital_id) -> None:
     """
 
     # ------------------------------------------------------------------
+    # Clinical Documents
+    # ------------------------------------------------------------------
+    #
+    # Clinical Documents belong to Encounters.
+    #
+    # Documents may also reference an earlier document version through
+    # amended_from_id. Clear that self-reference first so the test
+    # cleanup can safely remove the entire document history.
+    # ------------------------------------------------------------------
+
+    db.execute(
+        text(
+            """
+            UPDATE clinical_documents
+            SET amended_from_id = NULL
+            WHERE encounter_id IN (
+                SELECT e.id
+                FROM encounters e
+                JOIN episodes ep
+                    ON e.episode_id = ep.id
+                WHERE ep.hospital_id = :hospital_id
+            )
+            """
+        ),
+        {"hospital_id": hospital_id},
+    )
+
+    db.execute(
+        text(
+            """
+            DELETE FROM clinical_documents
+            WHERE encounter_id IN (
+                SELECT e.id
+                FROM encounters e
+                JOIN episodes ep
+                    ON e.episode_id = ep.id
+                WHERE ep.hospital_id = :hospital_id
+            )
+            """
+        ),
+        {"hospital_id": hospital_id},
+    )
+    # ------------------------------------------------------------------
+    # Clinical Events
+    # ------------------------------------------------------------------
+
+    db.execute(
+        text(
+            """
+            DELETE FROM clinical_events
+            WHERE encounter_id IN (
+                SELECT e.id
+                FROM encounters e
+                JOIN episodes ep
+                    ON e.episode_id = ep.id
+                WHERE ep.hospital_id = :hospital_id
+            )
+            """
+        ),
+        {"hospital_id": hospital_id},
+    )
+
+    # ------------------------------------------------------------------
     # Encounters
     # ------------------------------------------------------------------
 

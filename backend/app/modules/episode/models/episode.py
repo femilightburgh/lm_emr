@@ -1,8 +1,8 @@
 """
+==============================================================================
 LIGHTBURGH EMR
 
 Episode Model
-
 ==============================================================================
 
 An Episode of Care represents a patient's healthcare journey for a
@@ -12,6 +12,7 @@ An Episode:
 
 • Belongs to exactly one Hospital.
 • Belongs to exactly one Patient.
+• Has one managing doctor once admitted.
 • Groups related Encounters.
 • Groups related Clinical Events.
 • Represents the root aggregate of a patient's healthcare journey.
@@ -41,6 +42,7 @@ if TYPE_CHECKING:
     from app.modules.encounter.models import Encounter
     from app.modules.organization.models import Hospital
     from app.modules.patients.models import Patient
+    from app.modules.staff.models import Staff
 
 
 class EpisodeStatus(str, Enum):
@@ -49,6 +51,7 @@ class EpisodeStatus(str, Enum):
     """
 
     OPEN = "OPEN"
+    ADMITTED = "ADMITTED"
     CLOSED = "CLOSED"
     CANCELLED = "CANCELLED"
 
@@ -59,6 +62,9 @@ class Episode(BaseEntity):
 
     An Episode groups all clinical activity associated with a
     single healthcare journey.
+
+    Once an Episode is admitted, the clinician who performs the
+    admission becomes the managing doctor for that Episode.
     """
 
     __tablename__ = "episodes"
@@ -84,6 +90,16 @@ class Episode(BaseEntity):
     patient_id: Mapped[UUID] = mapped_column(
         ForeignKey("patients.id"),
         nullable=False,
+        index=True,
+    )
+
+    # ------------------------------------------------------------------
+    # Managing Doctor
+    # ------------------------------------------------------------------
+
+    managing_doctor_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("staff.id"),
+        nullable=True,
         index=True,
     )
 
@@ -139,6 +155,10 @@ class Episode(BaseEntity):
 
     patient: Mapped["Patient"] = relationship(
         back_populates="episodes",
+    )
+
+    managing_doctor: Mapped["Staff | None"] = relationship(
+        foreign_keys=[managing_doctor_id],
     )
 
     encounters: Mapped[list["Encounter"]] = relationship(
