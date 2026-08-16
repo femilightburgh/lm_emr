@@ -20,6 +20,10 @@ from uuid import UUID
 import jwt
 
 from app.core.config import settings
+from app.modules.identity.exceptions import (
+    ExpiredTokenError,
+    InvalidTokenError,
+)
 
 
 class TokenService:
@@ -111,13 +115,31 @@ class TokenService:
 
         return self._encode_token(payload)
     
-    def decode_token(self, token: str) -> dict:
+    def decode_token(
+        self,
+        token: str,
+    ) -> dict:
         """
         Decode and validate a JWT.
+
+        Raises
+        ------
+        InvalidTokenError
+            If the token is malformed or invalid.
+
+        ExpiredTokenError
+            If the token has expired.
         """
 
-        return jwt.decode(
-            token,
-            self.secret_key,
-            algorithms=[self.algorithm],
-        )
+        try:
+            return jwt.decode(
+                token,
+                self.secret_key,
+                algorithms=[self.algorithm],
+            )
+
+        except jwt.ExpiredSignatureError as exc:
+            raise ExpiredTokenError() from exc
+
+        except jwt.InvalidTokenError as exc:
+            raise InvalidTokenError() from exc

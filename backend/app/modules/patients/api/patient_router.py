@@ -1,4 +1,3 @@
-
 """
 ==============================================================================
 LIGHTBURGH EMR
@@ -10,7 +9,11 @@ Purpose
 -------
 Defines the HTTP endpoints for patient management.
 
+Authentication and authorization are enforced at the API boundary.
+
 Business logic belongs in PatientService.
+
+Persistence belongs in PatientRepository.
 
 HTTP concerns belong here.
 ==============================================================================
@@ -25,7 +28,11 @@ from app.core.context import (
     RequestContext,
     get_request_context,
 )
+from app.core.security.authorization import (
+    require_permission,
+)
 from app.db.session import get_db
+
 from app.modules.patients.repositories.patient_repository import (
     PatientRepository,
 )
@@ -46,9 +53,10 @@ router = APIRouter(
 )
 
 
-# ------------------------------------------------------------------
+# =============================================================================
 # Dependency Injection
-# ------------------------------------------------------------------
+# =============================================================================
+
 
 def get_patient_service(
     db: Session = Depends(get_db),
@@ -64,9 +72,10 @@ def get_patient_service(
     )
 
 
-# ------------------------------------------------------------------
+# =============================================================================
 # Create Patient
-# ------------------------------------------------------------------
+# =============================================================================
+
 
 @router.post(
     "",
@@ -76,6 +85,9 @@ def get_patient_service(
 )
 async def create_patient(
     request: CreatePatientRequest,
+    current_user=Depends(
+        require_permission("patient.create"),
+    ),
     context: RequestContext = Depends(
         get_request_context,
     ),
@@ -85,6 +97,9 @@ async def create_patient(
 ):
     """
     Register a new patient.
+
+    Requires:
+        patient.create
     """
 
     return service.create_patient(
@@ -93,9 +108,10 @@ async def create_patient(
     )
 
 
-# ------------------------------------------------------------------
-# List Patients
-# ------------------------------------------------------------------
+# =============================================================================
+# List / Search Patients
+# =============================================================================
+
 
 @router.get(
     "",
@@ -109,6 +125,9 @@ async def list_patients(
     name: str | None = Query(
         default=None,
     ),
+    current_user=Depends(
+        require_permission("patient.read"),
+    ),
     context: RequestContext = Depends(
         get_request_context,
     ),
@@ -118,6 +137,9 @@ async def list_patients(
 ):
     """
     List or search patients within the current hospital.
+
+    Requires:
+        patient.read
     """
 
     if hospital_number or name:
@@ -137,9 +159,10 @@ async def list_patients(
     )
 
 
-# ------------------------------------------------------------------
+# =============================================================================
 # Get Patient
-# ------------------------------------------------------------------
+# =============================================================================
+
 
 @router.get(
     "/{patient_id}",
@@ -148,6 +171,9 @@ async def list_patients(
 )
 async def get_patient(
     patient_id: UUID,
+    current_user=Depends(
+        require_permission("patient.read"),
+    ),
     context: RequestContext = Depends(
         get_request_context,
     ),
@@ -157,6 +183,9 @@ async def get_patient(
 ):
     """
     Retrieve a patient within the current hospital.
+
+    Requires:
+        patient.read
     """
 
     return service.get_patient(
@@ -165,9 +194,10 @@ async def get_patient(
     )
 
 
-# ------------------------------------------------------------------
+# =============================================================================
 # Update Patient
-# ------------------------------------------------------------------
+# =============================================================================
+
 
 @router.patch(
     "/{patient_id}",
@@ -177,6 +207,9 @@ async def get_patient(
 async def update_patient(
     patient_id: UUID,
     request: UpdatePatientRequest,
+    current_user=Depends(
+        require_permission("patient.update"),
+    ),
     context: RequestContext = Depends(
         get_request_context,
     ),
@@ -186,6 +219,9 @@ async def update_patient(
 ):
     """
     Update an existing patient within the current hospital.
+
+    Requires:
+        patient.update
     """
 
     return service.update_patient(

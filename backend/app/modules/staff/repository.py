@@ -133,6 +133,29 @@ class StaffRepository:
             )
         )
 
+
+    def get_by_user_account_id(
+        self,
+        hospital_id: UUID,
+        user_account_id: UUID,
+    ) -> Staff | None:
+        """
+        Retrieve a Staff member associated with a UserAccount
+        within a specific Hospital.
+        """
+
+        statement = (
+            select(Staff)
+            .where(
+                Staff.hospital_id == hospital_id,
+                Staff.user_account_id == user_account_id,
+            )
+        )
+
+        return self.session.scalar(
+            statement,
+        )
+
     # =========================================================================
     # Employment
     # =========================================================================

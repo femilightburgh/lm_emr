@@ -65,6 +65,14 @@ class LoginResponse(BaseModel):
     token_type: Literal["bearer"] = "bearer"
 
 
+class RefreshTokenRequest(BaseModel):
+    """
+    Request payload for refreshing an access token.
+    """
+
+    refresh_token: str
+
+
 # ============================================================================
 # User Creation
 # ============================================================================

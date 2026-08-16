@@ -52,6 +52,8 @@ from app.modules.episode.exceptions import (
     EpisodeAlreadyExistsError,
     EpisodeNotFoundError,
     EpisodeNotOpenError,
+    EpisodeAlreadyCheckedInError,
+    EpisodeNotAwaitingCheckInError,
     PatientNotFoundError,
     StaffHospitalMismatchError,
     StaffNotDoctorError,
@@ -59,6 +61,7 @@ from app.modules.episode.exceptions import (
 )
 from app.modules.episode.models import (
     Episode,
+    EpisodeFlowStatus,
     EpisodeStatus,
 )
 from app.modules.episode.repositories.episode_repository import (
@@ -179,10 +182,17 @@ class EpisodeService:
             episode_number=episode_number,
             title=title,
             status=EpisodeStatus.OPEN,
+            flow_status=EpisodeFlowStatus.AWAITING_CHECK_IN,
+            checked_in_at=None,
+            checked_in_by=None,
+            triaged_at=None,
+            triaged_by=None,
+            routed_at=None,
+            routed_by=None,
+            current_department_id=None,
             opened_at=datetime.now(UTC),
             closed_at=None,
         )
-
         self.repository.create(
             episode=episode,
         )
@@ -554,3 +564,105 @@ class EpisodeService:
             hospital_id=context.hospital_id,
             patient_id=patient_id,
         )
+
+
+    # =========================================================================
+    # Check In
+    # =========================================================================
+
+    def check_in_episode(
+        self,
+        *,
+        context: RequestContext,
+        episode_id: UUID,
+    ) -> Episode:
+        """
+        Check in an Episode for clinical care.
+
+        Reception check-in moves an Episode from the initial operational
+        state into the nursing intake queue.
+
+        The authenticated UserAccount is resolved to its Staff profile.
+        The Staff identifier is recorded on the Episode for audit purposes.
+
+        Clinical EpisodeStatus is deliberately unchanged.
+
+        Business Rules
+        --------------
+
+        • The Episode must belong to the authenticated Hospital.
+        • The Episode must exist.
+        • The Episode must not be CLOSED.
+        • The Episode must not be CANCELLED.
+        • The Episode must currently be AWAITING_CHECK_IN.
+        • The authenticated UserAccount must have a Staff profile
+        belonging to the authenticated Hospital.
+        • The check-in Staff member is recorded as checked_in_by.
+        • The check-in timestamp is recorded.
+        • The Episode moves to WAITING_FOR_NURSING.
+        """
+
+        # ------------------------------------------------------------------
+        # Episode
+        # ------------------------------------------------------------------
+
+        episode = self.repository.get_by_id(
+            hospital_id=context.hospital_id,
+            episode_id=episode_id,
+        )
+
+        if episode is None:
+            raise EpisodeNotFoundError()
+
+        # ------------------------------------------------------------------
+        # Clinical State
+        # ------------------------------------------------------------------
+
+        if episode.status == EpisodeStatus.CLOSED:
+            raise EpisodeAlreadyClosedError()
+
+        if episode.status == EpisodeStatus.CANCELLED:
+            raise EpisodeAlreadyCancelledError()
+
+        # ------------------------------------------------------------------
+        # Operational State
+        # ------------------------------------------------------------------
+
+        if episode.flow_status != EpisodeFlowStatus.AWAITING_CHECK_IN:
+            raise EpisodeNotAwaitingCheckInError()
+
+        # ------------------------------------------------------------------
+        # Resolve authenticated UserAccount → Staff
+        # ------------------------------------------------------------------
+
+        staff = self.staff_repository.get_by_user_account_id(
+            hospital_id=context.hospital_id,
+            user_account_id=context.user_id,
+        )
+
+        if staff is None:
+            raise StaffNotFoundError(
+                "Authenticated user does not have a Staff profile.",
+            )
+
+        # ------------------------------------------------------------------
+        # Check In
+        # ------------------------------------------------------------------
+
+        checked_in_at = datetime.now(UTC)
+
+        episode.flow_status = EpisodeFlowStatus.WAITING_FOR_NURSING
+        episode.checked_in_at = checked_in_at
+        episode.checked_in_by = staff.id
+
+        # ------------------------------------------------------------------
+        # Persist
+        # ------------------------------------------------------------------
+
+        self.repository.save()
+
+        self.repository.refresh(
+            episode,
+        )
+
+        return episode

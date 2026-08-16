@@ -29,6 +29,7 @@ from app.core.context import (
     RequestContext,
     get_request_context,
 )
+
 from app.db.session import get_db
 
 from app.modules.encounter.repositories.encounter_repository import (
@@ -40,18 +41,24 @@ from app.modules.episode.exceptions import (
     EpisodeAlreadyClosedError,
     EpisodeAlreadyExistsError,
     EpisodeNotFoundError,
+    EpisodeNotAwaitingCheckInError,
     PatientNotFoundError,
+    StaffNotFoundError,
 )
+
 from app.modules.episode.repositories.episode_repository import (
     EpisodeRepository,
 )
+
 from app.modules.episode.schemas import (
     CreateEpisodeRequest,
     EpisodeResponse,
 )
+
 from app.modules.episode.services.episode_number_generator import (
     EpisodeNumberGenerator,
 )
+
 from app.modules.episode.services.episode_service import (
     EpisodeService,
 )
@@ -59,6 +66,7 @@ from app.modules.episode.services.episode_service import (
 from app.modules.events.repositories import (
     ClinicalEventRepository,
 )
+
 from app.modules.events.services.event_service import (
     ClinicalEventService,
 )
@@ -208,6 +216,77 @@ def get_episode(
 
 
 # ============================================================================
+# Check In Episode
+# ============================================================================
+
+
+@router.post(
+    "/{episode_id}/check-in",
+    response_model=EpisodeResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Check in an Episode for clinical care",
+)
+def check_in_episode(
+    episode_id: UUID,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: EpisodeService = Depends(
+        get_episode_service,
+    ),
+):
+    """
+    Check in an Episode for clinical care.
+
+    The authenticated Staff member is recorded as the
+    receptionist/staff member who performed the check-in.
+
+    A successful check-in moves the Episode into the
+    nursing intake queue.
+    """
+
+    try:
+        episode = service.check_in_episode(
+            context=context,
+            episode_id=episode_id,
+        )
+
+        return EpisodeResponse.model_validate(
+            episode,
+        )
+
+    except EpisodeNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Episode not found.",
+        ) from exc
+
+    except EpisodeAlreadyClosedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Closed episodes cannot be checked in.",
+        ) from exc
+
+    except EpisodeAlreadyCancelledError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cancelled episodes cannot be checked in.",
+        ) from exc
+
+    except EpisodeNotAwaitingCheckInError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Episode is not awaiting check-in.",
+        ) from exc
+
+    except StaffNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Authenticated user does not have a Staff profile.",
+        ) from exc
+
+
+# ============================================================================
 # Close Episode
 # ============================================================================
 
@@ -229,12 +308,6 @@ def close_episode(
 ):
     """
     Close an open Episode of Care.
-
-    The Episode must belong to the authenticated Hospital
-    and must currently have an OPEN status.
-
-    Once closed, the Episode receives a closed_at timestamp
-    and cannot be closed again.
     """
 
     try:
@@ -288,13 +361,6 @@ def cancel_episode(
 ):
     """
     Cancel an open Episode of Care.
-
-    The Episode must belong to the authenticated Hospital
-    and must currently have an OPEN status.
-
-    Once cancelled, the Episode receives a CANCELLED status.
-    The closed_at timestamp remains unset because cancellation
-    is distinct from completing the Episode.
     """
 
     try:

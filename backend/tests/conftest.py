@@ -11,6 +11,7 @@ from app.modules.organization.enums import (
     HospitalType,
 )
 from app.modules.organization.models import Hospital
+from app.bootstrap.permissions import bootstrap_permissions
 
 
 TEST_DATABASE_URL = os.environ.get(
@@ -37,7 +38,11 @@ def db() -> Session:
     session = TestingSessionLocal()
 
     try:
+        bootstrap_permissions(session)
+        session.commit()
+
         yield session
+
     finally:
         session.rollback()
         session.close()
@@ -213,6 +218,30 @@ def cleanup_hospital(db: Session, hospital_id) -> None:
         text(
             """
             DELETE FROM departments
+            WHERE hospital_id = :hospital_id
+            """
+        ),
+        {"hospital_id": hospital_id},
+    )
+
+    # ------------------------------------------------------------------
+    # Identity
+    # ------------------------------------------------------------------
+
+    db.execute(
+        text(
+            """
+            DELETE FROM user_accounts
+            WHERE hospital_id = :hospital_id
+            """
+        ),
+        {"hospital_id": hospital_id},
+    )
+
+    db.execute(
+        text(
+            """
+            DELETE FROM roles
             WHERE hospital_id = :hospital_id
             """
         ),

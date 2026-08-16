@@ -19,6 +19,13 @@ An Episode:
 
 Episode numbers are unique within a Hospital.
 
+Clinical lifecycle and operational workflow are deliberately separate.
+
+EpisodeStatus represents the clinical lifecycle of the Episode.
+
+EpisodeFlowStatus represents where the Episode currently sits in the
+hospital's operational patient-flow process.
+
 ==============================================================================
 """
 
@@ -38,6 +45,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_entity import BaseEntity
 
+
 if TYPE_CHECKING:
     from app.modules.encounter.models import Encounter
     from app.modules.organization.models import Hospital
@@ -47,13 +55,36 @@ if TYPE_CHECKING:
 
 class EpisodeStatus(str, Enum):
     """
-    Status of an Episode of Care.
+    Clinical lifecycle status of an Episode of Care.
     """
 
     OPEN = "OPEN"
     ADMITTED = "ADMITTED"
     CLOSED = "CLOSED"
     CANCELLED = "CANCELLED"
+
+
+class EpisodeFlowStatus(str, Enum):
+    """
+    Operational workflow status of an Episode.
+
+    This is deliberately separate from EpisodeStatus.
+
+    EpisodeStatus answers:
+        What is the clinical lifecycle of this Episode?
+
+    EpisodeFlowStatus answers:
+        Where is this Episode in the hospital's operational
+        patient-flow process?
+    """
+
+    AWAITING_CHECK_IN = "AWAITING_CHECK_IN"
+
+    WAITING_FOR_NURSING = "WAITING_FOR_NURSING"
+
+    NURSING_IN_PROGRESS = "NURSING_IN_PROGRESS"
+
+    ROUTED = "ROUTED"
 
 
 class Episode(BaseEntity):
@@ -119,7 +150,7 @@ class Episode(BaseEntity):
     )
 
     # ------------------------------------------------------------------
-    # Status
+    # Clinical Status
     # ------------------------------------------------------------------
 
     status: Mapped[EpisodeStatus] = mapped_column(
@@ -129,6 +160,71 @@ class Episode(BaseEntity):
         ),
         nullable=False,
         default=EpisodeStatus.OPEN,
+    )
+
+    # ------------------------------------------------------------------
+    # Operational Flow Status
+    # ------------------------------------------------------------------
+
+    flow_status: Mapped[EpisodeFlowStatus] = mapped_column(
+        SqlEnum(
+            EpisodeFlowStatus,
+            name="episode_flow_status_enum",
+        ),
+        nullable=False,
+        default=EpisodeFlowStatus.AWAITING_CHECK_IN,
+        index=True,
+    )
+
+    # ------------------------------------------------------------------
+    # Reception Check-In
+    # ------------------------------------------------------------------
+
+    checked_in_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    checked_in_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("staff.id"),
+        nullable=True,
+        index=True,
+    )
+
+    # ------------------------------------------------------------------
+    # Nursing Workflow
+    # ------------------------------------------------------------------
+
+    triaged_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    triaged_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("staff.id"),
+        nullable=True,
+        index=True,
+    )
+
+    # ------------------------------------------------------------------
+    # Routing
+    # ------------------------------------------------------------------
+
+    routed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    routed_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("staff.id"),
+        nullable=True,
+        index=True,
+    )
+
+    current_department_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("departments.id"),
+        nullable=True,
+        index=True,
     )
 
     # ------------------------------------------------------------------
@@ -159,6 +255,18 @@ class Episode(BaseEntity):
 
     managing_doctor: Mapped["Staff | None"] = relationship(
         foreign_keys=[managing_doctor_id],
+    )
+
+    checked_in_staff: Mapped["Staff | None"] = relationship(
+        foreign_keys=[checked_in_by],
+    )
+
+    triaged_staff: Mapped["Staff | None"] = relationship(
+        foreign_keys=[triaged_by],
+    )
+
+    routed_staff: Mapped["Staff | None"] = relationship(
+        foreign_keys=[routed_by],
     )
 
     encounters: Mapped[list["Encounter"]] = relationship(

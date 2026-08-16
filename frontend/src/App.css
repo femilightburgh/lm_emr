@@ -1,0 +1,831 @@
+#root {
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f4f6f8;
+  color: #17212b;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+
+/* ==========================================================================
+   Shared
+   ========================================================================== */
+
+.brand {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #17212b;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: #607080;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.login-subtitle {
+  margin: 12px 0 0;
+  color: #6d7883;
+  line-height: 1.6;
+}
+
+
+/* ==========================================================================
+   Login
+   ========================================================================== */
+
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+  background: #f4f6f8;
+}
+
+.login-card {
+  width: min(100%, 440px);
+  padding: 48px;
+  background: #ffffff;
+  border: 1px solid #e1e5e9;
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(20, 30, 40, 0.08);
+}
+
+.loading-card {
+  text-align: center;
+}
+
+.workspace-name {
+  margin-top: 6px;
+  color: #7b8792;
+  font-size: 13px;
+}
+
+.login-heading {
+  margin-top: 48px;
+}
+
+.login-heading h1,
+.workspace-header h1 {
+  margin: 0;
+  color: #17212b;
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+.login-form {
+  display: grid;
+  gap: 20px;
+  margin-top: 32px;
+}
+
+.login-form label,
+.registration-form label {
+  display: grid;
+  gap: 8px;
+  color: #34414d;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.login-form input,
+.registration-form input,
+.registration-form select,
+.patient-search input,
+.quick-search input {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid #d5dce2;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #17212b;
+  outline: none;
+}
+
+.login-form input:focus,
+.registration-form input:focus,
+.registration-form select:focus,
+.patient-search input:focus,
+.quick-search input:focus {
+  border-color: #526b7d;
+  box-shadow: 0 0 0 3px rgba(82, 107, 125, 0.12);
+}
+
+.primary-button,
+.secondary-button {
+  border-radius: 8px;
+  padding: 12px 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary-button {
+  border: 0;
+  background: #17212b;
+  color: #ffffff;
+}
+
+.primary-button:hover {
+  background: #273642;
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.secondary-button {
+  border: 1px solid #d5dce2;
+  background: #ffffff;
+  color: #273642;
+}
+
+.secondary-button:hover {
+  background: #f4f6f8;
+}
+
+.login-error {
+  margin-top: 24px;
+  padding: 12px 14px;
+  border: 1px solid #e5b8b8;
+  border-radius: 8px;
+  background: #fff5f5;
+  color: #9b3030;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+
+/* ==========================================================================
+   Application Shell
+   ========================================================================== */
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  background: #f4f6f8;
+}
+
+.sidebar {
+  width: 250px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #17212b;
+  color: #ffffff;
+}
+
+.sidebar .brand {
+  color: #ffffff;
+}
+
+.sidebar-brand {
+  padding: 30px 24px 28px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-caption {
+  margin-top: 7px;
+  color: #aeb9c3;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.sidebar-nav {
+  display: grid;
+  gap: 4px;
+  padding: 20px 12px;
+}
+
+.nav-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #c3ccd4;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+}
+
+.nav-item.active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.nav-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.nav-item small {
+  font-size: 9px;
+  color: #8f9ca7;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.user-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-avatar {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #17212b;
+  font-weight: 800;
+}
+
+.user-summary div:last-child {
+  min-width: 0;
+}
+
+.user-summary strong,
+.user-summary span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-summary strong {
+  max-width: 155px;
+  color: #ffffff;
+  font-size: 11px;
+}
+
+.user-summary span {
+  margin-top: 3px;
+  color: #8f9ca7;
+  font-size: 10px;
+}
+
+.sign-out-button {
+  width: 100%;
+  margin-top: 14px;
+  padding: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 7px;
+  background: transparent;
+  color: #c3ccd4;
+  cursor: pointer;
+}
+
+.sign-out-button:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+}
+
+
+/* ==========================================================================
+   Workspace
+   ========================================================================== */
+
+.workspace {
+  min-width: 0;
+  flex: 1;
+}
+
+.workspace-header {
+  min-height: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 42px;
+  background: #ffffff;
+  border-bottom: 1px solid #e1e5e9;
+}
+
+.workspace-header h1 {
+  font-size: 27px;
+}
+
+.header-user {
+  color: #697681;
+  font-size: 12px;
+}
+
+.workspace-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 36px 42px 60px;
+}
+
+
+/* ==========================================================================
+   Dashboard
+   ========================================================================== */
+
+.welcome-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  padding: 30px;
+  background: #ffffff;
+  border: 1px solid #e1e5e9;
+  border-radius: 12px;
+}
+
+.welcome-panel h2 {
+  margin: 0;
+  font-size: 25px;
+}
+
+.welcome-panel p:not(.eyebrow) {
+  max-width: 650px;
+  margin: 10px 0 0;
+  color: #687580;
+  line-height: 1.6;
+}
+
+.dashboard-action {
+  flex: 0 0 auto;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 18px;
+  margin-top: 20px;
+}
+
+.stat-card,
+.action-card {
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid #e1e5e9;
+  border-radius: 12px;
+}
+
+.stat-card span {
+  display: block;
+  color: #71808c;
+  font-size: 12px;
+}
+
+.stat-card strong {
+  display: block;
+  margin: 8px 0 18px;
+  font-size: 34px;
+}
+
+.stat-card button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #526b7d;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.action-card h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.quick-search {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.quick-search input {
+  flex: 1;
+}
+
+
+/* ==========================================================================
+   Patients
+   ========================================================================== */
+
+.section-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.patient-search {
+  display: flex;
+  flex: 1;
+  max-width: 650px;
+  gap: 8px;
+}
+
+.patient-table {
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #e1e5e9;
+  border-radius: 12px;
+}
+
+.patient-table-header,
+.patient-row {
+  display: grid;
+  grid-template-columns:
+    1.1fr
+    2fr
+    0.8fr
+    1.1fr
+    1.2fr;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 18px;
+}
+
+.patient-table-header {
+  background: #f7f8fa;
+  color: #74818c;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.patient-row {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid #edf0f2;
+  background: #ffffff;
+  color: #34414d;
+  text-align: left;
+  cursor: pointer;
+}
+
+.patient-row:hover {
+  background: #f8fafb;
+}
+
+.patient-row strong {
+  color: #17212b;
+}
+
+.empty-state {
+  display: grid;
+  place-items: center;
+  gap: 7px;
+  min-height: 220px;
+  padding: 30px;
+  background: #ffffff;
+  border: 1px solid #e1e5e9;
+  border-radius: 12px;
+  color: #74818c;
+  text-align: center;
+}
+
+.empty-state strong {
+  color: #34414d;
+}
+
+.patient-detail-card {
+  margin-top: 20px;
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid #e1e5e9;
+  border-radius: 12px;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.detail-header h2 {
+  margin: 0;
+  font-size: 23px;
+}
+
+.detail-header span {
+  display: block;
+  margin-top: 6px;
+  color: #71808c;
+  font-size: 12px;
+}
+
+.close-button {
+  align-self: flex-start;
+  padding: 8px 12px;
+  border: 1px solid #d5dce2;
+  border-radius: 7px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px solid #edf0f2;
+}
+
+.detail-grid span,
+.detail-grid strong {
+  display: block;
+}
+
+.detail-grid span {
+  margin-bottom: 5px;
+  color: #74818c;
+  font-size: 11px;
+}
+
+.detail-grid strong {
+  color: #34414d;
+  font-size: 13px;
+}
+
+
+/* ==========================================================================
+   Registration
+   ========================================================================== */
+
+.registration-form {
+  display: grid;
+  gap: 20px;
+}
+
+.form-section {
+  padding: 28px;
+  background: #ffffff;
+  border: 1px solid #e1e5e9;
+  border-radius: 12px;
+}
+
+.form-section-heading {
+  margin-bottom: 24px;
+}
+
+.form-section-heading h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.form-section-heading p:last-child {
+  margin: 8px 0 0;
+  color: #74818c;
+  font-size: 13px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.wide-field {
+  grid-column: 1 / -1;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.registration-success {
+  max-width: 650px;
+  margin: 30px auto;
+  padding: 40px;
+  background: #ffffff;
+  border: 1px solid #e1e5e9;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.registration-success .success-mark {
+  margin: 0 auto 25px;
+}
+
+.registration-success h2 {
+  margin: 0;
+  font-size: 26px;
+}
+
+.registration-success > p:not(.eyebrow) {
+  color: #74818c;
+}
+
+.success-mark {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #edf7f0;
+  color: #287343;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.registration-number {
+  display: grid;
+  gap: 5px;
+  margin: 24px auto;
+  padding: 18px;
+  border-radius: 8px;
+  background: #f4f6f8;
+}
+
+.registration-number span {
+  color: #74818c;
+  font-size: 11px;
+}
+
+.registration-number strong {
+  font-size: 20px;
+}
+
+.registration-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media (max-width: 900px) {
+  .sidebar {
+    width: 210px;
+  }
+
+  .workspace-header,
+  .workspace-content {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .patient-table-header,
+  .patient-row {
+    grid-template-columns:
+      1fr
+      2fr
+      0.8fr;
+  }
+
+  .patient-table-header span:nth-child(4),
+  .patient-table-header span:nth-child(5),
+  .patient-row span:nth-child(4),
+  .patient-row span:nth-child(5) {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .app-shell {
+    display: block;
+  }
+
+  .sidebar {
+    width: 100%;
+    min-height: auto;
+  }
+
+  .sidebar-nav {
+    display: flex;
+    overflow-x: auto;
+  }
+
+  .nav-item {
+    flex: 0 0 auto;
+    width: auto;
+  }
+
+  .sidebar-footer {
+    display: none;
+  }
+
+  .workspace-header {
+    padding: 20px;
+  }
+
+  .header-user {
+    display: none;
+  }
+
+  .workspace-content {
+    padding: 20px;
+  }
+
+  .welcome-panel {
+    display: block;
+  }
+
+  .dashboard-action {
+    margin-top: 20px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .wide-field {
+    grid-column: auto;
+  }
+
+  .section-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .patient-search {
+    max-width: none;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .login-card {
+    padding: 32px 24px;
+  }
+
+  .workspace-header h1 {
+    font-size: 24px;
+  }
+
+  .form-section {
+    padding: 20px;
+  }
+
+  .patient-table-header,
+  .patient-row {
+    grid-template-columns: 1fr 2fr;
+  }
+
+  .patient-table-header span:nth-child(3),
+  .patient-row span:nth-child(3) {
+    display: none;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .registration-actions,
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .registration-actions button,
+  .form-actions button {
+    width: 100%;
+  }
+}

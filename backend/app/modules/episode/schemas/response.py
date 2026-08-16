@@ -15,7 +15,10 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from app.modules.episode.models import EpisodeStatus
+from app.modules.episode.models import (
+    EpisodeFlowStatus,
+    EpisodeStatus,
+)
 
 
 class EpisodeResponse(BaseModel):
@@ -39,7 +42,35 @@ class EpisodeResponse(BaseModel):
 
     title: str
 
+    # ------------------------------------------------------------------
+    # Clinical lifecycle
+    # ------------------------------------------------------------------
+
     status: EpisodeStatus
+
+    # ------------------------------------------------------------------
+    # Operational workflow
+    # ------------------------------------------------------------------
+
+    flow_status: EpisodeFlowStatus
+
+    checked_in_at: datetime | None
+
+    checked_in_by: UUID | None
+
+    triaged_at: datetime | None
+
+    triaged_by: UUID | None
+
+    routed_at: datetime | None
+
+    routed_by: UUID | None
+
+    current_department_id: UUID | None
+
+    # ------------------------------------------------------------------
+    # Timeline
+    # ------------------------------------------------------------------
 
     opened_at: datetime
 

@@ -25,8 +25,10 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.modules.identity.auth_service import AuthService
 from app.modules.identity.exceptions import (
+    ExpiredTokenError,
     InactiveAccountError,
     InvalidCredentialsError,
+    InvalidTokenError,
 )
 from app.modules.identity.repository import IdentityRepository
 from app.modules.identity.schemas import (
@@ -34,13 +36,13 @@ from app.modules.identity.schemas import (
     LoginRequest,
     LoginResponse,
     UserResponse,
+    RefreshTokenRequest,
 )
 from app.modules.identity.token_service import TokenService
 from app.modules.identity.user_service import UserService
 
 from app.core.security.dependencies import get_current_user
 
-from app.core.security.authorization import require_role
 
 router = APIRouter(
     prefix="/auth",
@@ -117,7 +119,51 @@ def login(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(exc),
         ) from exc
-    
+
+
+@router.post(
+    "/refresh",
+    response_model=LoginResponse,
+    summary="Refresh an access token",
+)
+def refresh(
+    request: RefreshTokenRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Issue a new access token using a valid refresh token.
+    """
+
+    repository = IdentityRepository(db)
+    token_service = TokenService()
+
+    service = AuthService(
+        repository=repository,
+        token_service=token_service,
+    )
+
+    try:
+        return service.refresh(
+            refresh_token=request.refresh_token,
+        )
+
+    except InactiveAccountError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+
+    except InvalidTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(exc),
+        ) from exc
+
+    except ExpiredTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(exc),
+        ) from exc
 
 
 @router.post(
@@ -196,7 +242,7 @@ def oauth2_token(
     summary="Current authenticated user",
 )
 def me(
-    current_user=Depends(require_role("Administrator")),
+    current_user=Depends(get_current_user),
 ):
     """
     Test role-based authorization.

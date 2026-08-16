@@ -31,8 +31,9 @@ from app.modules.identity.schemas import LoginResponse
 from app.modules.identity.exceptions import (
     InvalidCredentialsError,
     InactiveAccountError,
+    InvalidTokenError,
+    ExpiredTokenError,
 )
-
 from uuid import UUID
 
 
@@ -105,6 +106,70 @@ class AuthService:
             access_token=access_token,
             refresh_token=refresh_token,
         )
+
+
+    def refresh(
+        self,
+        *,
+        refresh_token: str,
+    ) -> LoginResponse:
+        """
+        Validate a refresh token and issue a new access token.
+
+        The refresh token itself is not rotated yet.
+
+        Workflow
+        --------
+        1. Decode the refresh token.
+        2. Verify that it is a refresh token.
+        3. Retrieve the user.
+        4. Verify that the account is active.
+        5. Retrieve the user's current roles.
+        6. Issue a new access token.
+        """
+
+        payload = self.token_service.decode_token(
+            refresh_token,
+        )
+
+        if payload.get(
+            self.token_service.CLAIM_TOKEN_TYPE,
+        ) != self.token_service.REFRESH_TOKEN:
+            raise InvalidTokenError()
+
+        user_id = payload.get(
+            self.token_service.CLAIM_SUBJECT,
+        )
+
+        if not user_id:
+            raise InvalidTokenError()
+
+        user = self.repository.get_user_by_id(
+            UUID(user_id),
+        )
+
+        if user is None:
+            raise InvalidTokenError()
+
+        self._validate_account_status(
+            user.status,
+        )
+
+        roles = self._get_user_role_names(
+            user.id,
+        )
+
+        access_token = self.token_service.create_access_token(
+            user_id=user.id,
+            hospital_id=user.hospital_id,
+            roles=roles,
+        )
+
+        return LoginResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+        )
+
 
     def _get_hospital_or_raise(
         self,

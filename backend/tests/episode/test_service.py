@@ -37,11 +37,16 @@ from app.modules.episode.exceptions import (
     EpisodeAlreadyAdmittedError,
     EpisodeAlreadyCancelledError,
     EpisodeAlreadyClosedError,
+    EpisodeNotAwaitingCheckInError,
     EpisodeNotFoundError,
     PatientNotFoundError,
+    StaffNotFoundError,
 )
 
-from app.modules.episode.models import EpisodeStatus
+from app.modules.episode.models import (
+    EpisodeFlowStatus,
+    EpisodeStatus,
+)
 
 from app.modules.patients.repositories.patient_repository import (
     PatientRepository,
@@ -90,6 +95,8 @@ from app.modules.staff.service import StaffService
 from app.modules.organization.repository import HospitalRepository
 
 from tests.helpers.episode import build_episode_service
+from app.modules.identity.models import UserAccount
+from app.modules.identity.enums import AccountStatus
 
 
 # =============================================================================
@@ -170,6 +177,45 @@ def create_staff(
     )
 
     return staff
+
+def create_authenticated_staff(
+    db,
+    hospital,
+):
+    """
+    Create a Staff member linked to a real UserAccount.
+
+    This helper is used for tests that need to represent
+    an authenticated Staff member.
+    """
+
+    user = UserAccount(
+        hospital_id=hospital.id,
+        email=f"staff-{uuid4()}@example.com",
+        password_hash="test-password-hash",
+        status=AccountStatus.ACTIVE,
+        is_superuser=False,
+    )
+
+    db.add(user)
+    db.flush()
+
+    staff = create_staff(
+        db=db,
+        hospital=hospital,
+    )
+
+    staff.user_account_id = user.id
+
+    db.flush()
+
+    context = RequestContext(
+        user_id=user.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
+    return user, staff, context
 
 
 def create_open_encounter(
@@ -1282,3 +1328,215 @@ def test_list_patient_episodes_returns_patient_episodes(
 
     assert first.id in episode_ids
     assert second.id in episode_ids
+
+
+# =============================================================================
+# Episode Check-In
+# =============================================================================
+
+
+def test_check_in_episode_moves_episode_to_nursing_queue(
+    db,
+    hospital,
+):
+    """
+    Checking in an Episode moves it from AWAITING_CHECK_IN
+    to WAITING_FOR_NURSING and records the authenticated Staff member.
+    """
+
+    user, staff, context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+    )
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+    )
+
+    service = build_episode_service(db)
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    assert episode.flow_status == EpisodeFlowStatus.AWAITING_CHECK_IN
+
+    checked_in_episode = service.check_in_episode(
+        context=context,
+        episode_id=episode.id,
+    )
+
+    assert (
+        checked_in_episode.flow_status
+        == EpisodeFlowStatus.WAITING_FOR_NURSING
+    )
+
+    assert checked_in_episode.checked_in_by == staff.id
+
+    assert checked_in_episode.checked_in_by != user.id
+
+    assert checked_in_episode.checked_in_at is not None
+
+
+def test_check_in_episode_rejects_episode_not_awaiting_check_in(
+    db,
+    hospital,
+):
+    """
+    An Episode that has already entered the nursing queue
+    cannot be checked in again.
+    """
+
+    _, staff, context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+    )
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+    )
+
+    service = build_episode_service(db)
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    service.check_in_episode(
+        context=context,
+        episode_id=episode.id,
+    )
+
+    with pytest.raises(EpisodeNotAwaitingCheckInError):
+        service.check_in_episode(
+            context=context,
+            episode_id=episode.id,
+        )
+
+
+def test_check_in_episode_rejects_user_without_staff_profile(
+    db,
+    hospital,
+):
+    """
+    A UserAccount without a Staff profile cannot perform
+    Episode check-in.
+    """
+
+    user = UserAccount(
+        hospital_id=hospital.id,
+        email=f"user-{uuid4()}@example.com",
+        password_hash="test-password-hash",
+        status=AccountStatus.ACTIVE,
+        is_superuser=False,
+    )
+
+    db.add(user)
+    db.flush()
+
+    context = RequestContext(
+        user_id=user.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+    )
+
+    service = build_episode_service(db)
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    with pytest.raises(StaffNotFoundError):
+        service.check_in_episode(
+            context=context,
+            episode_id=episode.id,
+        )
+
+
+def test_check_in_episode_rejects_closed_episode(
+    db,
+    hospital,
+):
+    """
+    A CLOSED Episode cannot be checked in.
+    """
+
+    _, _, context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+    )
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+    )
+
+    service = build_episode_service(db)
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    service.close_episode(
+        context=context,
+        episode_id=episode.id,
+    )
+
+    with pytest.raises(EpisodeAlreadyClosedError):
+        service.check_in_episode(
+            context=context,
+            episode_id=episode.id,
+        )
+
+
+def test_check_in_episode_rejects_cancelled_episode(
+    db,
+    hospital,
+):
+    """
+    A CANCELLED Episode cannot be checked in.
+    """
+
+    _, _, context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+    )
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+    )
+
+    service = build_episode_service(db)
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    service.cancel_episode(
+        context=context,
+        episode_id=episode.id,
+    )
+
+    with pytest.raises(EpisodeAlreadyCancelledError):
+        service.check_in_episode(
+            context=context,
+            episode_id=episode.id,
+        )

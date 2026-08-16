@@ -28,7 +28,19 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.core.context import RequestContext, get_request_context
+from app.core.context import (
+    RequestContext,
+    get_request_context,
+)
+
+from app.core.security.authorization import (
+    get_authorization_service,
+)
+
+from app.core.security.dependencies import (
+    get_current_user,
+)
+
 from app.db.session import get_db
 from app.main import app
 from app.modules.patients.repositories.patient_repository import (
@@ -49,19 +61,77 @@ def hospital_a_client(
 ):
     """
     Create an API client operating as Hospital A.
+
+    These tests focus on tenant isolation, so authentication and
+    authorization are explicitly bypassed here.
     """
 
     def override_get_db():
         yield db
 
+    def override_get_current_user():
+        """
+        Provide a fake authenticated user.
+
+        Authentication is not under test here.
+        """
+        return type(
+            "TestUser",
+            (),
+            {
+                "id": uuid4(),
+                "hospital_id": hospital.id,
+            },
+        )()
+
+    def override_get_authorization_service():
+        """
+        Allow the request through authorization so the tests can
+        exercise hospital-level isolation.
+        """
+
+        class TestAuthorizationService:
+            def has_permission(
+                self,
+                *,
+                user_id,
+                permission_code,
+            ):
+                return True
+
+            def has_role(
+                self,
+                *,
+                user_id,
+                role_name,
+            ):
+                return True
+
+        return TestAuthorizationService()
+
     def override_get_request_context():
         return RequestContext(
             user_id=uuid4(),
             hospital_id=hospital.id,
-            permissions=frozenset(),
+            permissions=frozenset(
+                {
+                    "patient.read",
+                    "patient.create",
+                    "patient.update",
+                }
+            ),
         )
 
     app.dependency_overrides[get_db] = override_get_db
+
+    app.dependency_overrides[get_current_user] = (
+        override_get_current_user
+    )
+
+    app.dependency_overrides[get_authorization_service] = (
+        override_get_authorization_service
+    )
+
     app.dependency_overrides[get_request_context] = (
         override_get_request_context
     )

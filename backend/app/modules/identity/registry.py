@@ -39,14 +39,25 @@ class PermissionRegistry:
     ) -> None:
         """
         Register one or more permission definitions.
+
+        Registration is idempotent. Re-registering an
+        already-known permission is allowed as long as the
+        definition is the same.
         """
 
         for permission in permissions:
+            existing = self._permissions.get(
+                permission.code,
+            )
 
-            if permission.code in self._permissions:
-                raise ValueError(
-                    f"Duplicate permission: {permission.code}"
-                )
+            if existing is not None:
+                if existing != permission:
+                    raise ValueError(
+                        f"Conflicting permission definition: "
+                        f"{permission.code}"
+                    )
+
+                continue
 
             self._permissions[permission.code] = permission
 

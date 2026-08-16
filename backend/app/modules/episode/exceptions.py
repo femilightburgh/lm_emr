@@ -3,7 +3,6 @@
 LIGHTBURGH EMR
 
 Episode Exceptions
-
 ==============================================================================
 
 Domain exceptions raised by the Episode module.
@@ -94,4 +93,18 @@ class StaffHospitalMismatchError(EpisodeError):
 class StaffNotDoctorError(EpisodeError):
     """
     Raised when a non-doctor attempts to become the managing doctor.
+    """
+
+
+class EpisodeAlreadyCheckedInError(EpisodeError):
+    """
+    Raised when an Episode that has already been checked in
+    is checked in again.
+    """
+
+
+class EpisodeNotAwaitingCheckInError(EpisodeError):
+    """
+    Raised when an operation requires an Episode to be awaiting
+    receptionist check-in.
     """

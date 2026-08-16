@@ -21,6 +21,7 @@ Instead, they should be registered through app.api.router.
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 import app.models
 from app.api.router import api_router
@@ -54,6 +55,16 @@ app = FastAPI(
     version="1.0.0",
     description="Backend API",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 register_exception_handlers(app)
