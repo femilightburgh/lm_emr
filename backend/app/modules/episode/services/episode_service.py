@@ -3,20 +3,20 @@
 LIGHTBURGH EMR
 
 Episode Service
-
 ==============================================================================
 
-Purpose
--------
-
-Contains the business logic for managing Episodes of Care.
+Business logic for Episodes of Care.
 
 Responsibilities
 ----------------
-
 • Create Episodes.
 • Generate hospital-scoped Episode numbers.
 • Retrieve Episodes.
+• Check Episodes in for clinical care.
+• List the nursing queue.
+• Start nursing intake.
+• Create the Nursing Encounter.
+• Route Episodes to departments.
 • Admit Episodes.
 • Assign the managing doctor during admission.
 • Close Episodes.
@@ -27,6 +27,7 @@ Database access belongs in repositories.
 
 HTTP concerns belong in routers.
 
+Clinical lifecycle and operational workflow remain separate.
 ==============================================================================
 """
 
@@ -38,35 +39,47 @@ from app.core.context import RequestContext
 from app.modules.encounter.exceptions import (
     EncounterNotFoundError,
 )
-from app.modules.encounter.models import EncounterStatus
+from app.modules.encounter.models import (
+    Encounter,
+    EncounterStatus,
+)
 from app.modules.encounter.repositories.encounter_repository import (
     EncounterRepository,
 )
 
 from app.modules.episode.exceptions import (
+    DepartmentHospitalMismatchError,
+    DepartmentInactiveError,
+    DepartmentNotFoundError,
     EncounterNotBelongingToEpisodeError,
     EncounterNotOpenError,
     EpisodeAlreadyAdmittedError,
     EpisodeAlreadyCancelledError,
     EpisodeAlreadyClosedError,
     EpisodeAlreadyExistsError,
-    EpisodeNotFoundError,
-    EpisodeNotOpenError,
-    EpisodeAlreadyCheckedInError,
+    EpisodeAlreadyInNursingError,
+    EpisodeAlreadyRoutedError,
     EpisodeNotAwaitingCheckInError,
+    EpisodeNotFoundError,
+    EpisodeNotInNursingError,
+    EpisodeNotOpenError,
+    EpisodeNotWaitingForNursingError,
     PatientNotFoundError,
     StaffHospitalMismatchError,
     StaffNotDoctorError,
     StaffNotFoundError,
 )
+
 from app.modules.episode.models import (
     Episode,
     EpisodeFlowStatus,
     EpisodeStatus,
 )
+
 from app.modules.episode.repositories.episode_repository import (
     EpisodeRepository,
 )
+
 from app.modules.episode.services.episode_number_generator import (
     EpisodeNumberGenerator,
 )
@@ -75,6 +88,11 @@ from app.modules.events.enums import EventType
 from app.modules.events.services.event_service import (
     ClinicalEventService,
 )
+
+from app.modules.organization.department_repository import (
+    DepartmentRepository,
+)
+from app.modules.organization.enums import DepartmentStatus
 
 from app.modules.patients.repositories.patient_repository import (
     PatientRepository,
@@ -91,12 +109,14 @@ class EpisodeService:
 
     def __init__(
         self,
+        *,
         repository: EpisodeRepository,
         patient_repository: PatientRepository,
         number_generator: EpisodeNumberGenerator,
         encounter_repository: EncounterRepository,
         event_service: ClinicalEventService,
         staff_repository: StaffRepository,
+        department_repository: DepartmentRepository | None = None,
     ) -> None:
         self.repository = repository
         self.patient_repository = patient_repository
@@ -104,6 +124,77 @@ class EpisodeService:
         self.encounter_repository = encounter_repository
         self.event_service = event_service
         self.staff_repository = staff_repository
+
+        if department_repository is None:
+            department_repository = DepartmentRepository(
+                repository.db,
+            )
+
+        self.department_repository = department_repository
+
+    # =========================================================================
+    # Internal Helpers
+    # =========================================================================
+
+    def _get_episode(
+        self,
+        *,
+        context: RequestContext,
+        episode_id: UUID,
+    ) -> Episode:
+        """
+        Retrieve an Episode within the authenticated Hospital.
+        """
+
+        episode = self.repository.get_by_id(
+            hospital_id=context.hospital_id,
+            episode_id=episode_id,
+        )
+
+        if episode is None:
+            raise EpisodeNotFoundError()
+
+        return episode
+
+    def _get_authenticated_staff(
+        self,
+        *,
+        context: RequestContext,
+    ):
+        """
+        Resolve the authenticated UserAccount to its Staff profile.
+        """
+
+        staff = self.staff_repository.get_by_user_account_id(
+            hospital_id=context.hospital_id,
+            user_account_id=context.user_id,
+        )
+
+        if staff is None:
+            raise StaffNotFoundError(
+                "Authenticated user does not have a Staff profile.",
+            )
+
+        if staff.hospital_id != context.hospital_id:
+            raise StaffHospitalMismatchError(
+                "Staff member belongs to another hospital.",
+            )
+
+        return staff
+
+    def _ensure_episode_not_closed_or_cancelled(
+        self,
+        episode: Episode,
+    ) -> None:
+        """
+        Ensure the Episode is still operationally modifiable.
+        """
+
+        if episode.status == EpisodeStatus.CLOSED:
+            raise EpisodeAlreadyClosedError()
+
+        if episode.status == EpisodeStatus.CANCELLED:
+            raise EpisodeAlreadyCancelledError()
 
     # =========================================================================
     # Create
@@ -119,22 +210,16 @@ class EpisodeService:
         """
         Create a new Episode of Care.
 
-        The Episode number is generated automatically from the
-        authenticated Hospital context.
-
         Business Rules
         --------------
 
-        • The Patient must exist.
-        • The Patient must belong to the authenticated Hospital.
-        • The Episode number is generated by the platform.
-        • The Episode starts with OPEN status.
-        • A newly created Episode has no managing doctor.
+        • Patient must exist.
+        • Patient must belong to the authenticated Hospital.
+        • Episode number is generated by the platform.
+        • Episode starts OPEN.
+        • Episode starts AWAITING_CHECK_IN.
+        • Episode has no managing doctor.
         """
-
-        # ------------------------------------------------------------------
-        # Patient
-        # ------------------------------------------------------------------
 
         patient = self.patient_repository.get_by_id(
             hospital_id=context.hospital_id,
@@ -144,24 +229,12 @@ class EpisodeService:
         if patient is None:
             raise PatientNotFoundError()
 
-        # ------------------------------------------------------------------
-        # Verify Patient belongs to authenticated Hospital
-        # ------------------------------------------------------------------
-
         if patient.hospital_id != context.hospital_id:
             raise PatientNotFoundError()
-
-        # ------------------------------------------------------------------
-        # Generate Episode Number
-        # ------------------------------------------------------------------
 
         episode_number = self.number_generator.generate(
             hospital_id=context.hospital_id,
         )
-
-        # ------------------------------------------------------------------
-        # Defensive duplicate check
-        # ------------------------------------------------------------------
 
         existing = self.repository.get_by_episode_number(
             hospital_id=context.hospital_id,
@@ -170,10 +243,6 @@ class EpisodeService:
 
         if existing is not None:
             raise EpisodeAlreadyExistsError()
-
-        # ------------------------------------------------------------------
-        # Create Episode
-        # ------------------------------------------------------------------
 
         episode = Episode(
             hospital_id=context.hospital_id,
@@ -193,17 +262,23 @@ class EpisodeService:
             opened_at=datetime.now(UTC),
             closed_at=None,
         )
-        self.repository.create(
-            episode=episode,
-        )
 
-        self.repository.save()
+        try:
+            self.repository.create(
+                episode=episode,
+            )
 
-        self.repository.refresh(
-            episode,
-        )
+            self.repository.save()
 
-        return episode
+            self.repository.refresh(
+                episode,
+            )
+
+            return episode
+
+        except Exception:
+            self.repository.rollback()
+            raise
 
     # =========================================================================
     # Retrieve
@@ -217,23 +292,265 @@ class EpisodeService:
     ) -> Episode:
         """
         Retrieve an Episode within the authenticated Hospital.
+        """
+
+        return self._get_episode(
+            context=context,
+            episode_id=episode_id,
+        )
+
+    # =========================================================================
+    # Reception Check-In
+    # =========================================================================
+
+    def check_in_episode(
+        self,
+        *,
+        context: RequestContext,
+        episode_id: UUID,
+    ) -> Episode:
+        """
+        Check in an Episode for clinical care.
+
+        State transition:
+
+            AWAITING_CHECK_IN
+                    ↓
+            WAITING_FOR_NURSING
+        """
+
+        episode = self._get_episode(
+            context=context,
+            episode_id=episode_id,
+        )
+
+        self._ensure_episode_not_closed_or_cancelled(
+            episode,
+        )
+
+        if episode.flow_status != EpisodeFlowStatus.AWAITING_CHECK_IN:
+            raise EpisodeNotAwaitingCheckInError()
+
+        staff = self._get_authenticated_staff(
+            context=context,
+        )
+
+        episode.flow_status = EpisodeFlowStatus.WAITING_FOR_NURSING
+        episode.checked_in_at = datetime.now(UTC)
+        episode.checked_in_by = staff.id
+
+        try:
+            self.repository.save()
+
+            self.repository.refresh(
+                episode,
+            )
+
+            return episode
+
+        except Exception:
+            self.repository.rollback()
+            raise
+
+    # =========================================================================
+    # Nursing Queue
+    # =========================================================================
+
+    def list_nursing_queue(
+        self,
+        *,
+        context: RequestContext,
+    ) -> list[Episode]:
+        """
+        Return Episodes currently waiting for nursing attention.
+
+        Includes:
+
+            WAITING_FOR_NURSING
+            NURSING_IN_PROGRESS
+
+        The queue is hospital-scoped.
+        """
+
+        return self.repository.list_nursing_queue(
+            hospital_id=context.hospital_id,
+        )
+
+    # =========================================================================
+    # Start Nursing
+    # =========================================================================
+
+    def start_nursing(
+        self,
+        *,
+        context: RequestContext,
+        episode_id: UUID,
+    ) -> Episode:
+        """
+        Begin nursing intake for an Episode.
+
+        State transition:
+
+            WAITING_FOR_NURSING
+                    ↓
+            NURSING_IN_PROGRESS
+
+        Starting nursing also creates the Nursing Encounter.
+
+        The Episode state change and Encounter creation are committed
+        atomically as one transaction.
 
         Business Rules
         --------------
 
-        • The Episode must exist.
-        • The Episode must belong to the authenticated Hospital.
+        • Episode must exist.
+        • Episode must belong to the authenticated Hospital.
+        • Episode must not be CLOSED.
+        • Episode must not be CANCELLED.
+        • Episode must currently be WAITING_FOR_NURSING.
+        • Authenticated user must have a Staff profile.
+        • Nursing Encounter belongs to the authenticated Staff member.
         """
 
-        episode = self.repository.get_by_id(
-            hospital_id=context.hospital_id,
+        episode = self._get_episode(
+            context=context,
             episode_id=episode_id,
         )
 
-        if episode is None:
-            raise EpisodeNotFoundError()
+        self._ensure_episode_not_closed_or_cancelled(
+            episode,
+        )
+
+        if episode.flow_status == EpisodeFlowStatus.NURSING_IN_PROGRESS:
+            raise EpisodeAlreadyInNursingError()
+
+        if episode.flow_status != EpisodeFlowStatus.WAITING_FOR_NURSING:
+            raise EpisodeNotWaitingForNursingError()
+
+        staff = self._get_authenticated_staff(
+            context=context,
+        )
+
+        started_at = datetime.now(UTC)
+
+        encounter = Encounter(
+            episode_id=episode.id,
+            staff_id=staff.id,
+            title="Nursing Intake",
+            status=EncounterStatus.OPEN,
+            started_at=started_at,
+            ended_at=None,
+        )
+
+        try:
+            episode.flow_status = (
+                EpisodeFlowStatus.NURSING_IN_PROGRESS
+            )
+
+            self.encounter_repository.db.add(
+                encounter,
+            )
+
+            self.repository.db.flush()
+
+            self.repository.db.commit()
+
+        except Exception:
+            self.repository.db.rollback()
+            raise
+
+        self.repository.refresh(
+            episode,
+        )
 
         return episode
+
+    # =========================================================================
+    # Route Episode
+    # =========================================================================
+
+    def route_episode(
+        self,
+        *,
+        context: RequestContext,
+        episode_id: UUID,
+        department_id: UUID,
+    ) -> Episode:
+        """
+        Route a nursing-completed Episode to a hospital department.
+
+        Business Rules
+        --------------
+
+        • Episode must exist.
+        • Episode must belong to the authenticated Hospital.
+        • Episode must currently be NURSING_IN_PROGRESS.
+        • Episode must not already be routed.
+        • Department must exist.
+        • Department must belong to the authenticated Hospital.
+        • Department must be active.
+        • Authenticated user must have a Staff profile.
+        • Routing Staff is recorded.
+        • Routing timestamp is recorded.
+        • Department is recorded as current department.
+        • Episode moves to ROUTED.
+
+        Note
+        ----
+        Nursing Intake completion/signing is intentionally not enforced
+        here yet. That will be added after the Clinical Document repository
+        exposes the required latest-version query.
+        """
+
+        episode = self._get_episode(
+            context=context,
+            episode_id=episode_id,
+        )
+
+        self._ensure_episode_not_closed_or_cancelled(
+            episode,
+        )
+
+        if episode.flow_status == EpisodeFlowStatus.ROUTED:
+            raise EpisodeAlreadyRoutedError()
+
+        if episode.flow_status != EpisodeFlowStatus.NURSING_IN_PROGRESS:
+            raise EpisodeNotInNursingError()
+
+        department = self.department_repository.get_by_id(
+            department_id,
+        )
+
+        if department is None:
+            raise DepartmentNotFoundError()
+
+        if department.hospital_id != context.hospital_id:
+            raise DepartmentHospitalMismatchError()
+
+        if department.status != DepartmentStatus.ACTIVE:
+            raise DepartmentInactiveError()
+
+        staff = self._get_authenticated_staff(
+            context=context,
+        )
+
+        episode.current_department_id = department.id
+        episode.routed_at = datetime.now(UTC)
+        episode.routed_by = staff.id
+        episode.flow_status = EpisodeFlowStatus.ROUTED
+
+        try:
+            self.repository.save()
+
+            self.repository.refresh(
+                episode,
+            )
+
+            return episode
+
+        except Exception:
+            self.repository.rollback()
+            raise
 
     # =========================================================================
     # Admit Episode
@@ -247,54 +564,28 @@ class EpisodeService:
         encounter_id: UUID,
     ) -> Episode:
         """
-        Admit an open Episode of Care into inpatient care.
+        Admit an open Episode into inpatient care.
 
-        Admission must be performed during an OPEN professional
-        Encounter belonging to the Episode.
+        Admission must occur through an OPEN Encounter belonging
+        to the Episode.
 
-        The doctor who performed the admission becomes the
-        managing doctor for the Episode.
+        The doctor associated with the Encounter becomes the
+        managing doctor.
 
         State transition:
 
-            OPEN → ADMITTED
+            OPEN
+              ↓
+           ADMITTED
 
-        An EPISODE_ADMITTED Clinical Event is created atomically
-        with the state transition and managing-doctor assignment.
-
-        Business Rules
-        --------------
-
-        • The Episode must belong to the authenticated Hospital.
-        • The Episode must exist.
-        • The Episode must currently be OPEN.
-        • The Encounter must exist.
-        • The Encounter must belong to the Episode.
-        • The Encounter must be OPEN.
-        • The Encounter's staff member must exist.
-        • The staff member must belong to the authenticated Hospital.
-        • The staff member must have an active employment.
-        • The active employment must identify the staff member as a Doctor.
-        • The Episode's managing doctor is the admitting doctor.
-        • The Episode state transition, managing-doctor assignment,
-          and Clinical Event must succeed or fail together.
+        The Episode state transition, managing doctor assignment,
+        and EPISODE_ADMITTED clinical event are committed atomically.
         """
 
-        # ------------------------------------------------------------------
-        # Episode
-        # ------------------------------------------------------------------
-
-        episode = self.repository.get_by_id(
-            hospital_id=context.hospital_id,
+        episode = self._get_episode(
+            context=context,
             episode_id=episode_id,
         )
-
-        if episode is None:
-            raise EpisodeNotFoundError()
-
-        # ------------------------------------------------------------------
-        # Episode State
-        # ------------------------------------------------------------------
 
         if episode.status == EpisodeStatus.ADMITTED:
             raise EpisodeAlreadyAdmittedError()
@@ -308,10 +599,6 @@ class EpisodeService:
         if episode.status != EpisodeStatus.OPEN:
             raise EpisodeNotOpenError()
 
-        # ------------------------------------------------------------------
-        # Encounter
-        # ------------------------------------------------------------------
-
         encounter = self.encounter_repository.get_by_id(
             hospital_id=context.hospital_id,
             encounter_id=encounter_id,
@@ -320,23 +607,11 @@ class EpisodeService:
         if encounter is None:
             raise EncounterNotFoundError()
 
-        # ------------------------------------------------------------------
-        # Encounter Ownership
-        # ------------------------------------------------------------------
-
         if encounter.episode_id != episode.id:
             raise EncounterNotBelongingToEpisodeError()
 
-        # ------------------------------------------------------------------
-        # Encounter State
-        # ------------------------------------------------------------------
-
         if encounter.status != EncounterStatus.OPEN:
             raise EncounterNotOpenError()
-
-        # ------------------------------------------------------------------
-        # Admission Clinician
-        # ------------------------------------------------------------------
 
         staff = self.staff_repository.get_by_id(
             encounter.staff_id,
@@ -347,18 +622,10 @@ class EpisodeService:
                 "Admission clinician not found.",
             )
 
-        # ------------------------------------------------------------------
-        # Hospital Ownership
-        # ------------------------------------------------------------------
-
         if staff.hospital_id != context.hospital_id:
             raise StaffHospitalMismatchError(
                 "Admission clinician belongs to another hospital.",
             )
-
-        # ------------------------------------------------------------------
-        # Active Employment
-        # ------------------------------------------------------------------
 
         employment = self.staff_repository.get_active_employment(
             staff.id,
@@ -369,28 +636,15 @@ class EpisodeService:
                 "Admission clinician has no active employment.",
             )
 
-        # ------------------------------------------------------------------
-        # Professional Role
-        # ------------------------------------------------------------------
-
         if employment.profession != Profession.DOCTOR:
             raise StaffNotDoctorError(
                 "Only a doctor can become the managing doctor of an Episode.",
             )
 
-        # ------------------------------------------------------------------
-        # Admission Time
-        # ------------------------------------------------------------------
-
         admitted_at = datetime.now(UTC)
-
-        # ------------------------------------------------------------------
-        # Atomic State Transition + Managing Doctor + Clinical Event
-        # ------------------------------------------------------------------
 
         try:
             episode.status = EpisodeStatus.ADMITTED
-
             episode.managing_doctor_id = staff.id
 
             self.repository.db.flush()
@@ -431,33 +685,18 @@ class EpisodeService:
         episode_id: UUID,
     ) -> Episode:
         """
-        Close an Episode of Care.
+        Close an Episode.
 
-        An Episode may be closed while OPEN or ADMITTED.
+        Allowed transitions:
 
-        Closing an Episode:
-
-        • Changes OPEN or ADMITTED → CLOSED.
-        • Records the time at which the Episode was closed.
-        • Preserves the Episode and its clinical history.
-        • Preserves the managing doctor if one exists.
-
-        Business Rules
-        --------------
-
-        • The Episode must belong to the authenticated Hospital.
-        • The Episode must exist.
-        • A CLOSED Episode cannot be closed again.
-        • A CANCELLED Episode cannot be closed.
+            OPEN → CLOSED
+            ADMITTED → CLOSED
         """
 
-        episode = self.repository.get_by_id(
-            hospital_id=context.hospital_id,
+        episode = self._get_episode(
+            context=context,
             episode_id=episode_id,
         )
-
-        if episode is None:
-            raise EpisodeNotFoundError()
 
         if episode.status == EpisodeStatus.CLOSED:
             raise EpisodeAlreadyClosedError()
@@ -468,13 +707,18 @@ class EpisodeService:
         episode.status = EpisodeStatus.CLOSED
         episode.closed_at = datetime.now(UTC)
 
-        self.repository.save()
+        try:
+            self.repository.save()
 
-        self.repository.refresh(
-            episode,
-        )
+            self.repository.refresh(
+                episode,
+            )
 
-        return episode
+            return episode
+
+        except Exception:
+            self.repository.rollback()
+            raise
 
     # =========================================================================
     # Cancel Episode
@@ -487,33 +731,19 @@ class EpisodeService:
         episode_id: UUID,
     ) -> Episode:
         """
-        Cancel an open Episode of Care.
+        Cancel an Episode.
 
-        An Episode may only be cancelled while it is currently OPEN.
+        Only OPEN Episodes may be cancelled.
 
-        Cancelling an Episode:
+        State transition:
 
-        • Changes OPEN → CANCELLED.
-        • Leaves closed_at as None.
-        • Preserves the Episode and its clinical history.
-
-        Business Rules
-        --------------
-
-        • The Episode must belong to the authenticated Hospital.
-        • The Episode must exist.
-        • A CLOSED Episode cannot be cancelled.
-        • An ADMITTED Episode cannot be cancelled.
-        • A CANCELLED Episode cannot be cancelled again.
+            OPEN → CANCELLED
         """
 
-        episode = self.repository.get_by_id(
-            hospital_id=context.hospital_id,
+        episode = self._get_episode(
+            context=context,
             episode_id=episode_id,
         )
-
-        if episode is None:
-            raise EpisodeNotFoundError()
 
         if episode.status == EpisodeStatus.CLOSED:
             raise EpisodeAlreadyClosedError()
@@ -524,16 +754,23 @@ class EpisodeService:
         if episode.status == EpisodeStatus.ADMITTED:
             raise EpisodeAlreadyAdmittedError()
 
+        if episode.status != EpisodeStatus.OPEN:
+            raise EpisodeNotOpenError()
+
         episode.status = EpisodeStatus.CANCELLED
-        episode.closed_at = None
 
-        self.repository.save()
+        try:
+            self.repository.save()
 
-        self.repository.refresh(
-            episode,
-        )
+            self.repository.refresh(
+                episode,
+            )
 
-        return episode
+            return episode
+
+        except Exception:
+            self.repository.rollback()
+            raise
 
     # =========================================================================
     # Patient Episodes
@@ -546,123 +783,13 @@ class EpisodeService:
         patient_id: UUID,
     ) -> list[Episode]:
         """
-        Return all Episodes belonging to a Patient
-        within the authenticated Hospital.
+        List Episodes belonging to a Patient within the authenticated
+        Hospital.
 
-        The Patient must belong to the authenticated Hospital.
+        Tenant isolation is enforced by the repository.
         """
-
-        patient = self.patient_repository.get_by_id(
-            hospital_id=context.hospital_id,
-            patient_id=patient_id,
-        )
-
-        if patient is None:
-            raise PatientNotFoundError()
 
         return self.repository.list_by_patient(
             hospital_id=context.hospital_id,
             patient_id=patient_id,
         )
-
-
-    # =========================================================================
-    # Check In
-    # =========================================================================
-
-    def check_in_episode(
-        self,
-        *,
-        context: RequestContext,
-        episode_id: UUID,
-    ) -> Episode:
-        """
-        Check in an Episode for clinical care.
-
-        Reception check-in moves an Episode from the initial operational
-        state into the nursing intake queue.
-
-        The authenticated UserAccount is resolved to its Staff profile.
-        The Staff identifier is recorded on the Episode for audit purposes.
-
-        Clinical EpisodeStatus is deliberately unchanged.
-
-        Business Rules
-        --------------
-
-        • The Episode must belong to the authenticated Hospital.
-        • The Episode must exist.
-        • The Episode must not be CLOSED.
-        • The Episode must not be CANCELLED.
-        • The Episode must currently be AWAITING_CHECK_IN.
-        • The authenticated UserAccount must have a Staff profile
-        belonging to the authenticated Hospital.
-        • The check-in Staff member is recorded as checked_in_by.
-        • The check-in timestamp is recorded.
-        • The Episode moves to WAITING_FOR_NURSING.
-        """
-
-        # ------------------------------------------------------------------
-        # Episode
-        # ------------------------------------------------------------------
-
-        episode = self.repository.get_by_id(
-            hospital_id=context.hospital_id,
-            episode_id=episode_id,
-        )
-
-        if episode is None:
-            raise EpisodeNotFoundError()
-
-        # ------------------------------------------------------------------
-        # Clinical State
-        # ------------------------------------------------------------------
-
-        if episode.status == EpisodeStatus.CLOSED:
-            raise EpisodeAlreadyClosedError()
-
-        if episode.status == EpisodeStatus.CANCELLED:
-            raise EpisodeAlreadyCancelledError()
-
-        # ------------------------------------------------------------------
-        # Operational State
-        # ------------------------------------------------------------------
-
-        if episode.flow_status != EpisodeFlowStatus.AWAITING_CHECK_IN:
-            raise EpisodeNotAwaitingCheckInError()
-
-        # ------------------------------------------------------------------
-        # Resolve authenticated UserAccount → Staff
-        # ------------------------------------------------------------------
-
-        staff = self.staff_repository.get_by_user_account_id(
-            hospital_id=context.hospital_id,
-            user_account_id=context.user_id,
-        )
-
-        if staff is None:
-            raise StaffNotFoundError(
-                "Authenticated user does not have a Staff profile.",
-            )
-
-        # ------------------------------------------------------------------
-        # Check In
-        # ------------------------------------------------------------------
-
-        checked_in_at = datetime.now(UTC)
-
-        episode.flow_status = EpisodeFlowStatus.WAITING_FOR_NURSING
-        episode.checked_in_at = checked_in_at
-        episode.checked_in_by = staff.id
-
-        # ------------------------------------------------------------------
-        # Persist
-        # ------------------------------------------------------------------
-
-        self.repository.save()
-
-        self.repository.refresh(
-            episode,
-        )
-
-        return episode

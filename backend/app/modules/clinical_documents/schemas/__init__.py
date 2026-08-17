@@ -25,6 +25,10 @@ from app.modules.clinical_documents.schemas.initial_clerking import (
     InitialClerkingContent,
 )
 
+from app.modules.clinical_documents.schemas.nursing_intake import (
+    NursingIntakeContent,
+)
+
 from app.modules.clinical_documents.schemas.progress_note import (
     ProgressNoteContent,
 )
@@ -61,6 +65,7 @@ __all__ = [
     # ------------------------------------------------------------------
     "DischargeSummaryContent",
     "InitialClerkingContent",
+    "NursingIntakeContent",
     "ProgressNoteContent",
 
     # ------------------------------------------------------------------

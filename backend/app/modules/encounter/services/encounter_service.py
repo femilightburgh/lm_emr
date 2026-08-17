@@ -15,6 +15,9 @@ HTTP concerns belong in the API router.
 An Encounter may be created while its Episode is OPEN or ADMITTED.
 
 An Episode that is CLOSED or CANCELLED cannot receive new Encounters.
+
+The create operation supports optional transaction control so higher-level
+workflow services can create an Encounter atomically with other changes.
 ==============================================================================
 """
 
@@ -70,6 +73,7 @@ class EncounterService:
         episode_id: UUID,
         staff_id: UUID,
         title: str,
+        commit: bool = True,
     ) -> Encounter:
         """
         Create a new professional Encounter.
@@ -77,10 +81,19 @@ class EncounterService:
         A newly created Encounter starts OPEN.
 
         The Episode must:
+
         - belong to the authenticated Hospital;
         - be OPEN or ADMITTED.
 
         CLOSED and CANCELLED Episodes cannot receive new Encounters.
+
+        Parameters
+        ----------
+        commit:
+            When True, persist the transaction immediately.
+
+            When False, flush the Encounter but leave transaction
+            ownership to the calling service.
         """
 
         # --------------------------------------------------------------
@@ -136,7 +149,14 @@ class EncounterService:
             encounter=encounter,
         )
 
-        self.repository.save()
+        # --------------------------------------------------------------
+        # Transaction Handling
+        # --------------------------------------------------------------
+
+        if commit:
+            self.repository.save()
+        else:
+            self.repository.db.flush()
 
         self.repository.refresh(
             encounter,
@@ -158,6 +178,7 @@ class EncounterService:
         Close an open Encounter.
 
         The Encounter must:
+
         - exist within the authenticated Hospital;
         - currently be OPEN.
 

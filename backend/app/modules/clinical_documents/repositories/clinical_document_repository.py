@@ -171,6 +171,47 @@ class ClinicalDocumentRepository:
             self.db.scalars(statement),
         )
 
+        # =========================================================================
+    # Latest Version
+    # =========================================================================
+
+    def get_latest_version(
+        self,
+        *,
+        hospital_id: UUID,
+        encounter_id: UUID,
+        document_type,
+    ) -> ClinicalDocument | None:
+        """
+        Return the latest version of a specific Clinical Document type
+        belonging to an Encounter within the authenticated Hospital.
+
+        The latest version is determined by the highest version number.
+        """
+
+        statement = (
+            select(ClinicalDocument)
+            .join(
+                Encounter,
+                ClinicalDocument.encounter_id == Encounter.id,
+            )
+            .join(
+                Episode,
+                Encounter.episode_id == Episode.id,
+            )
+            .where(
+                ClinicalDocument.encounter_id == encounter_id,
+                ClinicalDocument.document_type == document_type,
+                Episode.hospital_id == hospital_id,
+            )
+            .order_by(
+                ClinicalDocument.version.desc(),
+            )
+            .limit(1)
+        )
+
+        return self.db.scalar(statement)
+
     # =========================================================================
     # Persistence
     # =========================================================================

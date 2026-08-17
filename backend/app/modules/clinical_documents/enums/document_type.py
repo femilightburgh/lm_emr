@@ -14,6 +14,8 @@ class ClinicalDocumentType(str, Enum):
     Defines the types of clinical documents that can be recorded.
     """
 
+    NURSING_INTAKE = "NURSING_INTAKE"
+
     INITIAL_CLERKING = "INITIAL_CLERKING"
 
     PROGRESS_NOTE = "PROGRESS_NOTE"

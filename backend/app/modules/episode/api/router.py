@@ -3,20 +3,15 @@
 LIGHTBURGH EMR
 
 Episode API Router
-
 ==============================================================================
 
-Purpose
--------
-
-Exposes HTTP endpoints for managing Episodes of Care.
+HTTP endpoints for Episodes of Care.
 
 Business logic belongs in EpisodeService.
 
 Database access belongs in repositories.
 
-The router should remain as thin as possible.
-
+The router remains responsible for HTTP concerns only.
 ==============================================================================
 """
 
@@ -29,7 +24,6 @@ from app.core.context import (
     RequestContext,
     get_request_context,
 )
-
 from app.db.session import get_db
 
 from app.modules.encounter.repositories.encounter_repository import (
@@ -37,12 +31,22 @@ from app.modules.encounter.repositories.encounter_repository import (
 )
 
 from app.modules.episode.exceptions import (
+    DepartmentHospitalMismatchError,
+    DepartmentInactiveError,
+    DepartmentNotFoundError,
+    EpisodeAlreadyAdmittedError,
     EpisodeAlreadyCancelledError,
     EpisodeAlreadyClosedError,
     EpisodeAlreadyExistsError,
-    EpisodeNotFoundError,
+    EpisodeAlreadyInNursingError,
+    EpisodeAlreadyRoutedError,
     EpisodeNotAwaitingCheckInError,
+    EpisodeNotFoundError,
+    EpisodeNotInNursingError,
+    EpisodeNotOpenError,
+    EpisodeNotWaitingForNursingError,
     PatientNotFoundError,
+    StaffHospitalMismatchError,
     StaffNotFoundError,
 )
 
@@ -71,6 +75,10 @@ from app.modules.events.services.event_service import (
     ClinicalEventService,
 )
 
+from app.modules.organization.department_repository import (
+    DepartmentRepository,
+)
+
 from app.modules.patients.repositories.patient_repository import (
     PatientRepository,
 )
@@ -95,26 +103,37 @@ def get_episode_service(
     db: Session = Depends(get_db),
 ) -> EpisodeService:
     """
-    Build the EpisodeService with its complete production
-    dependency graph.
+    Build the complete EpisodeService dependency graph.
     """
 
-    repository = EpisodeRepository(db)
+    repository = EpisodeRepository(
+        db,
+    )
 
-    patient_repository = PatientRepository(db)
+    patient_repository = PatientRepository(
+        db,
+    )
 
     number_generator = EpisodeNumberGenerator(
         repository=repository,
     )
 
-    encounter_repository = EncounterRepository(db)
+    encounter_repository = EncounterRepository(
+        db,
+    )
 
     event_service = ClinicalEventService(
-        repository=ClinicalEventRepository(db),
+        repository=ClinicalEventRepository(
+            db,
+        ),
     )
 
     staff_repository = StaffRepository(
         session=db,
+    )
+
+    department_repository = DepartmentRepository(
+        db,
     )
 
     return EpisodeService(
@@ -124,6 +143,7 @@ def get_episode_service(
         encounter_repository=encounter_repository,
         event_service=event_service,
         staff_repository=staff_repository,
+        department_repository=department_repository,
     )
 
 
@@ -195,7 +215,7 @@ def get_episode(
     ),
 ):
     """
-    Retrieve an Episode by its identifier.
+    Retrieve an Episode by identifier.
     """
 
     try:
@@ -216,15 +236,14 @@ def get_episode(
 
 
 # ============================================================================
-# Check In Episode
+# Reception Check-In
 # ============================================================================
 
 
 @router.post(
     "/{episode_id}/check-in",
     response_model=EpisodeResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Check in an Episode for clinical care",
+    summary="Check in an Episode",
 )
 def check_in_episode(
     episode_id: UUID,
@@ -236,13 +255,13 @@ def check_in_episode(
     ),
 ):
     """
-    Check in an Episode for clinical care.
+    Receptionist check-in.
 
-    The authenticated Staff member is recorded as the
-    receptionist/staff member who performed the check-in.
+    Moves:
 
-    A successful check-in moves the Episode into the
-    nursing intake queue.
+        AWAITING_CHECK_IN
+                ↓
+        WAITING_FOR_NURSING
     """
 
     try:
@@ -287,6 +306,278 @@ def check_in_episode(
 
 
 # ============================================================================
+# Nursing Queue
+# ============================================================================
+
+
+@router.get(
+    "/queue/nursing",
+    response_model=list[EpisodeResponse],
+    summary="List the nursing queue",
+)
+def list_nursing_queue(
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: EpisodeService = Depends(
+        get_episode_service,
+    ),
+):
+    """
+    Return Episodes currently waiting for or undergoing nursing intake.
+    """
+
+    episodes = service.list_nursing_queue(
+        context=context,
+    )
+
+    return [
+        EpisodeResponse.model_validate(
+            episode,
+        )
+        for episode in episodes
+    ]
+
+
+# ============================================================================
+# Start Nursing
+# ============================================================================
+
+
+@router.post(
+    "/{episode_id}/nursing/start",
+    response_model=EpisodeResponse,
+    summary="Start nursing intake",
+)
+def start_nursing(
+    episode_id: UUID,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: EpisodeService = Depends(
+        get_episode_service,
+    ),
+):
+    """
+    Start nursing intake.
+
+    Moves:
+
+        WAITING_FOR_NURSING
+                ↓
+        NURSING_IN_PROGRESS
+    """
+
+    try:
+        episode = service.start_nursing(
+            context=context,
+            episode_id=episode_id,
+        )
+
+        return EpisodeResponse.model_validate(
+            episode,
+        )
+
+    except EpisodeNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Episode not found.",
+        ) from exc
+
+    except EpisodeAlreadyClosedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Closed episodes cannot enter nursing.",
+        ) from exc
+
+    except EpisodeAlreadyCancelledError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cancelled episodes cannot enter nursing.",
+        ) from exc
+
+    except EpisodeAlreadyInNursingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Episode is already in nursing.",
+        ) from exc
+
+    except EpisodeNotWaitingForNursingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Episode is not waiting for nursing.",
+        ) from exc
+
+
+# ============================================================================
+# Route Episode
+# ============================================================================
+
+
+@router.post(
+    "/{episode_id}/route",
+    response_model=EpisodeResponse,
+    summary="Route an Episode to a department",
+)
+def route_episode(
+    episode_id: UUID,
+    department_id: UUID,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: EpisodeService = Depends(
+        get_episode_service,
+    ),
+):
+    """
+    Route a nursing-completed Episode to a department.
+    """
+
+    try:
+        episode = service.route_episode(
+            context=context,
+            episode_id=episode_id,
+            department_id=department_id,
+        )
+
+        return EpisodeResponse.model_validate(
+            episode,
+        )
+
+    except EpisodeNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Episode not found.",
+        ) from exc
+
+    except EpisodeAlreadyClosedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Closed episodes cannot be routed.",
+        ) from exc
+
+    except EpisodeAlreadyCancelledError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cancelled episodes cannot be routed.",
+        ) from exc
+
+    except EpisodeAlreadyRoutedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Episode has already been routed.",
+        ) from exc
+
+    except EpisodeNotInNursingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Episode is not currently in nursing.",
+        ) from exc
+
+    except DepartmentNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Department not found.",
+        ) from exc
+
+    except DepartmentHospitalMismatchError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Department belongs to another hospital.",
+        ) from exc
+
+    except DepartmentInactiveError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Department is inactive.",
+        ) from exc
+
+    except StaffNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Authenticated user does not have a Staff profile.",
+        ) from exc
+
+
+# ============================================================================
+# Admit Episode
+# ============================================================================
+
+
+@router.post(
+    "/{episode_id}/admit",
+    response_model=EpisodeResponse,
+    summary="Admit an Episode",
+)
+def admit_episode(
+    episode_id: UUID,
+    encounter_id: UUID,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: EpisodeService = Depends(
+        get_episode_service,
+    ),
+):
+    """
+    Admit an Episode into inpatient care.
+    """
+
+    try:
+        episode = service.admit_episode(
+            context=context,
+            episode_id=episode_id,
+            encounter_id=encounter_id,
+        )
+
+        return EpisodeResponse.model_validate(
+            episode,
+        )
+
+    except EpisodeNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Episode not found.",
+        ) from exc
+
+    except EpisodeAlreadyAdmittedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Episode is already admitted.",
+        ) from exc
+
+    except EpisodeAlreadyClosedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Closed episodes cannot be admitted.",
+        ) from exc
+
+    except EpisodeAlreadyCancelledError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cancelled episodes cannot be admitted.",
+        ) from exc
+
+    except EpisodeNotOpenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Episode is not open.",
+        ) from exc
+
+    except StaffNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Admission clinician not found.",
+        ) from exc
+
+    except StaffHospitalMismatchError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admission clinician belongs to another hospital.",
+        ) from exc
+
+
+# ============================================================================
 # Close Episode
 # ============================================================================
 
@@ -294,8 +585,7 @@ def check_in_episode(
 @router.post(
     "/{episode_id}/close",
     response_model=EpisodeResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Close an Episode of Care",
+    summary="Close an Episode",
 )
 def close_episode(
     episode_id: UUID,
@@ -307,7 +597,7 @@ def close_episode(
     ),
 ):
     """
-    Close an open Episode of Care.
+    Close an Episode.
     """
 
     try:
@@ -347,8 +637,7 @@ def close_episode(
 @router.post(
     "/{episode_id}/cancel",
     response_model=EpisodeResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Cancel an Episode of Care",
+    summary="Cancel an Episode",
 )
 def cancel_episode(
     episode_id: UUID,
@@ -360,7 +649,7 @@ def cancel_episode(
     ),
 ):
     """
-    Cancel an open Episode of Care.
+    Cancel an open Episode.
     """
 
     try:
@@ -391,9 +680,15 @@ def cancel_episode(
             detail="Episode is already cancelled.",
         ) from exc
 
+    except EpisodeAlreadyAdmittedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Admitted episodes cannot be cancelled.",
+        ) from exc
+
 
 # ============================================================================
-# List Patient Episodes
+# Patient Episodes
 # ============================================================================
 
 
@@ -416,14 +711,21 @@ def list_patient_episodes(
     within the authenticated Hospital.
     """
 
-    episodes = service.list_patient_episodes(
-        context=context,
-        patient_id=patient_id,
-    )
-
-    return [
-        EpisodeResponse.model_validate(
-            episode,
+    try:
+        episodes = service.list_patient_episodes(
+            context=context,
+            patient_id=patient_id,
         )
-        for episode in episodes
-    ]
+
+        return [
+            EpisodeResponse.model_validate(
+                episode,
+            )
+            for episode in episodes
+        ]
+
+    except PatientNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Patient not found.",
+        ) from exc

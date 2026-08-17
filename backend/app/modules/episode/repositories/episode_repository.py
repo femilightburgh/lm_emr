@@ -6,15 +6,11 @@ Episode Repository
 
 ==============================================================================
 
-Purpose
--------
-
-Provides data access operations for Episodes of Care.
+Provides persistence operations for Episodes of Care.
 
 Business rules belong in EpisodeService.
 
-This repository is responsible only for persistence.
-
+Hospital tenancy is enforced by repository query predicates.
 ==============================================================================
 """
 
@@ -23,7 +19,10 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.modules.episode.models import Episode
+from app.modules.episode.models import (
+    Episode,
+    EpisodeFlowStatus,
+)
 
 
 class EpisodeRepository:
@@ -37,9 +36,9 @@ class EpisodeRepository:
     ) -> None:
         self.db = db
 
-    # ------------------------------------------------------------------
+    # =========================================================================
     # Create
-    # ------------------------------------------------------------------
+    # =========================================================================
 
     def create(
         self,
@@ -47,16 +46,16 @@ class EpisodeRepository:
         episode: Episode,
     ) -> Episode:
         """
-        Persist a new Episode.
+        Add an Episode to the current transaction.
         """
 
         self.db.add(episode)
 
         return episode
 
-    # ------------------------------------------------------------------
+    # =========================================================================
     # Retrieve
-    # ------------------------------------------------------------------
+    # =========================================================================
 
     def get_by_id(
         self,
@@ -65,30 +64,22 @@ class EpisodeRepository:
         episode_id: UUID,
     ) -> Episode | None:
         """
-        Retrieve an Episode by its primary key.
-
-        The primary key lookup is performed using SQLAlchemy's
-        Session.get() identity lookup. The returned Episode is then
-        verified against the authenticated Hospital to preserve
-        tenant isolation.
+        Retrieve an Episode by ID within a Hospital.
         """
 
-        episode = self.db.get(
-            Episode,
-            episode_id,
+        statement = (
+            select(Episode)
+            .where(
+                Episode.id == episode_id,
+                Episode.hospital_id == hospital_id,
+            )
         )
 
-        if episode is None:
-            return None
+        return self.db.scalar(statement)
 
-        if episode.hospital_id != hospital_id:
-            return None
-
-        return episode
-
-    # ------------------------------------------------------------------
+    # =========================================================================
     # Episode Number
-    # ------------------------------------------------------------------
+    # =========================================================================
 
     def get_by_episode_number(
         self,
@@ -97,7 +88,7 @@ class EpisodeRepository:
         episode_number: str,
     ) -> Episode | None:
         """
-        Retrieve an Episode by its hospital-scoped episode number.
+        Retrieve an Episode by hospital-scoped episode number.
         """
 
         statement = (
@@ -116,8 +107,7 @@ class EpisodeRepository:
         hospital_id: UUID,
     ) -> str | None:
         """
-        Retrieve the most recently assigned Episode number
-        for a specific hospital.
+        Retrieve the latest Episode number assigned to a Hospital.
         """
 
         statement = (
@@ -133,9 +123,50 @@ class EpisodeRepository:
 
         return self.db.scalar(statement)
 
-    # ------------------------------------------------------------------
+    # =========================================================================
+    # Nursing Queue
+    # =========================================================================
+
+    def list_nursing_queue(
+        self,
+        *,
+        hospital_id: UUID,
+    ) -> list[Episode]:
+        """
+        Return Episodes currently requiring nursing attention.
+
+        Includes:
+
+            WAITING_FOR_NURSING
+            NURSING_IN_PROGRESS
+
+        Results are ordered by check-in time so the oldest patient
+        appears first.
+        """
+
+        statement = (
+            select(Episode)
+            .where(
+                Episode.hospital_id == hospital_id,
+                Episode.flow_status.in_(
+                    (
+                        EpisodeFlowStatus.WAITING_FOR_NURSING,
+                        EpisodeFlowStatus.NURSING_IN_PROGRESS,
+                    ),
+                ),
+            )
+            .order_by(
+                Episode.checked_in_at.asc(),
+            )
+        )
+
+        return list(
+            self.db.scalars(statement),
+        )
+
+    # =========================================================================
     # Patient Episodes
-    # ------------------------------------------------------------------
+    # =========================================================================
 
     def list_by_patient(
         self,
@@ -163,9 +194,9 @@ class EpisodeRepository:
             self.db.scalars(statement),
         )
 
-    # ------------------------------------------------------------------
+    # =========================================================================
     # Persistence
-    # ------------------------------------------------------------------
+    # =========================================================================
 
     def save(self) -> None:
         """
@@ -183,3 +214,10 @@ class EpisodeRepository:
         """
 
         self.db.refresh(episode)
+
+    def rollback(self) -> None:
+        """
+        Roll back the current transaction.
+        """
+
+        self.db.rollback()
