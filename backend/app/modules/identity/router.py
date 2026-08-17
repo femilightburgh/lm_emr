@@ -7,9 +7,12 @@ Identity API Router
 
 ========================================================================
 
-This router exposes authentication endpoints.
+This router exposes authentication and identity endpoints.
 
-Business logic belongs in AuthService.
+Authorization administration endpoints belong in
+`authorization_router.py`.
+
+Business logic belongs in services.
 
 Database access belongs in repositories.
 
@@ -18,11 +21,13 @@ The router should remain as thin as possible.
 ========================================================================
 """
 
-from fastapi.security import OAuth2PasswordRequestForm
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
+from app.core.security.dependencies import get_current_user
 from app.db.session import get_db
+
 from app.modules.identity.auth_service import AuthService
 from app.modules.identity.exceptions import (
     ExpiredTokenError,
@@ -35,19 +40,26 @@ from app.modules.identity.schemas import (
     CreateUserRequest,
     LoginRequest,
     LoginResponse,
-    UserResponse,
     RefreshTokenRequest,
+    UserResponse,
 )
 from app.modules.identity.token_service import TokenService
 from app.modules.identity.user_service import UserService
 
-from app.core.security.dependencies import get_current_user
 
+# ============================================================================
+# Router
+# ============================================================================
 
 router = APIRouter(
     prefix="/auth",
     tags=["Authentication"],
 )
+
+
+# ============================================================================
+# User Creation
+# ============================================================================
 
 
 @router.post(
@@ -61,11 +73,14 @@ def create_user(
     db: Session = Depends(get_db),
 ):
     """
-    Create a new user account.
+    Create a new user account and assign an initial role.
     """
 
     repository = IdentityRepository(db)
-    service = UserService(repository)
+
+    service = UserService(
+        repository,
+    )
 
     user = service.create_user(
         hospital_code=request.hospital_code,
@@ -77,7 +92,14 @@ def create_user(
     repository.save()
     repository.refresh(user)
 
-    return UserResponse.model_validate(user)
+    return UserResponse.model_validate(
+        user,
+    )
+
+
+# ============================================================================
+# Login
+# ============================================================================
 
 
 @router.post(
@@ -94,6 +116,7 @@ def login(
     """
 
     repository = IdentityRepository(db)
+
     token_service = TokenService()
 
     service = AuthService(
@@ -121,6 +144,11 @@ def login(
         ) from exc
 
 
+# ============================================================================
+# Refresh Token
+# ============================================================================
+
+
 @router.post(
     "/refresh",
     response_model=LoginResponse,
@@ -135,6 +163,7 @@ def refresh(
     """
 
     repository = IdentityRepository(db)
+
     token_service = TokenService()
 
     service = AuthService(
@@ -166,6 +195,11 @@ def refresh(
         ) from exc
 
 
+# ============================================================================
+# OAuth2 / Swagger Token Endpoint
+# ============================================================================
+
+
 @router.post(
     "/token",
     response_model=LoginResponse,
@@ -178,11 +212,19 @@ def oauth2_token(
     """
     OAuth2-compatible token endpoint.
 
-    This endpoint exists for Swagger UI and OAuth2-compatible clients.
-    It delegates authentication to the existing AuthService.
+    OAuth2 provides only a `username` field.
+
+    LIGHTBURGH expects:
+
+        hospital_code|email
+
+    Example:
+
+        WTH001|admin@lightburgh.com
     """
 
     repository = IdentityRepository(db)
+
     token_service = TokenService()
 
     service = AuthService(
@@ -190,32 +232,20 @@ def oauth2_token(
         token_service=token_service,
     )
 
-    #
-    # OAuth2 provides only "username".
-    #
-    # LIGHTBURGH expects hospital_code + email.
-    #
-    # For now we encode them as:
-    #
-    #     username = hospital_code|email
-    #
-    # Example:
-    #
-    #     WTH001|admin@lightburgh.com
-    #
-
-
     try:
-        hospital_code, email = form_data.username.split("|", maxsplit=1)
+        hospital_code, email = form_data.username.split(
+            "|",
+            maxsplit=1,
+        )
 
-    except ValueError:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
                 "Username must be in the format "
                 "'hospital_code|email'."
             ),
-        )
+        ) from exc
 
     try:
         return service.login(
@@ -237,6 +267,11 @@ def oauth2_token(
         ) from exc
 
 
+# ============================================================================
+# Current User
+# ============================================================================
+
+
 @router.get(
     "/me",
     summary="Current authenticated user",
@@ -245,7 +280,8 @@ def me(
     current_user=Depends(get_current_user),
 ):
     """
-    Test role-based authorization.
+    Return the currently authenticated user's identity
+    and active roles.
     """
 
     return {

@@ -6,18 +6,34 @@ LIGHTBURGH EMR
 User Service
 
 ========================================================================
+
+Business logic for user lifecycle and role assignment.
+
+Database access belongs in IdentityRepository.
+
+Authentication belongs in AuthService.
+
+HTTP concerns belong in routers.
+
+========================================================================
 """
 
 from uuid import UUID
 
+from app.core.context import RequestContext
 from app.core.security.hashing import hash_password
 from app.modules.identity.enums import AccountStatus
 from app.modules.identity.exceptions import (
     HospitalNotFoundError,
+    RoleAlreadyAssignedError,
     RoleNotFoundError,
     UserAlreadyExistsError,
+    UserRoleNotFoundError,
 )
-from app.modules.identity.models import UserAccount, UserRole
+from app.modules.identity.models import (
+    UserAccount,
+    UserRole,
+)
 from app.modules.identity.repository import IdentityRepository
 
 
@@ -27,8 +43,12 @@ class UserService:
 
     Responsibilities
     ----------------
+    - List hospital users
     - Create user accounts
-    - Assign roles to users
+    - Assign initial roles
+    - Assign roles to existing users
+    - Reactivate inactive role assignments
+    - Deactivate role assignments
 
     This service DOES NOT:
     - Commit transactions
@@ -36,12 +56,15 @@ class UserService:
     - Generate JWT tokens
     """
 
-    def __init__(self, repository: IdentityRepository):
+    def __init__(
+        self,
+        repository: IdentityRepository,
+    ) -> None:
         self.repository = repository
 
-    # ------------------------------------------------------------------
+    # =========================================================================
     # Private Helpers
-    # ------------------------------------------------------------------
+    # =========================================================================
 
     def _get_hospital_or_raise(
         self,
@@ -56,12 +79,12 @@ class UserService:
         """
 
         hospital = self.repository.get_hospital_by_code(
-            hospital_code
+            hospital_code,
         )
 
         if hospital is None:
             raise HospitalNotFoundError(
-                "Hospital not found."
+                "Hospital not found.",
             )
 
         return hospital
@@ -84,7 +107,7 @@ class UserService:
 
         if existing_user is not None:
             raise UserAlreadyExistsError(
-                "A user with this email already exists."
+                "A user with this email already exists.",
             )
 
     def _create_user_account(
@@ -97,8 +120,7 @@ class UserService:
         """
         Create a new user account.
 
-        NOTE:
-        This method DOES NOT commit.
+        This method does NOT commit.
         """
 
         user = UserAccount(
@@ -109,16 +131,65 @@ class UserService:
             is_superuser=False,
         )
 
-        self.repository.create_user(user)
+        self.repository.create_user(
+            user,
+        )
 
         # Generate the UUID before assigning roles.
         self.repository.flush()
 
         return user
 
-    # ------------------------------------------------------------------
-    # Public Methods
-    # ------------------------------------------------------------------
+    def _get_role_or_raise(
+        self,
+        *,
+        hospital_id: UUID,
+        role_name: str,
+    ):
+        """
+        Retrieve a role belonging to the supplied hospital.
+
+        Raises:
+            RoleNotFoundError
+                If the role does not exist.
+        """
+
+        normalized_role_name = role_name.strip()
+
+        role = self.repository.get_role_by_name(
+            hospital_id=hospital_id,
+            role_name=normalized_role_name,
+        )
+
+        if role is None:
+            raise RoleNotFoundError(
+                f"Role '{normalized_role_name}' does not exist.",
+            )
+
+        return role
+
+    # =========================================================================
+    # List Users
+    # =========================================================================
+
+    def list_users(
+        self,
+        *,
+        context: RequestContext,
+    ) -> list[UserAccount]:
+        """
+        Return all users belonging to the authenticated Hospital.
+
+        Hospital tenancy is enforced through the RequestContext.
+        """
+
+        return self.repository.list_users(
+            hospital_id=context.hospital_id,
+        )
+
+    # =========================================================================
+    # User Creation
+    # =========================================================================
 
     def create_user(
         self,
@@ -131,12 +202,11 @@ class UserService:
         """
         Create a new user and assign an initial role.
 
-        NOTE:
-        This method DOES NOT commit the transaction.
+        This method does NOT commit the transaction.
         """
 
         hospital = self._get_hospital_or_raise(
-            hospital_code
+            hospital_code,
         )
 
         self._ensure_email_is_available(
@@ -157,6 +227,10 @@ class UserService:
 
         return user
 
+    # =========================================================================
+    # Assign Role
+    # =========================================================================
+
     def assign_role(
         self,
         *,
@@ -167,19 +241,60 @@ class UserService:
         """
         Assign a role to an existing user.
 
-        NOTE:
-        This method DOES NOT commit.
+        Assignment behavior:
+
+        1. Role does not exist:
+           RoleNotFoundError
+
+        2. Active assignment already exists:
+           RoleAlreadyAssignedError
+
+        3. Inactive assignment exists:
+           Reactivate the existing assignment.
+
+        4. No assignment exists:
+           Create a new UserRole.
+
+        This method does NOT commit.
         """
 
-        role = self.repository.get_role_by_name(
+        role = self._get_role_or_raise(
             hospital_id=user.hospital_id,
             role_name=role_name,
         )
 
-        if role is None:
-            raise RoleNotFoundError(
-                f"Role '{role_name}' does not exist."
+        existing_assignment = self.repository.get_user_role(
+            user_id=user.id,
+            role_id=role.id,
+        )
+
+        # ------------------------------------------------------------------
+        # Existing Assignment
+        # ------------------------------------------------------------------
+
+        if existing_assignment is not None:
+
+            if existing_assignment.is_active:
+                raise RoleAlreadyAssignedError(
+                    f"Role '{role.name}' is already assigned "
+                    "to this user.",
+                )
+
+            # --------------------------------------------------------------
+            # Reactivate Historical Assignment
+            # --------------------------------------------------------------
+
+            existing_assignment.is_active = True
+            existing_assignment.assigned_by_user_id = (
+                assigned_by_user_id
             )
+            existing_assignment.expires_at = None
+
+            return existing_assignment
+
+        # ------------------------------------------------------------------
+        # New Assignment
+        # ------------------------------------------------------------------
 
         user_role = UserRole(
             user_account_id=user.id,
@@ -188,6 +303,54 @@ class UserService:
             is_active=True,
         )
 
-        self.repository.create_user_role(user_role)
+        self.repository.create_user_role(
+            user_role,
+        )
+
+        return user_role
+
+    # =========================================================================
+    # Remove Role
+    # =========================================================================
+
+    def remove_role(
+        self,
+        *,
+        user: UserAccount,
+        role_name: str,
+    ) -> UserRole:
+        """
+        Deactivate an active role assignment.
+
+        Role assignments are intentionally not deleted.
+
+        This preserves the UserRole record for future audit,
+        historical reporting, and lifecycle management.
+
+        This method does NOT commit.
+        """
+
+        role = self._get_role_or_raise(
+            hospital_id=user.hospital_id,
+            role_name=role_name,
+        )
+
+        user_role = self.repository.get_user_role(
+            user_id=user.id,
+            role_id=role.id,
+        )
+
+        if (
+            user_role is None
+            or not user_role.is_active
+        ):
+            raise UserRoleNotFoundError(
+                f"Role '{role.name}' is not currently "
+                "assigned to this user.",
+            )
+
+        self.repository.deactivate_user_role(
+            user_role,
+        )
 
         return user_role

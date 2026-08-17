@@ -137,6 +137,30 @@ class UserResponse(BaseModel):
     status: AccountStatus
 
 
+class UserRoleResponse(BaseModel):
+    """
+    Role assignment returned by the Administration API.
+    """
+
+    id: UUID
+    role_id: UUID
+    role_name: str
+    is_active: bool
+
+
+class AdminUserResponse(BaseModel):
+    """
+    User representation returned to the Administration workspace.
+    """
+
+    id: UUID
+    email: EmailStr
+    hospital_id: UUID
+    is_superuser: bool
+    status: AccountStatus
+    roles: list[UserRoleResponse]
+
+
 # ============================================================================
 # Role Permission Management
 # ============================================================================
@@ -173,3 +197,75 @@ class RolePermissionsResponse(BaseModel):
     """
 
     permissions: list[PermissionResponse]
+
+
+# ============================================================================
+# Role Management
+# ============================================================================
+
+
+class CreateRoleRequest(BaseModel):
+    """
+    Request payload for creating a hospital role.
+    """
+
+    name: str = Field(
+        ...,
+        min_length=2,
+        max_length=100,
+        description="Human-readable role name.",
+    )
+
+    description: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Optional description of the role.",
+    )
+
+
+class UpdateRoleRequest(BaseModel):
+    """
+    Request payload for updating a hospital role.
+    """
+
+    name: str = Field(
+        ...,
+        min_length=2,
+        max_length=100,
+        description="Human-readable role name.",
+    )
+
+    description: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Optional description of the role.",
+    )
+
+
+class RoleResponse(BaseModel):
+    """
+    Role returned by the Administration API.
+    """
+
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
+
+    id: UUID
+    hospital_id: UUID
+    name: str
+    description: str | None
+    is_template: bool
+
+
+class AssignRoleRequest(BaseModel):
+    """
+    Request payload for assigning a role to a user.
+    """
+
+    role_name: str = Field(
+        ...,
+        min_length=2,
+        max_length=100,
+        description="Role to assign to the user.",
+    )

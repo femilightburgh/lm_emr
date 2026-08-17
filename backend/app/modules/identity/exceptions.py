@@ -15,7 +15,14 @@ from app.core.exceptions import AppError
 
 
 class IdentityError(AppError):
-    """Base exception for Identity."""
+    """
+    Base exception for Identity.
+    """
+
+
+# ============================================================================
+# Hospital / User
+# ============================================================================
 
 
 class HospitalNotFoundError(IdentityError):
@@ -28,9 +35,51 @@ class UserAlreadyExistsError(IdentityError):
     error_code = "USER_ALREADY_EXISTS"
 
 
+# ============================================================================
+# Roles
+# ============================================================================
+
+
 class RoleNotFoundError(IdentityError):
+    """
+    Raised when a role cannot be found.
+    """
+
     status_code = 404
     error_code = "ROLE_NOT_FOUND"
+
+
+class RoleAlreadyExistsError(IdentityError):
+    """
+    Raised when a role with the same name already exists
+    within a hospital.
+    """
+
+    status_code = 409
+    error_code = "ROLE_ALREADY_EXISTS"
+
+
+class RoleAlreadyAssignedError(IdentityError):
+    """
+    Raised when a role is already actively assigned to a user.
+    """
+
+    status_code = 409
+    error_code = "ROLE_ALREADY_ASSIGNED"
+
+
+class UserRoleNotFoundError(IdentityError):
+    """
+    Raised when a requested user-role assignment cannot be found.
+    """
+
+    status_code = 404
+    error_code = "USER_ROLE_NOT_FOUND"
+
+
+# ============================================================================
+# Authentication
+# ============================================================================
 
 
 class InvalidCredentialsError(Exception):
@@ -39,7 +88,9 @@ class InvalidCredentialsError(Exception):
     """
 
     def __init__(self):
-        super().__init__("Invalid email or password.")
+        super().__init__(
+            "Invalid email or password."
+        )
 
 
 class InactiveAccountError(Exception):
@@ -48,7 +99,9 @@ class InactiveAccountError(Exception):
     """
 
     def __init__(self):
-        super().__init__("User account is not active.")
+        super().__init__(
+            "User account is not active."
+        )
 
 
 class InvalidTokenError(Exception):
@@ -57,7 +110,9 @@ class InvalidTokenError(Exception):
     """
 
     def __init__(self):
-        super().__init__("Invalid authentication token.")
+        super().__init__(
+            "Invalid authentication token."
+        )
 
 
 class ExpiredTokenError(Exception):
@@ -66,7 +121,14 @@ class ExpiredTokenError(Exception):
     """
 
     def __init__(self):
-        super().__init__("Authentication token has expired.")
+        super().__init__(
+            "Authentication token has expired."
+        )
+
+
+# ============================================================================
+# Permissions
+# ============================================================================
 
 
 class PermissionDeniedError(IdentityError):

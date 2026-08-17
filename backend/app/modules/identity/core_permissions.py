@@ -154,4 +154,14 @@ PERMISSIONS: list[PermissionDefinition] = [
         name="Update Hospital Settings",
         description="Allows modifying hospital settings.",
     ),
+
+    # ==============================================================
+    # Vitals
+    # ==============================================================
+
+    PermissionDefinition(
+        code=Permissions.VITALS_CREATE,
+        name="Create Vitals",
+        description="Allows recording patient vital signs.",
+    ),
 ]
