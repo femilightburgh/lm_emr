@@ -36,6 +36,14 @@ from uuid import UUID
 
 from app.core.context import RequestContext
 
+from app.modules.clinical_documents.enums import (
+    ClinicalDocumentStatus,
+    ClinicalDocumentType,
+)
+from app.modules.clinical_documents.repositories import (
+    ClinicalDocumentRepository,
+)
+
 from app.modules.encounter.exceptions import (
     EncounterNotFoundError,
 )
@@ -64,6 +72,7 @@ from app.modules.episode.exceptions import (
     EpisodeNotInNursingError,
     EpisodeNotOpenError,
     EpisodeNotWaitingForNursingError,
+    NursingIntakeNotSignedError,
     PatientNotFoundError,
     StaffHospitalMismatchError,
     StaffNotDoctorError,
@@ -132,6 +141,12 @@ class EpisodeService:
 
         self.department_repository = department_repository
 
+        self.clinical_document_repository = (
+            ClinicalDocumentRepository(
+                repository.db,
+            )
+        )
+
     # =========================================================================
     # Internal Helpers
     # =========================================================================
@@ -195,6 +210,74 @@ class EpisodeService:
 
         if episode.status == EpisodeStatus.CANCELLED:
             raise EpisodeAlreadyCancelledError()
+
+    def _get_nursing_encounter(
+        self,
+        *,
+        episode: Episode,
+    ) -> Encounter | None:
+        """
+        Return the latest Nursing Intake Encounter belonging to the Episode.
+
+        Nursing Encounters are created by start_nursing() with the
+        explicit title "Nursing Intake".
+        """
+
+        nursing_encounters = [
+            encounter
+            for encounter in episode.encounters
+            if encounter.title == "Nursing Intake"
+        ]
+
+        if not nursing_encounters:
+            return None
+
+        return max(
+            nursing_encounters,
+            key=lambda encounter: encounter.started_at,
+        )
+
+    def _ensure_nursing_intake_signed(
+        self,
+        *,
+        context: RequestContext,
+        episode: Episode,
+    ) -> None:
+        """
+        Ensure the latest Nursing Intake document is signed.
+
+        Routing is not permitted until nursing has completed and signed
+        the Nursing Intake Clinical Document.
+        """
+
+        nursing_encounter = self._get_nursing_encounter(
+            episode=episode,
+        )
+
+        if nursing_encounter is None:
+            raise NursingIntakeNotSignedError(
+                "Nursing Encounter not found.",
+            )
+
+        nursing_intake = (
+            self.clinical_document_repository.get_latest_version(
+                hospital_id=context.hospital_id,
+                encounter_id=nursing_encounter.id,
+                document_type=ClinicalDocumentType.NURSING_INTAKE,
+            )
+        )
+
+        if nursing_intake is None:
+            raise NursingIntakeNotSignedError(
+                "Nursing Intake must be completed before the Episode "
+                "can be routed.",
+            )
+
+        if nursing_intake.status != ClinicalDocumentStatus.SIGNED:
+            raise NursingIntakeNotSignedError(
+                "Nursing Intake must be signed before the Episode "
+                "can be routed.",
+            )
 
     # =========================================================================
     # Create
@@ -399,17 +482,6 @@ class EpisodeService:
 
         The Episode state change and Encounter creation are committed
         atomically as one transaction.
-
-        Business Rules
-        --------------
-
-        • Episode must exist.
-        • Episode must belong to the authenticated Hospital.
-        • Episode must not be CLOSED.
-        • Episode must not be CANCELLED.
-        • Episode must currently be WAITING_FOR_NURSING.
-        • Authenticated user must have a Staff profile.
-        • Nursing Encounter belongs to the authenticated Staff member.
         """
 
         episode = self._get_episode(
@@ -486,6 +558,8 @@ class EpisodeService:
         • Episode must belong to the authenticated Hospital.
         • Episode must currently be NURSING_IN_PROGRESS.
         • Episode must not already be routed.
+        • Nursing Intake must exist.
+        • Latest Nursing Intake must be SIGNED.
         • Department must exist.
         • Department must belong to the authenticated Hospital.
         • Department must be active.
@@ -494,12 +568,6 @@ class EpisodeService:
         • Routing timestamp is recorded.
         • Department is recorded as current department.
         • Episode moves to ROUTED.
-
-        Note
-        ----
-        Nursing Intake completion/signing is intentionally not enforced
-        here yet. That will be added after the Clinical Document repository
-        exposes the required latest-version query.
         """
 
         episode = self._get_episode(
@@ -517,6 +585,19 @@ class EpisodeService:
         if episode.flow_status != EpisodeFlowStatus.NURSING_IN_PROGRESS:
             raise EpisodeNotInNursingError()
 
+        # ------------------------------------------------------------------
+        # Nursing Completion
+        # ------------------------------------------------------------------
+
+        self._ensure_nursing_intake_signed(
+            context=context,
+            episode=episode,
+        )
+
+        # ------------------------------------------------------------------
+        # Department
+        # ------------------------------------------------------------------
+
         department = self.department_repository.get_by_id(
             department_id,
         )
@@ -530,9 +611,17 @@ class EpisodeService:
         if department.status != DepartmentStatus.ACTIVE:
             raise DepartmentInactiveError()
 
+        # ------------------------------------------------------------------
+        # Routing Staff
+        # ------------------------------------------------------------------
+
         staff = self._get_authenticated_staff(
             context=context,
         )
+
+        # ------------------------------------------------------------------
+        # Route
+        # ------------------------------------------------------------------
 
         episode.current_department_id = department.id
         episode.routed_at = datetime.now(UTC)
