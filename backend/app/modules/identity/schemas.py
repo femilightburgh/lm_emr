@@ -18,9 +18,9 @@ Responsibilities
 ========================================================================
 """
 
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
-
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.modules.identity.models import AccountStatus
@@ -160,6 +160,53 @@ class AdminUserResponse(BaseModel):
     status: AccountStatus
     roles: list[UserRoleResponse]
 
+
+class CreateStaffRequest(BaseModel):
+    """
+    Request payload for administrator-led staff onboarding.
+
+    The administrator supplies the staff member's email and
+    initial role. The staff member creates their own password
+    during account activation.
+    """
+
+    email: EmailStr
+
+    role_name: str = Field(
+        ...,
+        min_length=2,
+        max_length=100,
+        description="Initial role to assign.",
+    )
+
+
+class CreateStaffResponse(BaseModel):
+    """
+    Response returned after administrator-led staff onboarding.
+    """
+
+    user: AdminUserResponse
+
+    invitation_token: str
+    invitation_expires_at: datetime
+
+
+class ActivateUserRequest(BaseModel):
+    """
+    Request payload for activating a pending user account.
+    """
+
+    token: str = Field(
+        ...,
+        min_length=20,
+        description="One-time invitation token.",
+    )
+
+    password: str = Field(
+        ...,
+        min_length=8,
+        description="The user's new password.",
+    )
 
 # ============================================================================
 # Role Permission Management

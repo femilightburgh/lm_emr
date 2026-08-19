@@ -829,3 +829,422 @@ select {
     width: 100%;
   }
 }
+
+/* ==========================================================================
+   Administration
+   ========================================================================== */
+
+.admin-panel {
+  display: grid;
+  gap: 20px;
+}
+
+.admin-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.admin-panel-header h3 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.admin-panel-header p {
+  margin: 0;
+}
+
+
+/* --------------------------------------------------------------------------
+   Users Toolbar
+   -------------------------------------------------------------------------- */
+
+.admin-users-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 20px;
+  background: #ffffff;
+  border: 1px solid #e1e5e9;
+  border-radius: 12px;
+}
+
+.admin-search {
+  flex: 1;
+  max-width: 520px;
+}
+
+.admin-search input {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid #d5dce2;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #17212b;
+  outline: none;
+}
+
+.admin-search input:focus {
+  border-color: #526b7d;
+  box-shadow: 0 0 0 3px rgba(82, 107, 125, 0.12);
+}
+
+
+/* --------------------------------------------------------------------------
+   User Table
+   -------------------------------------------------------------------------- */
+
+.admin-table {
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #e1e5e9;
+  border-radius: 12px;
+}
+
+.admin-table-header,
+.admin-table-row {
+  display: grid;
+  grid-template-columns:
+    minmax(220px, 1.8fr)
+    110px
+    minmax(180px, 1.3fr)
+    100px;
+  gap: 18px;
+  align-items: center;
+  padding: 15px 20px;
+}
+
+.admin-table-header {
+  background: #f7f8fa;
+  color: #74818c;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.admin-table-row {
+  min-height: 68px;
+  border-top: 1px solid #edf0f2;
+}
+
+.admin-table-row strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #17212b;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-table-row > .secondary-button {
+  justify-self: end;
+}
+
+
+/* --------------------------------------------------------------------------
+   Status
+   -------------------------------------------------------------------------- */
+
+.admin-status {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.admin-status-active {
+  background: #e9f6ee;
+  color: #277347;
+}
+
+.admin-status-pending {
+  background: #fff5df;
+  color: #96671d;
+}
+
+.admin-status-locked,
+.admin-status-inactive {
+  background: #fbeaea;
+  color: #9b3030;
+}
+
+
+/* --------------------------------------------------------------------------
+   Role Badges
+   -------------------------------------------------------------------------- */
+
+.role-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 8px;
+  border: 1px solid #dce2e7;
+  border-radius: 999px;
+  background: #f7f8fa;
+  color: #52616d;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+
+/* --------------------------------------------------------------------------
+   Empty / Loading
+   -------------------------------------------------------------------------- */
+
+.admin-empty {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  padding: 30px;
+  background: #ffffff;
+  border: 1px solid #e1e5e9;
+  border-radius: 12px;
+  color: #74818c;
+  font-size: 13px;
+}
+
+
+/* --------------------------------------------------------------------------
+   Add Staff
+   -------------------------------------------------------------------------- */
+
+.admin-onboarding-card {
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid #e1e5e9;
+  border-radius: 12px;
+}
+
+.admin-onboarding-card h4 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.admin-onboarding-card > p {
+  margin: 7px 0 20px;
+  color: #74818c;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.admin-onboarding-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.admin-field {
+  display: grid;
+  gap: 7px;
+}
+
+.admin-field label {
+  color: #34414d;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.admin-field input,
+.admin-field select {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #d5dce2;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #17212b;
+  outline: none;
+}
+
+.admin-field input:focus,
+.admin-field select:focus {
+  border-color: #526b7d;
+  box-shadow: 0 0 0 3px rgba(82, 107, 125, 0.12);
+}
+
+.admin-form-error {
+  margin-top: 14px;
+  padding: 11px 13px;
+  border: 1px solid #e5b8b8;
+  border-radius: 8px;
+  background: #fff5f5;
+  color: #9b3030;
+  font-size: 12px;
+}
+
+
+/* --------------------------------------------------------------------------
+   Invitation Success
+   -------------------------------------------------------------------------- */
+
+.admin-invitation {
+  padding: 22px;
+  border: 1px solid #cfe3d6;
+  border-radius: 12px;
+  background: #f3faf5;
+}
+
+.admin-invitation h4 {
+  margin: 0;
+  color: #277347;
+  font-size: 17px;
+}
+
+.admin-invitation p {
+  margin: 7px 0 0;
+  color: #52616d;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.admin-invitation-token {
+  display: block;
+  margin-top: 16px;
+  padding: 12px;
+  overflow-x: auto;
+  border: 1px solid #dce8df;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #34414d;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.admin-invitation-actions {
+  display: flex;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+
+/* --------------------------------------------------------------------------
+   User Manager
+   -------------------------------------------------------------------------- */
+
+.admin-user-manager {
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid #e1e5e9;
+  border-radius: 12px;
+}
+
+.admin-user-manager .admin-panel-header {
+  padding-bottom: 20px;
+  border-bottom: 1px solid #edf0f2;
+}
+
+.current-roles {
+  margin-top: 22px;
+}
+
+.current-roles h4,
+.admin-role-assignment h4 {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+.current-roles > p {
+  margin: 0;
+  color: #74818c;
+  font-size: 13px;
+}
+
+.admin-role-assignment {
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid #edf0f2;
+}
+
+.inline-form {
+  display: flex;
+  gap: 8px;
+}
+
+.inline-form select {
+  min-width: 220px;
+  padding: 10px 12px;
+  border: 1px solid #d5dce2;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #34414d;
+}
+
+.permission-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid #edf0f2;
+}
+
+.permission-item:last-child {
+  border-bottom: 0;
+}
+
+.permission-item strong {
+  color: #34414d;
+  font-size: 13px;
+}
+
+.danger-button {
+  padding: 8px 11px;
+  border: 1px solid #e5b8b8;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #9b3030;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.danger-button:hover {
+  background: #fff5f5;
+}
+
+
+/* --------------------------------------------------------------------------
+   Administration Responsive
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 850px) {
+  .admin-onboarding-form {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-table-header {
+    display: none;
+  }
+
+  .admin-table-row {
+    grid-template-columns: 1fr;
+    gap: 9px;
+    padding: 18px;
+  }
+
+  .admin-table-row > .secondary-button {
+    justify-self: start;
+  }
+
+  .admin-users-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-search {
+    max-width: none;
+  }
+}

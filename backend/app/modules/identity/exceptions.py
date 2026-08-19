@@ -59,6 +59,33 @@ class RoleAlreadyExistsError(IdentityError):
     error_code = "ROLE_ALREADY_EXISTS"
 
 
+class InvalidInvitationError(IdentityError):
+    """
+    Raised when an invitation token is invalid.
+    """
+
+    status_code = 400
+    error_code = "INVALID_INVITATION"
+
+
+class ExpiredInvitationError(IdentityError):
+    """
+    Raised when an invitation has expired.
+    """
+
+    status_code = 400
+    error_code = "EXPIRED_INVITATION"
+
+
+class InvitationAlreadyUsedError(IdentityError):
+    """
+    Raised when an invitation has already been consumed.
+    """
+
+    status_code = 400
+    error_code = "INVITATION_ALREADY_USED"
+
+
 class RoleAlreadyAssignedError(IdentityError):
     """
     Raised when a role is already actively assigned to a user.

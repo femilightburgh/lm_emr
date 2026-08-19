@@ -3,6 +3,8 @@ import {
   useState,
 } from 'react'
 import type { FormEvent } from 'react'
+import AdministratorWorkspace from './components/administration/AdministratorWorkspace'
+import AppShell from './app/AppShell'
 
 import {
   createPatient,
@@ -28,12 +30,14 @@ import type {
 } from './types'
 
 import './App.css'
+import ActivateAccount from './components/auth/ActivateAccount'
 
 
 type WorkspaceView =
   | 'dashboard'
   | 'patients'
   | 'register'
+  | 'administrator'
 
 
 const emptyPatientForm: CreatePatientRequest = {
@@ -437,6 +441,25 @@ function App() {
   }
 
 
+  if (
+    window.location.pathname === '/activate'
+  ) {
+    return (
+      <ActivateAccount
+        onActivated={() => {
+          window.history.pushState(
+            {},
+            '',
+            '/',
+          )
+
+          window.location.reload()
+        }}
+      />
+    )
+  }
+
+
   // ==========================================================================
   // Login Screen
   // ==========================================================================
@@ -553,161 +576,23 @@ function App() {
   const isReceptionist =
     user.roles?.includes('Receptionist') ?? false
 
+  const isAdministrator =
+    user.roles?.includes('Administrator') ?? false
+
   return (
-    <div className="app-shell">
-
-      {/* ================================================================== */}
-      {/* Sidebar                                                            */}
-      {/* ================================================================== */}
-
-      <aside className="sidebar">
-
-        <div className="sidebar-brand">
-          <div className="brand">
-            LIGHTBURGH
-          </div>
-
-          <div className="sidebar-caption">
-            Hospital Information System
-          </div>
-        </div>
-
-        <nav className="sidebar-nav">
-
-          <button
-            type="button"
-            className={
-              view === 'dashboard'
-                ? 'nav-item active'
-                : 'nav-item'
-            }
-            onClick={openDashboard}
-          >
-            <span>Dashboard</span>
-          </button>
-
-          <button
-            type="button"
-            className={
-              view === 'patients'
-                ? 'nav-item active'
-                : 'nav-item'
-            }
-            onClick={openPatients}
-          >
-            <span>Patients</span>
-          </button>
-
-          <button
-            type="button"
-            className={
-              view === 'register'
-                ? 'nav-item active'
-                : 'nav-item'
-            }
-            onClick={openRegistration}
-          >
-            <span>Register patient</span>
-          </button>
-
-          <button
-            type="button"
-            className="nav-item"
-            disabled
-          >
-            <span>Returning patient</span>
-            <small>Coming soon</small>
-          </button>
-
-          <button
-            type="button"
-            className="nav-item"
-            disabled
-          >
-            <span>Queue</span>
-            <small>Coming soon</small>
-          </button>
-
-          <button
-            type="button"
-            className="nav-item"
-            disabled
-          >
-            <span>Payments</span>
-            <small>Coming soon</small>
-          </button>
-
-        </nav>
-
-        <div className="sidebar-footer">
-
-          <div className="user-summary">
-            <div className="user-avatar">
-              {user.email
-                .charAt(0)
-                .toUpperCase()}
-            </div>
-
-            <div>
-              <strong>
-                {user.email}
-              </strong>
-
-              <span>
-                {isReceptionist
-                  ? 'Receptionist'
-                  : 'Staff'}
-              </span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className="sign-out-button"
-            onClick={handleSignOut}
-          >
-            Sign out
-          </button>
-
-        </div>
-
-      </aside>
-
-
-      {/* ================================================================== */}
-      {/* Main                                                               */}
-      {/* ================================================================== */}
-
-      <main className="workspace">
-
-        <header className="workspace-header">
-
-          <div>
-            <p className="eyebrow">
-              {isReceptionist
-                ? 'RECEPTION'
-                : 'STAFF WORKSPACE'}
-            </p>
-
-            <h1>
-              {view === 'dashboard' &&
-                'Good day'}
-
-              {view === 'patients' &&
-                'Patients'}
-
-              {view === 'register' &&
-                'Register patient'}
-            </h1>
-          </div>
-
-          <div className="header-user">
-            <span>
-              {user.email}
-            </span>
-          </div>
-
-        </header>
+    <AppShell
+      user={user}
+      view={view}
+      isReceptionist={isReceptionist}
+      isAdministrator={isAdministrator}
+      onDashboard={openDashboard}
+      onPatients={openPatients}
+      onRegistration={openRegistration}
+      onAdministrator={() =>
+        setView('administrator')
+      }
+      onSignOut={handleSignOut}
+    >
 
 
         {/* ================================================================= */}
@@ -1620,11 +1505,17 @@ function App() {
             )}
 
           </section>
-        )}
+         
+          )}
+          {view === 'administrator' &&
+          isAdministrator && (
+            <AdministratorWorkspace
+              accessToken={session.access_token}
+              currentUserEmail={user.email}
+            />
+          )}
 
-      </main>
-
-    </div>
+        </AppShell>
   )
 }
 

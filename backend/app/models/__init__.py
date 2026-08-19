@@ -61,6 +61,10 @@ from app.modules.identity.models import (
     UserRole,
 )
 
+from app.modules.identity.invitation_models import (
+    UserInvitation,
+)
+
 
 # ============================================================================
 # Patients
@@ -97,6 +101,7 @@ __all__ = [
 
     # Identity
     "UserAccount",
+    "UserInvitation",
     "Role",
     "Permission",
     "UserRole",

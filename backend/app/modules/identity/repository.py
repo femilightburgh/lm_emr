@@ -21,6 +21,10 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.modules.identity.invitation_models import (
+    UserInvitation,
+)
+
 from app.modules.identity.models import (
     Permission,
     Role,
@@ -103,6 +107,53 @@ class IdentityRepository:
         self.db.add(user)
 
         return user
+
+    def create_invitation(
+        self,
+        invitation: UserInvitation,
+    ) -> UserInvitation:
+        """
+        Add a UserInvitation to the current session.
+
+        Does NOT commit.
+        """
+
+        self.db.add(invitation)
+
+        return invitation
+
+    def get_invitation_by_token_hash(
+        self,
+        token_hash: str,
+    ) -> UserInvitation | None:
+        """
+        Retrieve an invitation by its hashed token.
+        """
+
+        statement = (
+            select(UserInvitation)
+            .where(
+                UserInvitation.token_hash == token_hash,
+            )
+        )
+
+        return self.db.scalar(statement)
+
+    def mark_invitation_used(
+        self,
+        invitation: UserInvitation,
+        *,
+        used_at,
+    ) -> UserInvitation:
+        """
+        Mark an invitation as consumed.
+
+        Does NOT commit.
+        """
+
+        invitation.used_at = used_at
+
+        return invitation
 
     def get_user_by_id(
         self,

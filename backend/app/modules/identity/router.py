@@ -34,6 +34,9 @@ from app.modules.identity.exceptions import (
     InactiveAccountError,
     InvalidCredentialsError,
     InvalidTokenError,
+    ExpiredInvitationError,
+    InvalidInvitationError,
+    InvitationAlreadyUsedError,
 )
 from app.modules.identity.repository import IdentityRepository
 from app.modules.identity.schemas import (
@@ -42,9 +45,13 @@ from app.modules.identity.schemas import (
     LoginResponse,
     RefreshTokenRequest,
     UserResponse,
+    ActivateUserRequest,
 )
 from app.modules.identity.token_service import TokenService
 from app.modules.identity.user_service import UserService
+from app.modules.identity.invitation_service import (
+    InvitationService,
+)
 
 
 # ============================================================================
@@ -96,6 +103,57 @@ def create_user(
         user,
     )
 
+
+@router.post(
+    "/activate",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Activate a user account",
+)
+def activate_user(
+    request: ActivateUserRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Activate a pending user account using a valid invitation.
+    """
+
+    repository = IdentityRepository(db)
+
+    service = InvitationService(
+        repository=repository,
+    )
+
+    try:
+        service.activate_user(
+            token=request.token,
+            password=request.password,
+        )
+
+        db.commit()
+
+    except InvalidInvitationError as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    except ExpiredInvitationError as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    except InvitationAlreadyUsedError as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
 
 # ============================================================================
 # Login

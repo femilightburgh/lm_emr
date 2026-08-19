@@ -19,6 +19,7 @@ HTTP concerns belong in routers.
 """
 
 from uuid import UUID
+import secrets
 
 from app.core.context import RequestContext
 from app.core.security.hashing import hash_password
@@ -227,6 +228,63 @@ class UserService:
 
         return user
 
+    def onboard_staff(
+        self,
+        *,
+        hospital_id: UUID,
+        email: str,
+        role_name: str,
+    ) -> tuple[UserAccount, str, object]:
+        """
+        Create a pending staff account and its activation invitation.
+
+        The administrator does not provide a permanent password.
+        The staff member will establish their password during activation.
+
+        This method does NOT commit the transaction.
+        """
+
+        self._ensure_email_is_available(
+            hospital_id=hospital_id,
+            email=email,
+        )
+
+        temporary_password = (
+            secrets.token_urlsafe(32)
+        )
+
+        user = self._create_user_account(
+            hospital_id=hospital_id,
+            email=email,
+            password=temporary_password,
+        )
+        user.status = AccountStatus.PENDING
+
+        self.assign_role(
+            user=user,
+            role_name=role_name,
+        )
+
+        from app.modules.identity.invitation_service import (
+            InvitationService,
+        )
+
+        invitation_service = InvitationService(
+            repository=self.repository,
+        )
+
+        invitation_token, expires_at = (
+            invitation_service.create_invitation(
+                hospital_id=hospital_id,
+                user_id=user.id,
+            )
+        )
+
+        return (
+            user,
+            invitation_token,
+            expires_at,
+        )
     # =========================================================================
     # Assign Role
     # =========================================================================

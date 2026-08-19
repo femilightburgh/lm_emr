@@ -1442,3 +1442,154 @@ def test_inactive_role_no_longer_grants_permission(
     )
 
     assert "vitals.create" not in after
+
+
+def test_administrator_can_onboard_staff(
+    client,
+    db,
+):
+    """
+    An Administrator can onboard a staff member.
+
+    The new account must be pending, receive its initial role,
+    and have an activation invitation.
+    """
+
+    hospital = create_hospital(db)
+
+    admin = create_user(
+        db,
+        hospital=hospital,
+        email="admin-onboard@example.com",
+        role_name="Administrator",
+    )
+
+    token = authenticate(
+        db,
+        hospital=hospital,
+        email=admin.email,
+    )
+
+    response = client.post(
+        "/api/v1/authorization/users/onboard",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+        json={
+            "email": "new-nurse@example.com",
+            "role_name": "Nurse",
+        },
+    )
+
+    assert response.status_code == 201
+
+    data = response.json()
+
+    assert data["user"]["email"] == (
+        "new-nurse@example.com"
+    )
+
+    assert data["user"]["status"] == "PENDING"
+
+    assert any(
+        role["role_name"] == "Nurse"
+        for role in data["user"]["roles"]
+    )
+
+    assert data["invitation_token"]
+    assert data["invitation_expires_at"]
+
+    repository = IdentityRepository(db)
+
+    user = repository.get_user_by_email(
+        hospital_id=hospital.id,
+        email="new-nurse@example.com",
+    )
+
+    assert user is not None
+    assert user.status.value == "PENDING"
+
+
+def test_staff_activation_completes_onboarding(
+    client,
+    db,
+):
+    """
+    A pending staff member can activate their account using
+    the invitation token, establish a password, and then log in.
+
+    The invitation cannot be reused.
+    """
+
+    hospital = create_hospital(db)
+
+    admin = create_user(
+        db,
+        hospital=hospital,
+        email="admin-activation@example.com",
+        role_name="Administrator",
+    )
+
+    token = authenticate(
+        db,
+        hospital=hospital,
+        email=admin.email,
+    )
+
+    onboarding_response = client.post(
+        "/api/v1/authorization/users/onboard",
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+        json={
+            "email": "activation-nurse@example.com",
+            "role_name": "Nurse",
+        },
+    )
+
+    assert onboarding_response.status_code == 201
+
+    invitation_token = (
+        onboarding_response.json()["invitation_token"]
+    )
+
+    activation_response = client.post(
+        "/api/v1/auth/activate",
+        json={
+            "token": invitation_token,
+            "password": "NewSecurePassword123!",
+        },
+    )
+
+    assert activation_response.status_code == 204
+
+    repository = IdentityRepository(db)
+
+    user = repository.get_user_by_email(
+        hospital_id=hospital.id,
+        email="activation-nurse@example.com",
+    )
+
+    assert user is not None
+    assert user.status.value == "ACTIVE"
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "hospital_code": hospital.code,
+            "email": "activation-nurse@example.com",
+            "password": "NewSecurePassword123!",
+        },
+    )
+
+    assert login_response.status_code == 200
+
+    reuse_response = client.post(
+        "/api/v1/auth/activate",
+        json={
+            "token": invitation_token,
+            "password": "AnotherPassword123!",
+        },
+    )
+
+    assert reuse_response.status_code == 400

@@ -41,6 +41,7 @@ from app.modules.identity.exceptions import (
     RoleAlreadyExistsError,
     RoleNotFoundError,
     UserRoleNotFoundError,
+    UserAlreadyExistsError,
 )
 
 from app.modules.identity.permission_repository import (
@@ -73,6 +74,8 @@ from app.modules.identity.schemas import (
     RoleResponse,
     UpdateRoleRequest,
     UserRoleResponse,
+    CreateStaffRequest,
+    CreateStaffResponse,
 )
 
 from app.modules.identity.user_service import (
@@ -167,6 +170,76 @@ def _get_hospital_role_or_404(
 # ============================================================================
 # Users
 # ============================================================================
+@router.post(
+    "/users/onboard",
+    response_model=CreateStaffResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Onboard hospital staff",
+)
+def onboard_staff(
+    request: CreateStaffRequest,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    db: Session = Depends(get_db),
+    _=Depends(
+        require_role("Administrator"),
+    ),
+):
+    """
+    Create a pending staff account and issue an activation invitation.
+
+    The administrator supplies the staff member's email and
+    initial role. The staff member establishes their password
+    during activation.
+    """
+
+    repository = _get_identity_repository(db)
+
+    service = UserService(
+        repository=repository,
+    )
+
+    try:
+        user, invitation_token, expires_at = (
+            service.onboard_staff(
+                hospital_id=context.hospital_id,
+                email=request.email,
+                role_name=request.role_name,
+            )
+        )
+
+        db.commit()
+
+        return CreateStaffResponse(
+            user=_build_admin_user_response(user),
+            invitation_token=invitation_token,
+            invitation_expires_at=expires_at,
+        )
+
+    except RoleNotFoundError as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    except RoleAlreadyAssignedError as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    except UserAlreadyExistsError as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get(
@@ -202,6 +275,77 @@ def list_users(
         _build_admin_user_response(user)
         for user in users
     ]
+
+@router.post(
+    "/users/onboard",
+    response_model=CreateStaffResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Onboard hospital staff",
+)
+def onboard_staff(
+    request: CreateStaffRequest,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    db: Session = Depends(get_db),
+    _=Depends(
+        require_role("Administrator"),
+    ),
+):
+    """
+    Create a pending staff account and issue an activation invitation.
+
+    The administrator supplies the staff member's email and
+    initial role. The staff member establishes their password
+    during activation.
+    """
+
+    repository = _get_identity_repository(db)
+
+    service = UserService(
+        repository=repository,
+    )
+
+    try:
+        user, invitation_token, expires_at = (
+            service.onboard_staff(
+                hospital_code=context.hospital_code,
+                email=request.email,
+                role_name=request.role_name,
+            )
+        )
+
+        db.commit()
+
+        return CreateStaffResponse(
+            user=_build_admin_user_response(user),
+            invitation_token=invitation_token,
+            invitation_expires_at=expires_at,
+        )
+
+    except RoleNotFoundError as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    except RoleAlreadyAssignedError as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    except UserAlreadyExistsError as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get(
