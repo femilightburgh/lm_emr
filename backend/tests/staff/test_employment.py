@@ -1,6 +1,7 @@
 from datetime import date
 from uuid import UUID
 
+from app.modules.identity.repository import IdentityRepository
 from app.modules.organization.repository import HospitalRepository
 from app.modules.staff.employment_repository import StaffEmploymentRepository
 from app.modules.staff.enums import (
@@ -31,6 +32,7 @@ def test_create_staff_creates_initial_employment(db, hospital):
         repository=StaffRepository(db),
         hospital_repository=HospitalRepository(db),
         employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
     )
 
     data = StaffCreate(
@@ -74,6 +76,7 @@ def test_get_current_employment_returns_initial_employment(
         repository=StaffRepository(db),
         hospital_repository=HospitalRepository(db),
         employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
     )
 
     staff = service.create_staff(
@@ -110,6 +113,7 @@ def test_close_current_employment(
         repository=StaffRepository(db),
         hospital_repository=HospitalRepository(db),
         employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
     )
 
     staff = service.create_staff(
@@ -149,6 +153,7 @@ def test_closed_employment_is_retained_in_history_and_is_no_longer_current(
         repository=StaffRepository(db),
         hospital_repository=HospitalRepository(db),
         employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
     )
 
     staff = service.create_staff(
@@ -193,6 +198,7 @@ def test_close_current_employment_rejects_invalid_date(
         repository=StaffRepository(db),
         hospital_repository=HospitalRepository(db),
         employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
     )
 
     staff = service.create_staff(
@@ -218,6 +224,7 @@ def test_close_current_employment_rejects_invalid_date(
                 employment_status=EmploymentStatus.RESIGNED,
             ),
         )
+
         assert False, "Expected InvalidEmploymentDateError"
     except InvalidEmploymentDateError as exc:
         assert "before employment date" in str(exc)
@@ -231,6 +238,7 @@ def test_close_current_employment_rejects_when_no_current_employment(
         repository=StaffRepository(db),
         hospital_repository=HospitalRepository(db),
         employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
     )
 
     staff = service.create_staff(
@@ -264,6 +272,7 @@ def test_close_current_employment_rejects_when_no_current_employment(
                 employment_status=EmploymentStatus.TERMINATED,
             ),
         )
+
         assert False, "Expected NoCurrentEmploymentError"
     except NoCurrentEmploymentError as exc:
         assert "no current employment" in str(exc).lower()
@@ -277,6 +286,7 @@ def test_start_employment_creates_new_current_employment(
         repository=StaffRepository(db),
         hospital_repository=HospitalRepository(db),
         employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
     )
 
     staff = service.create_staff(
@@ -339,6 +349,7 @@ def test_start_employment_rejects_when_current_employment_exists(
         repository=StaffRepository(db),
         hospital_repository=HospitalRepository(db),
         employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
     )
 
     staff = service.create_staff(
@@ -381,6 +392,7 @@ def test_start_employment_rejects_date_before_date_of_birth(
         repository=StaffRepository(db),
         hospital_repository=HospitalRepository(db),
         employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
     )
 
     staff = service.create_staff(
@@ -431,6 +443,7 @@ def test_update_staff_updates_staff_information_without_changing_employment(
         repository=StaffRepository(db),
         hospital_repository=HospitalRepository(db),
         employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
     )
 
     staff = service.create_staff(
@@ -480,6 +493,7 @@ def test_create_staff_rejects_duplicate_staff_number(
         repository=StaffRepository(db),
         hospital_repository=HospitalRepository(db),
         employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
     )
 
     service.create_staff(
@@ -528,6 +542,7 @@ def test_create_staff_allows_same_staff_number_in_different_hospital(
         repository=StaffRepository(db),
         hospital_repository=HospitalRepository(db),
         employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
     )
 
     first_staff = service.create_staff(
@@ -572,12 +587,15 @@ def test_create_staff_rejects_nonexistent_hospital(db):
         repository=StaffRepository(db),
         hospital_repository=HospitalRepository(db),
         employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
     )
 
     try:
         service.create_staff(
             StaffCreate(
-                hospital_id=UUID("00000000-0000-0000-0000-000000000001"),
+                hospital_id=UUID(
+                    "00000000-0000-0000-0000-000000000001"
+                ),
                 staff_number="STF-013",
                 first_name="John",
                 last_name="Doe",
@@ -604,6 +622,7 @@ def test_create_staff_rejects_employment_date_before_date_of_birth(
         repository=StaffRepository(db),
         hospital_repository=HospitalRepository(db),
         employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
     )
 
     try:

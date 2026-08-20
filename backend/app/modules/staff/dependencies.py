@@ -22,6 +22,7 @@ from app.modules.staff.service import StaffService
 from app.modules.staff.employment_repository import (
     StaffEmploymentRepository,
 )
+from app.modules.identity.repository import IdentityRepository
 
 
 def get_staff_repository(
@@ -50,6 +51,15 @@ def get_staff_employment_repository(
     return StaffEmploymentRepository(db)
 
 
+def get_identity_repository(
+    db: Session = Depends(get_db),
+) -> IdentityRepository:
+    """
+    Return an IdentityRepository instance.
+    """
+    return IdentityRepository(db)
+
+
 def get_staff_service(
     repository: StaffRepository = Depends(get_staff_repository),
     hospital_repository: HospitalRepository = Depends(
@@ -57,6 +67,9 @@ def get_staff_service(
     ),
     employment_repository: StaffEmploymentRepository = Depends(
         get_staff_employment_repository,
+    ),
+    identity_repository: IdentityRepository = Depends(
+        get_identity_repository,
     ),
 ) -> StaffService:
     """
@@ -66,4 +79,5 @@ def get_staff_service(
         repository=repository,
         hospital_repository=hospital_repository,
         employment_repository=employment_repository,
+        identity_repository=identity_repository,
     )

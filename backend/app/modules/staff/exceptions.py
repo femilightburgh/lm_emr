@@ -38,6 +38,23 @@ class DuplicateStaffNumberError(StaffError):
     status_code = 409
     error_code = "DUPLICATE_STAFF_NUMBER"
 
+class UserAccountAlreadyLinkedError(StaffError):
+    """
+    Raised when a UserAccount is already linked to a Staff profile.
+    """
+
+    status_code = 409
+    error_code = "USER_ACCOUNT_ALREADY_LINKED"
+
+
+class UserAccountHospitalMismatchError(StaffError):
+    """
+    Raised when a UserAccount belongs to another hospital.
+    """
+
+    status_code = 400
+    error_code = "USER_ACCOUNT_HOSPITAL_MISMATCH"
+
 class HospitalNotFoundError(StaffError):
     """
     Raised when the specified hospital does not exist.

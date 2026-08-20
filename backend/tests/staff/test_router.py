@@ -186,6 +186,117 @@ def test_update_staff_endpoint(client, hospital):
     assert body["phone_number"] == "08011111111"
 
 
+def test_link_user_account_endpoint(
+    client,
+    hospital,
+    db,
+):
+    from tests.identity.test_authorization import (
+        create_role,
+        create_user,
+    )
+
+    create_role(
+        db,
+        hospital=hospital,
+        name="Receptionist",
+    )
+
+    user = create_user(
+        db,
+        hospital=hospital,
+        email="receptionist@example.com",
+        role_name="Receptionist",
+    )
+
+    create_response = client.post(
+        "/api/v1/staff",
+        json={
+            "hospital_id": str(hospital.id),
+            "staff_number": "LINK-001",
+            "first_name": "Reception",
+            "last_name": "Staff",
+            "gender": "Female",
+            "date_of_birth": "1990-01-01",
+            "email": "receptionist@example.com",
+            "profession": "Nurse",
+            "employment_status": "Active",
+            "employment_type": "Full Time",
+            "date_employed": "2026-01-01",
+        },
+    )
+
+    assert create_response.status_code == 201
+
+    staff_id = create_response.json()["id"]
+
+    response = client.post(
+        f"/api/v1/staff/{staff_id}/link-user",
+        json={
+            "user_account_id": str(user.id),
+        },
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert body["id"] == staff_id
+    assert body["user_account_id"] == str(user.id)
+
+
+def test_link_user_account_rejects_foreign_hospital(
+    client,
+    hospital,
+    db,
+):
+    from tests.identity.test_authorization import (
+        create_hospital,
+        create_user,
+    )
+
+    foreign_hospital = create_hospital(
+        db,
+        code=f"FOREIGN-LINK-{uuid4().hex[:6].upper()}",
+    )
+
+    foreign_user = create_user(
+        db,
+        hospital=foreign_hospital,
+        email="foreign-receptionist@example.com",
+        role_name="Receptionist",
+    )
+
+    create_response = client.post(
+        "/api/v1/staff",
+        json={
+            "hospital_id": str(hospital.id),
+            "staff_number": "LINK-002",
+            "first_name": "Foreign",
+            "last_name": "Link",
+            "gender": "Female",
+            "date_of_birth": "1990-01-01",
+            "profession": "Nurse",
+            "employment_status": "Active",
+            "employment_type": "Full Time",
+            "date_employed": "2026-01-01",
+        },
+    )
+
+    assert create_response.status_code == 201
+
+    staff_id = create_response.json()["id"]
+
+    response = client.post(
+        f"/api/v1/staff/{staff_id}/link-user",
+        json={
+            "user_account_id": str(foreign_user.id),
+        },
+    )
+
+    assert response.status_code == 400
+
+
 def test_list_employment_history_endpoint(client, hospital):
     create_response = client.post(
         "/api/v1/staff",

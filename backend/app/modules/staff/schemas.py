@@ -146,6 +146,14 @@ class StaffUpdate(BaseSchema):
     email: EmailStr | None = None
 
 
+class LinkUserAccountRequest(BaseSchema):
+    """
+    Request schema used to link a Staff profile to a UserAccount.
+    """
+
+    user_account_id: UUID
+
+
 # ==============================================================================
 # Response Schema
 # ==============================================================================

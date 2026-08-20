@@ -41,6 +41,7 @@ from app.modules.staff.schemas import (
     StaffListResponse,
     StaffResponse,
     StaffUpdate,
+    LinkUserAccountRequest,
 )
 from app.modules.staff.service import StaffService
 
@@ -413,3 +414,36 @@ def update_staff(
     )
 
     return StaffResponse.model_validate(staff)
+
+
+@router.post(
+    "/{staff_id}/link-user",
+    response_model=StaffResponse,
+    summary="Link a staff member to a user account",
+    dependencies=[
+        Depends(
+            require_permission(
+                Permissions.STAFF_UPDATE,
+            ),
+        ),
+    ],
+)
+def link_user_account(
+    staff_id: UUID,
+    payload: LinkUserAccountRequest,
+    service: StaffService = Depends(
+        get_staff_service,
+    ),
+) -> StaffResponse:
+    """
+    Link an existing Staff profile to a UserAccount.
+    """
+
+    staff = service.link_user_account(
+        staff_id=staff_id,
+        user_account_id=payload.user_account_id,
+    )
+
+    return StaffResponse.model_validate(
+        staff,
+    )
