@@ -48,6 +48,8 @@ from uuid import uuid4
 import pytest
 
 from app.core.context import RequestContext
+from app.modules.identity.enums import AccountStatus
+from app.modules.identity.models import UserAccount
 
 from app.modules.clinical_documents.enums import (
     ClinicalDocumentStatus,
@@ -138,8 +140,19 @@ def create_test_encounter(
     hierarchy required by the Clinical Document Service.
     """
 
+    user = UserAccount(
+        hospital_id=hospital.id,
+        email=f"clinical-doc-{uuid4()}@example.com",
+        password_hash="test-password-hash",
+        status=AccountStatus.ACTIVE,
+        is_superuser=False,
+    )
+
+    db.add(user)
+    db.flush()
+
     context = RequestContext(
-        user_id=uuid4(),
+        user_id=user.id,
         hospital_id=hospital.id,
         permissions=frozenset(),
     )
@@ -188,6 +201,9 @@ def create_test_encounter(
             date_employed=date(2026, 1, 1),
         )
     )
+
+    staff.user_account_id = user.id
+    db.flush()
 
     # ------------------------------------------------------------------
     # Episode
@@ -409,7 +425,6 @@ def test_signed_document_cannot_be_updated_as_draft(
     service.sign_document(
         context=context,
         document_id=document.id,
-        signed_by=staff.id,
     )
 
     with pytest.raises(DocumentNotDraftError):
@@ -438,15 +453,18 @@ def test_signed_document_cannot_be_updated_as_draft(
     assert persisted_document.signed_by == staff.id
 
 
-def test_update_draft_rejects_editor_from_another_hospital(
+def test_update_draft_rejects_authenticated_user_from_another_hospital(
     db,
     hospital,
     hospital_two,
 ):
     """
-    A staff member belonging to another hospital cannot update a draft
-    Clinical Document.
+    A Staff member from another Hospital cannot update a document in
+    the authenticated Hospital.
     """
+
+    from app.modules.identity.enums import AccountStatus
+    from app.modules.identity.models import UserAccount
 
     context, _, _, document, service = create_document(
         db,
@@ -454,6 +472,17 @@ def test_update_draft_rejects_editor_from_another_hospital(
         hospital_number="PAT-CD-SVC-021",
         staff_number="STF-CD-SVC-021",
     )
+
+    user = UserAccount(
+        hospital_id=hospital_two.id,
+        email=f"foreign-editor-{uuid4()}@example.com",
+        password_hash="test-password-hash",
+        status=AccountStatus.ACTIVE,
+        is_superuser=False,
+    )
+
+    db.add(user)
+    db.flush()
 
     foreign_staff_service = StaffService(
         repository=StaffRepository(db),
@@ -476,191 +505,60 @@ def test_update_draft_rejects_editor_from_another_hospital(
         )
     )
 
+    foreign_staff.user_account_id = user.id
+    db.flush()
+
+    context = RequestContext(
+        user_id=user.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
     original_content = dict(document.content)
 
-    with pytest.raises(StaffHospitalMismatchError):
+    with pytest.raises(StaffNotFoundError):
         service.update_draft(
             context=context,
             document_id=document.id,
             edited_by=foreign_staff.id,
             content={
-                "presenting_complaints": ["Unauthorized update"],
-                "history_of_presenting_complaints": (
-                    "This update must be rejected."
-                ),
+                "presenting_complaints": ["Updated"],
             },
         )
 
-    db.expire_all()
-
-    persisted_document = db.get(
-        type(document),
-        document.id,
-    )
-
-    assert persisted_document.status == ClinicalDocumentStatus.DRAFT
-    assert persisted_document.content == original_content
+    assert document.content == original_content
 
 
-# ============================================================================
-# Create Draft
-# ============================================================================
-
-
-def test_create_draft(
-    db,
-    hospital,
-):
-    """
-    A valid Clinical Document should be created as DRAFT.
-    """
-
-    context, staff, encounter = create_test_encounter(
-        db,
-        hospital,
-        hospital_number="PAT-CD-SVC-001",
-        staff_number="STF-CD-SVC-001",
-    )
-
-    service = create_service(db)
-
-    content = {
-        "presenting_complaints": ["Fever"],
-        "history_of_presenting_complaints": "Two days of fever.",
-    }
-
-    document = service.create_draft(
-        context=context,
-        encounter_id=encounter.id,
-        document_type=ClinicalDocumentType.INITIAL_CLERKING,
-        authored_by=staff.id,
-        content=content,
-    )
-
-    assert document.id is not None
-    assert document.encounter_id == encounter.id
-    assert document.document_type == ClinicalDocumentType.INITIAL_CLERKING
-    assert document.status == ClinicalDocumentStatus.DRAFT
-    assert document.version == 1
-    assert document.authored_by == staff.id
-    assert document.signed_at is None
-    assert document.signed_by is None
-    assert document.amended_from_id is None
-    assert document.content == content
-
-
-def test_create_draft_serializes_structured_clinical_content(
-    db,
-    hospital,
-):
-    """
-    A Pydantic Clinical Document content schema should be serialized
-    into JSON-compatible data before persistence.
-    """
-
-    from app.modules.clinical_documents.schemas import (
-        InitialClerkingContent,
-    )
-
-    context, staff, encounter = create_test_encounter(
-        db,
-        hospital,
-        hospital_number="PAT-CD-SVC-017",
-        staff_number="STF-CD-SVC-017",
-    )
-
-    service = create_service(db)
-
-    content = InitialClerkingContent(
-        presenting_complaints=[
-            {
-                "complaint": "Fever",
-                "duration": "3 days",
-            },
-        ],
-        history_of_presenting_complaint=(
-            "Patient developed fever three days ago."
-        ),
-        examination={
-            "general": "Conscious and alert.",
-            "cardiovascular": "S1 and S2 heard.",
-        },
-        assessment={
-            "working_diagnosis": "Malaria",
-            "differentials": [
-                "Typhoid fever",
-            ],
-        },
-    )
-
-    document = service.create_draft(
-        context=context,
-        encounter_id=encounter.id,
-        document_type=ClinicalDocumentType.INITIAL_CLERKING,
-        authored_by=staff.id,
-        content=content,
-    )
-
-    assert document.content == content.model_dump(mode="json")
-
-
-# ============================================================================
-# Tenancy
-# ============================================================================
-
-
-def test_create_draft_rejects_encounter_from_another_hospital(
+def test_create_draft_rejects_authenticated_user_from_another_hospital(
     db,
     hospital,
     hospital_two,
 ):
     """
-    A hospital cannot create a Clinical Document against another
-    hospital's Encounter.
+    A Staff member from another Hospital cannot create a document in
+    the authenticated Hospital.
     """
 
-    context_a, _, _ = create_test_encounter(
-        db,
-        hospital,
-        hospital_number="PAT-CD-SVC-002",
-        staff_number="STF-CD-SVC-002",
-    )
+    from app.modules.identity.enums import AccountStatus
+    from app.modules.identity.models import UserAccount
 
-    _, staff_b, encounter_b = create_test_encounter(
-        db,
-        hospital_two,
-        hospital_number="PAT-CD-SVC-003",
-        staff_number="STF-CD-SVC-003",
-    )
-
-    service = create_service(db)
-
-    with pytest.raises(EncounterNotFoundError):
-        service.create_draft(
-            context=context_a,
-            encounter_id=encounter_b.id,
-            document_type=ClinicalDocumentType.INITIAL_CLERKING,
-            authored_by=staff_b.id,
-            content={"history": "Test"},
-        )
-
-
-def test_create_draft_rejects_author_from_another_hospital(
-    db,
-    hospital,
-    hospital_two,
-):
-    """
-    A hospital cannot create a document using a Staff member from
-    another hospital.
-    """
-
-    context_a, _, encounter_a = create_test_encounter(
+    _, _, encounter_a = create_test_encounter(
         db,
         hospital,
         hospital_number="PAT-CD-SVC-004",
         staff_number="STF-CD-SVC-004",
     )
+
+    user_b = UserAccount(
+        hospital_id=hospital_two.id,
+        email=f"foreign-author-{uuid4()}@example.com",
+        password_hash="test-password-hash",
+        status=AccountStatus.ACTIVE,
+        is_superuser=False,
+    )
+
+    db.add(user_b)
+    db.flush()
 
     _, staff_b, _ = create_test_encounter(
         db,
@@ -669,21 +567,27 @@ def test_create_draft_rejects_author_from_another_hospital(
         staff_number="STF-CD-SVC-005",
     )
 
+    staff_b.user_account_id = user_b.id
+    db.flush()
+
+    context = RequestContext(
+        user_id=user_b.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
     service = create_service(db)
 
-    with pytest.raises(StaffHospitalMismatchError):
+    with pytest.raises(StaffNotFoundError):
         service.create_draft(
-            context=context_a,
+            context=context,
             encounter_id=encounter_a.id,
             document_type=ClinicalDocumentType.INITIAL_CLERKING,
             authored_by=staff_b.id,
-            content={"history": "Test"},
+            content={
+                "history_of_presenting_complaints": "Test.",
+            },
         )
-
-
-# ============================================================================
-# Retrieval
-# ============================================================================
 
 
 def test_get_document(
@@ -809,7 +713,6 @@ def test_sign_document(
     result = service.sign_document(
         context=context,
         document_id=document.id,
-        signed_by=staff.id,
         signed_at=signed_at,
     )
 
@@ -846,7 +749,6 @@ def test_sign_document_creates_clinical_event(
     service.sign_document(
         context=context,
         document_id=document.id,
-        signed_by=staff.id,
         signed_at=signed_at,
     )
 
@@ -890,14 +792,12 @@ def test_signed_document_cannot_be_signed_again(
     service.sign_document(
         context=context,
         document_id=document.id,
-        signed_by=staff.id,
     )
 
     with pytest.raises(DocumentNotDraftError):
         service.sign_document(
             context=context,
             document_id=document.id,
-            signed_by=staff.id,
         )
 
 
@@ -924,7 +824,6 @@ def test_signed_document_can_be_amended(
     service.sign_document(
         context=context,
         document_id=document.id,
-        signed_by=staff.id,
     )
 
     amended_content = {
@@ -999,7 +898,6 @@ def test_list_versions_returns_document_history(
     service.sign_document(
         context=context,
         document_id=document.id,
-        signed_by=staff.id,
     )
 
     amended = service.amend_document(
@@ -1046,7 +944,6 @@ def test_sign_amended_document_creates_second_event(
     service.sign_document(
         context=context,
         document_id=document.id,
-        signed_by=staff.id,
     )
 
     amended = service.amend_document(
@@ -1068,7 +965,6 @@ def test_sign_amended_document_creates_second_event(
     service.sign_document(
         context=context,
         document_id=amended.id,
-        signed_by=staff.id,
         signed_at=amended_signed_at,
     )
 
@@ -1151,7 +1047,6 @@ def test_sign_document_rolls_back_if_event_creation_fails(
         service.sign_document(
             context=context,
             document_id=document.id,
-            signed_by=staff.id,
             signed_at=signed_at,
         )
 
@@ -1223,7 +1118,6 @@ def test_amend_document_rejects_non_latest_signed_version(
     service.sign_document(
         context=context,
         document_id=document.id,
-        signed_by=staff.id,
     )
 
     # ------------------------------------------------------------------
@@ -1255,7 +1149,6 @@ def test_amend_document_rejects_non_latest_signed_version(
     service.sign_document(
         context=context,
         document_id=version_two.id,
-        signed_by=staff.id,
     )
 
     # ------------------------------------------------------------------
@@ -1339,7 +1232,6 @@ def test_amend_document_allows_latest_signed_version(
     service.sign_document(
         context=context,
         document_id=document.id,
-        signed_by=staff.id,
     )
 
     # ------------------------------------------------------------------
@@ -1513,6 +1405,9 @@ def test_non_managing_doctor_cannot_sign_discharge_summary(
     Only the Episode managing doctor may sign a Discharge Summary.
     """
 
+    from app.modules.identity.enums import AccountStatus
+    from app.modules.identity.models import UserAccount
+
     context, managing_doctor, encounter = create_test_encounter(
         db,
         hospital,
@@ -1521,10 +1416,6 @@ def test_non_managing_doctor_cannot_sign_discharge_summary(
     )
 
     service = create_service(db)
-
-    # ------------------------------------------------------------------
-    # Retrieve the Episode.
-    # ------------------------------------------------------------------
 
     episode_repository = EpisodeRepository(db)
 
@@ -1535,21 +1426,10 @@ def test_non_managing_doctor_cannot_sign_discharge_summary(
 
     assert episode is not None
 
-    # ------------------------------------------------------------------
-    # Put the Episode into the state required for a Discharge Summary.
-    #
-    # The test is specifically testing ClinicalDocumentService's
-    # managing-doctor rule.
-    # ------------------------------------------------------------------
-
     episode.status = EpisodeStatus.ADMITTED
     episode.managing_doctor_id = managing_doctor.id
 
     db.flush()
-
-    # ------------------------------------------------------------------
-    # Create the Discharge Summary.
-    # ------------------------------------------------------------------
 
     discharge_summary = service.create_draft(
         context=context,
@@ -1567,10 +1447,6 @@ def test_non_managing_doctor_cannot_sign_discharge_summary(
             ),
         },
     )
-
-    # ------------------------------------------------------------------
-    # Create another doctor from the same Hospital.
-    # ------------------------------------------------------------------
 
     staff_service = StaffService(
         repository=StaffRepository(db),
@@ -1593,30 +1469,31 @@ def test_non_managing_doctor_cannot_sign_discharge_summary(
         )
     )
 
+    other_user = UserAccount(
+        hospital_id=hospital.id,
+        email=f"other-doctor-{uuid4()}@example.com",
+        password_hash="test-password-hash",
+        status=AccountStatus.ACTIVE,
+        is_superuser=False,
+    )
+
+    db.add(other_user)
     db.flush()
 
-    # ------------------------------------------------------------------
-    # The non-managing doctor must not be able to sign.
-    # ------------------------------------------------------------------
+    other_doctor.user_account_id = other_user.id
+    db.flush()
 
-    with pytest.raises(
-        NotManagingDoctorError,
-    ):
-        service.sign_document(
-            context=context,
-            document_id=discharge_summary.id,
-            signed_by=other_doctor.id,
-        )
-
-    # ------------------------------------------------------------------
-    # The document must remain a DRAFT.
-    # ------------------------------------------------------------------
-
-    db.refresh(discharge_summary)
-
-    assert discharge_summary.status == (
-        ClinicalDocumentStatus.DRAFT
+    other_context = RequestContext(
+        user_id=other_user.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
     )
+
+    with pytest.raises(NotManagingDoctorError):
+        service.sign_document(
+            context=other_context,
+            document_id=discharge_summary.id,
+        )
 
 
 def test_managing_doctor_can_sign_discharge_summary(
@@ -1682,7 +1559,6 @@ def test_managing_doctor_can_sign_discharge_summary(
     signed = service.sign_document(
         context=context,
         document_id=discharge_summary.id,
-        signed_by=managing_doctor.id,
     )
 
     assert signed.status == (

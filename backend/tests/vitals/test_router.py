@@ -25,6 +25,8 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from app.core.context import RequestContext, get_request_context
+from app.modules.identity.enums import AccountStatus
+from app.modules.identity.models import UserAccount
 from app.db.session import get_db
 from app.main import app
 
@@ -95,8 +97,19 @@ def create_test_encounter(
     hierarchy required by the Vitals API.
     """
 
+    user = UserAccount(
+        hospital_id=hospital.id,
+        email=f"vitals-api-{uuid4()}@example.com",
+        password_hash="test-password-hash",
+        status=AccountStatus.ACTIVE,
+        is_superuser=False,
+    )
+
+    db.add(user)
+    db.flush()
+
     context = RequestContext(
-        user_id=uuid4(),
+        user_id=user.id,
         hospital_id=hospital.id,
         permissions=frozenset(),
     )
@@ -145,6 +158,9 @@ def create_test_encounter(
             date_employed=date(2026, 1, 1),
         )
     )
+
+    staff.user_account_id = user.id
+    db.flush()
 
     # ------------------------------------------------------------------
     # Episode
@@ -375,17 +391,37 @@ def test_record_vitals_missing_encounter_returns_404(
 # ============================================================================
 
 
-def test_record_vitals_missing_performer_returns_404(
+def test_record_vitals_authenticated_user_without_staff_returns_404(
     db,
     hospital,
 ):
     """
-    A nonexistent staff member should produce HTTP 404.
+    An authenticated UserAccount without a Staff profile cannot record vitals.
     """
+
+    from app.modules.identity.enums import AccountStatus
+    from app.modules.identity.models import UserAccount
 
     context, _, encounter = create_test_encounter(
         db,
         hospital,
+    )
+
+    user = UserAccount(
+        hospital_id=hospital.id,
+        email=f"no-staff-api-{uuid4()}@example.com",
+        password_hash="test-password-hash",
+        status=AccountStatus.ACTIVE,
+        is_superuser=False,
+    )
+
+    db.add(user)
+    db.flush()
+
+    context = RequestContext(
+        user_id=user.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
     )
 
     client = create_test_client(
@@ -407,28 +443,34 @@ def test_record_vitals_missing_performer_returns_404(
     assert response.json()["detail"] == "Staff member not found."
 
 
-# ============================================================================
-# Cross-Hospital Performer
-# ============================================================================
-
-
-def test_record_vitals_performer_from_another_hospital_returns_403(
+def test_record_vitals_authenticated_user_from_another_hospital_returns_404(
     db,
     hospital,
     hospital_two,
 ):
     """
-    A staff member belonging to another hospital should produce HTTP 403.
+    An authenticated user whose Staff profile belongs to another
+    hospital is not a Staff member of the authenticated hospital.
     """
+
+    from app.modules.identity.enums import AccountStatus
+    from app.modules.identity.models import UserAccount
 
     context, _, encounter = create_test_encounter(
         db,
         hospital,
     )
 
-    # ------------------------------------------------------------------
-    # Staff belonging to Hospital B
-    # ------------------------------------------------------------------
+    user = UserAccount(
+        hospital_id=hospital_two.id,
+        email=f"foreign-api-{uuid4()}@example.com",
+        password_hash="test-password-hash",
+        status=AccountStatus.ACTIVE,
+        is_superuser=False,
+    )
+
+    db.add(user)
+    db.flush()
 
     staff_service = StaffService(
         repository=StaffRepository(db),
@@ -436,11 +478,11 @@ def test_record_vitals_performer_from_another_hospital_returns_403(
         employment_repository=StaffEmploymentRepository(db),
     )
 
-    other_staff = staff_service.create_staff(
+    foreign_staff = staff_service.create_staff(
         StaffCreate(
             hospital_id=hospital_two.id,
-            staff_number=f"STF-VITALS-OTHER-{uuid4().hex[:8]}",
-            first_name="Other",
+            staff_number=f"STF-VITALS-FOREIGN-{uuid4().hex[:8]}",
+            first_name="Foreign",
             last_name="Hospital",
             gender=Gender.MALE,
             date_of_birth=date(1985, 1, 1),
@@ -449,6 +491,15 @@ def test_record_vitals_performer_from_another_hospital_returns_403(
             employment_type=EmploymentType.FULL_TIME,
             date_employed=date(2026, 1, 1),
         )
+    )
+
+    foreign_staff.user_account_id = user.id
+    db.flush()
+
+    context = RequestContext(
+        user_id=user.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
     )
 
     client = create_test_client(
@@ -460,23 +511,14 @@ def test_record_vitals_performer_from_another_hospital_returns_403(
         "/api/v1/vitals",
         json={
             "encounter_id": str(encounter.id),
-            "performed_by": str(other_staff.id),
+            "performed_by": str(foreign_staff.id),
             "occurred_at": datetime.now(timezone.utc).isoformat(),
             "temperature": 37.2,
         },
     )
 
-    assert response.status_code == 403
-
-    assert (
-        response.json()["detail"]
-        == "Staff member does not belong to the authenticated Hospital."
-    )
-
-
-# ============================================================================
-# Invalid Measurement
-# ============================================================================
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Staff member not found."
 
 
 def test_record_vitals_invalid_measurement_returns_422(

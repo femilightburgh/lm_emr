@@ -31,6 +31,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core.context import RequestContext, get_request_context
+from app.modules.identity.enums import AccountStatus
+from app.modules.identity.models import UserAccount
 from app.db.session import get_db
 from app.main import app
 
@@ -87,21 +89,18 @@ from app.modules.staff.service import StaffService
 # Test Client
 # ============================================================================
 
+_REQUEST_CONTEXT_HOLDER: dict[str, RequestContext] = {}
+
 
 @pytest.fixture
 def client(
     db: Session,
-    hospital,
 ):
     def override_get_db():
         yield db
 
     def override_get_request_context():
-        return RequestContext(
-            user_id=uuid4(),
-            hospital_id=hospital.id,
-            permissions=frozenset(),
-        )
+        return _REQUEST_CONTEXT_HOLDER["context"]
 
     app.dependency_overrides[get_db] = override_get_db
 
@@ -131,11 +130,24 @@ def create_test_encounter(
     for Clinical Document API tests.
     """
 
+    user = UserAccount(
+        hospital_id=hospital.id,
+        email=f"clinical-doc-api-{uuid4()}@example.com",
+        password_hash="test-password-hash",
+        status=AccountStatus.ACTIVE,
+        is_superuser=False,
+    )
+
+    db.add(user)
+    db.flush()
+
     context = RequestContext(
-        user_id=uuid4(),
+        user_id=user.id,
         hospital_id=hospital.id,
         permissions=frozenset(),
     )
+
+    _REQUEST_CONTEXT_HOLDER["context"] = context
 
     # ------------------------------------------------------------------
     # Patient
@@ -181,6 +193,9 @@ def create_test_encounter(
             date_employed=date(2026, 1, 1),
         )
     )
+
+    staff.user_account_id = user.id
+    db.flush()
 
     # ------------------------------------------------------------------
     # Episode

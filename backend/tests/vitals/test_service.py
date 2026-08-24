@@ -27,6 +27,8 @@ from uuid import uuid4
 import pytest
 
 from app.core.context import RequestContext
+from app.modules.identity.enums import AccountStatus
+from app.modules.identity.models import UserAccount
 
 from app.modules.events.enums import EventType
 from app.modules.events.exceptions import (
@@ -97,8 +99,19 @@ def create_test_encounter(
     hierarchy required by the Vitals service.
     """
 
+    user = UserAccount(
+        hospital_id=hospital.id,
+        email=f"vitals-{uuid4()}@example.com",
+        password_hash="test-password-hash",
+        status=AccountStatus.ACTIVE,
+        is_superuser=False,
+    )
+
+    db.add(user)
+    db.flush()
+
     context = RequestContext(
-        user_id=uuid4(),
+        user_id=user.id,
         hospital_id=hospital.id,
         permissions=frozenset(),
     )
@@ -147,6 +160,9 @@ def create_test_encounter(
             date_employed=datetime(2026, 1, 1).date(),
         )
     )
+
+    staff.user_account_id = user.id
+    db.flush()
 
     # ------------------------------------------------------------------
     # Episode
@@ -209,6 +225,7 @@ def create_vitals_service(db):
 
     return VitalsService(
         event_service=event_service,
+        staff_repository=StaffRepository(db),
     )
 
 
@@ -319,10 +336,9 @@ def test_record_vitals_rejects_missing_encounter(
     Vitals cannot be recorded against an encounter that does not exist.
     """
 
-    context = RequestContext(
-        user_id=uuid4(),
-        hospital_id=hospital.id,
-        permissions=frozenset(),
+    context, _, _ = create_test_encounter(
+        db,
+        hospital,
     )
 
     service = create_vitals_service(db)
@@ -341,17 +357,37 @@ def test_record_vitals_rejects_missing_encounter(
         )
 
 
-def test_record_vitals_rejects_missing_performer(
+def test_record_vitals_rejects_authenticated_user_without_staff_profile(
     db,
     hospital,
 ):
     """
-    Vitals cannot be recorded by a nonexistent staff member.
+    An authenticated UserAccount without a Staff profile cannot record vitals.
     """
+
+    from app.modules.identity.enums import AccountStatus
+    from app.modules.identity.models import UserAccount
 
     context, _, encounter = create_test_encounter(
         db,
         hospital,
+    )
+
+    user = UserAccount(
+        hospital_id=hospital.id,
+        email=f"no-staff-{uuid4()}@example.com",
+        password_hash="test-password-hash",
+        status=AccountStatus.ACTIVE,
+        is_superuser=False,
+    )
+
+    db.add(user)
+    db.flush()
+
+    context = RequestContext(
+        user_id=user.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
     )
 
     service = create_vitals_service(db)
@@ -370,24 +406,34 @@ def test_record_vitals_rejects_missing_performer(
         )
 
 
-def test_record_vitals_rejects_performer_from_another_hospital(
+def test_record_vitals_rejects_authenticated_user_from_another_hospital(
     db,
     hospital,
     hospital_two,
 ):
     """
-    A clinician from another hospital cannot record vitals
-    in the current hospital.
+    A user whose Staff profile belongs to another hospital is not
+    a Staff member of the authenticated hospital.
     """
+
+    from app.modules.identity.enums import AccountStatus
+    from app.modules.identity.models import UserAccount
 
     context, _, encounter = create_test_encounter(
         db,
         hospital,
     )
 
-    # ------------------------------------------------------------------
-    # Create staff belonging to Hospital B
-    # ------------------------------------------------------------------
+    user = UserAccount(
+        hospital_id=hospital_two.id,
+        email=f"foreign-{uuid4()}@example.com",
+        password_hash="test-password-hash",
+        status=AccountStatus.ACTIVE,
+        is_superuser=False,
+    )
+
+    db.add(user)
+    db.flush()
 
     staff_service = StaffService(
         repository=StaffRepository(db),
@@ -395,31 +441,40 @@ def test_record_vitals_rejects_performer_from_another_hospital(
         employment_repository=StaffEmploymentRepository(db),
     )
 
-    other_staff = staff_service.create_staff(
+    foreign_staff = staff_service.create_staff(
         StaffCreate(
             hospital_id=hospital_two.id,
-            staff_number=f"STF-VITALS-OTHER-{uuid4().hex[:8]}",
-            first_name="Other",
+            staff_number=f"STF-VITALS-FOREIGN-{uuid4().hex[:8]}",
+            first_name="Foreign",
             last_name="Clinician",
             gender=Gender.MALE,
             date_of_birth=datetime(1985, 1, 1).date(),
-            profession=Profession.NURSE,
+            profession=Profession.DOCTOR,
             employment_status=EmploymentStatus.ACTIVE,
             employment_type=EmploymentType.FULL_TIME,
             date_employed=datetime(2026, 1, 1).date(),
         )
     )
 
+    foreign_staff.user_account_id = user.id
+    db.flush()
+
+    context = RequestContext(
+        user_id=user.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
     service = create_vitals_service(db)
 
     request = CreateVitalsRequest(
         encounter_id=encounter.id,
-        performed_by=other_staff.id,
+        performed_by=foreign_staff.id,
         occurred_at=datetime.now(timezone.utc),
         temperature=37.2,
     )
 
-    with pytest.raises(StaffHospitalMismatchError):
+    with pytest.raises(StaffNotFoundError):
         service.record_vitals(
             context=context,
             request=request,
