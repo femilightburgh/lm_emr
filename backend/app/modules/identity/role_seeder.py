@@ -55,6 +55,10 @@ DEFAULT_ROLES = [
         [
             Permissions.PATIENT_READ,
             Permissions.PATIENT_UPDATE,
+            Permissions.CLINICAL_ORDER_CREATE,
+            Permissions.CLINICAL_ORDER_READ,
+            Permissions.CLINICAL_ORDER_CANCEL,
+            Permissions.CLINICAL_RESULT_READ,
         ],
     ),
     (
@@ -63,6 +67,8 @@ DEFAULT_ROLES = [
         [
             Permissions.PATIENT_READ,
             Permissions.PATIENT_UPDATE,
+            Permissions.CLINICAL_ORDER_READ,
+            Permissions.CLINICAL_RESULT_READ,
         ],
     ),
     (
@@ -88,6 +94,8 @@ DEFAULT_ROLES = [
         "Performs laboratory investigations.",
         [
             Permissions.PATIENT_READ,
+            Permissions.CLINICAL_ORDER_READ,
+            Permissions.CLINICAL_RESULT_CREATE,
         ],
     ),
     (
@@ -95,6 +103,8 @@ DEFAULT_ROLES = [
         "Performs radiology investigations.",
         [
             Permissions.PATIENT_READ,
+            Permissions.CLINICAL_ORDER_READ,
+            Permissions.CLINICAL_RESULT_CREATE,
         ],
     ),
     (
@@ -102,6 +112,7 @@ DEFAULT_ROLES = [
         "Dispenses medications.",
         [
             Permissions.PATIENT_READ,
+            Permissions.CLINICAL_ORDER_READ,
         ],
     ),
     (

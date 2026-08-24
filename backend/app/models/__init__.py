@@ -89,6 +89,7 @@ from app.modules.staff.models import (
 from app.modules.encounter.models import Encounter, EncounterStatus
 from app.modules.events.models import ClinicalEvent
 from app.modules.clinical_documents.models import ClinicalDocument
+from app.modules.clinical_orders.models import ClinicalOrder
 
 # ============================================================================
 # Public Exports
@@ -122,5 +123,8 @@ __all__ = [
     "ClinicalEvent",
 
     # Clinical Documents
-    "ClinicalDocument", 
+    "ClinicalDocument",
+
+    # Clinical Orders
+    "ClinicalOrder",
 ]

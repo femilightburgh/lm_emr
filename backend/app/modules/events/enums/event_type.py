@@ -52,6 +52,8 @@ class EventType(str, Enum):
 
     INVESTIGATION_ORDERED = "INVESTIGATION_ORDERED"
 
+    CLINICAL_ORDER_CANCELLED = "CLINICAL_ORDER_CANCELLED"
+
     RESULT_RECORDED = "RESULT_RECORDED"
 
     # ------------------------------------------------------------------

@@ -76,6 +76,21 @@ class Permissions:
     VITALS_CREATE = "vitals.create"
 
     # ------------------------------------------------------------------
+    # Clinical Orders
+    # ------------------------------------------------------------------
+
+    CLINICAL_ORDER_CREATE = "clinical_order.create"
+    CLINICAL_ORDER_READ = "clinical_order.read"
+    CLINICAL_ORDER_CANCEL = "clinical_order.cancel"
+
+    # ------------------------------------------------------------------
+    # Clinical Results
+    # ------------------------------------------------------------------
+
+    CLINICAL_RESULT_CREATE = "clinical_result.create"
+    CLINICAL_RESULT_READ = "clinical_result.read"
+
+    # ------------------------------------------------------------------
     # Hospital
     # ------------------------------------------------------------------
 

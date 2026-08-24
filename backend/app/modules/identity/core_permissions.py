@@ -164,4 +164,42 @@ PERMISSIONS: list[PermissionDefinition] = [
         name="Create Vitals",
         description="Allows recording patient vital signs.",
     ),
+
+    # ==============================================================
+    # Clinical Orders
+    # ==============================================================
+
+    PermissionDefinition(
+        code=Permissions.CLINICAL_ORDER_CREATE,
+        name="Create Clinical Orders",
+        description="Allows creating clinical orders for patient care.",
+    ),
+
+    PermissionDefinition(
+        code=Permissions.CLINICAL_ORDER_READ,
+        name="Read Clinical Orders",
+        description="Allows viewing clinical orders for patient care.",
+    ),
+
+    PermissionDefinition(
+        code=Permissions.CLINICAL_ORDER_CANCEL,
+        name="Cancel Clinical Orders",
+        description="Allows cancelling clinical orders that have not been completed.",
+    ),
+
+    # ==============================================================
+    # Clinical Results
+    # ==============================================================
+
+    PermissionDefinition(
+        code=Permissions.CLINICAL_RESULT_CREATE,
+        name="Create Clinical Results",
+        description="Allows recording results for clinical orders.",
+    ),
+
+    PermissionDefinition(
+        code=Permissions.CLINICAL_RESULT_READ,
+        name="Read Clinical Results",
+        description="Allows viewing clinical results.",
+    ),
 ]
