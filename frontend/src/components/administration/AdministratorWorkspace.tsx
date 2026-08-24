@@ -9,11 +9,14 @@ import {
   assignPermission,
   assignRoleToUser,
   createRole,
+  createStaff,
   deleteRole,
   getRole,
   listPermissions,
   listRoles,
+  listStaff,
   listUsers,
+  linkUserAccount,
   onboardStaff,
   PLATFORM_PERMISSIONS,
   removePermission,
@@ -23,34 +26,74 @@ import {
   type OnboardStaffResponse,
   type Permission,
   type Role,
+  type Staff,
 } from '../../api'
+
+import type {
+  EmploymentStatus,
+  EmploymentType,
+  Gender,
+  Profession,
+} from '../../types'
+
 import AdministrationOverview from './AdministrationOverview'
-import AdministrationUsers from './AdministrationUsers'
 import AdministrationRoles from './AdministrationRoles'
+import AdministrationStaff from './AdministrationStaff'
+import AdministrationUsers from './AdministrationUsers'
+import AdministrationDepartments from './AdministrationDepartments'
 
 
 type AdminTab =
   | 'overview'
   | 'users'
+  | 'staff'
   | 'roles'
+  | 'departments'
   | 'permissions'
 
 
 interface Props {
   accessToken: string
   currentUserEmail: string
+  hospitalId: string
+}
+
+
+interface CreateStaffPayload {
+  hospital_id: string
+  staff_number: string
+
+  first_name: string
+  middle_name?: string | null
+  last_name: string
+
+  gender: Gender
+  date_of_birth: string
+
+  phone_number?: string | null
+  email?: string | null
+
+  profession: Profession
+  employment_status: EmploymentStatus
+  employment_type: EmploymentType
+
+  date_employed: string
 }
 
 
 export default function AdministratorWorkspace({
   accessToken,
   currentUserEmail,
+  hospitalId,
 }: Props) {
   const [tab, setTab] =
     useState<AdminTab>('overview')
 
   const [users, setUsers] =
     useState<AdminUser[]>([])
+
+  const [staff, setStaff] =
+    useState<Staff[]>([])
 
   const [roles, setRoles] =
     useState<Role[]>([])
@@ -90,7 +133,6 @@ export default function AdministratorWorkspace({
   // Error handling
   // ==========================================================================
 
-
   function showError(
     err: unknown,
     fallback: string,
@@ -106,7 +148,6 @@ export default function AdministratorWorkspace({
   // ==========================================================================
   // Users
   // ==========================================================================
-
 
   async function loadUsers() {
     setLoading(true)
@@ -167,7 +208,9 @@ export default function AdministratorWorkspace({
         role.name,
       )
 
-      await refreshSelectedUser(user.id)
+      await refreshSelectedUser(
+        user.id,
+      )
     } catch (err) {
       showError(
         err,
@@ -190,7 +233,9 @@ export default function AdministratorWorkspace({
         roleName,
       )
 
-      await refreshSelectedUser(user.id)
+      await refreshSelectedUser(
+        user.id,
+      )
     } catch (err) {
       showError(
         err,
@@ -201,9 +246,101 @@ export default function AdministratorWorkspace({
 
 
   // ==========================================================================
-  // Roles
+  // Staff
   // ==========================================================================
 
+  async function loadStaff() {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const response =
+        await listStaff(
+          accessToken,
+          hospitalId,
+        )
+
+      setStaff(response.items)
+    } catch (err) {
+      showError(
+        err,
+        'Unable to load hospital staff.',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+
+  async function handleCreateStaff(
+    payload: CreateStaffPayload,
+  ) {
+    console.log(
+      'PARENT HANDLE CREATE STAFF CALLED',
+      payload,
+    )
+
+    setError(null)
+
+    try {
+      console.log(
+        'ABOUT TO CALL createStaff()',
+      )
+
+      await createStaff(
+        accessToken,
+        payload,
+      )
+
+      console.log(
+        'createStaff() COMPLETED',
+      )
+
+      await loadStaff()
+    } catch (err) {
+      console.error(
+        'CREATE STAFF ERROR',
+        err,
+      )
+
+      showError(
+        err,
+        'Unable to create staff profile.',
+      )
+
+      throw err
+    }
+  }
+
+
+  async function handleLinkUser(
+    member: Staff,
+    userId: string,
+  ) {
+    setError(null)
+
+    try {
+      await linkUserAccount(
+        accessToken,
+        member.id,
+        userId,
+      )
+
+      await Promise.all([
+        loadStaff(),
+        loadUsers(),
+      ])
+    } catch (err) {
+      showError(
+        err,
+        'Unable to link user account.',
+      )
+    }
+  }
+
+  // ==========================================================================
+  // Roles
+  // ==========================================================================
 
   async function loadRoles() {
     setLoading(true)
@@ -267,7 +404,9 @@ export default function AdministratorWorkspace({
   }
 
 
-  function beginEditRole(role: Role) {
+  function beginEditRole(
+    role: Role,
+  ) {
     setSelectedRole(role)
     setRoleName(role.name)
     setRoleDescription(
@@ -289,6 +428,7 @@ export default function AdministratorWorkspace({
       setError(
         'Role name is required.',
       )
+
       return
     }
 
@@ -397,6 +537,7 @@ export default function AdministratorWorkspace({
     }
   }
 
+
   async function handleOnboardStaff(
     email: string,
     roleName: string,
@@ -404,13 +545,14 @@ export default function AdministratorWorkspace({
     setError(null)
 
     try {
-      const response = await onboardStaff(
-        accessToken,
-        {
-          email,
-          role_name: roleName,
-        },
-      )
+      const response =
+        await onboardStaff(
+          accessToken,
+          {
+            email,
+            role_name: roleName,
+          },
+        )
 
       await loadUsers()
 
@@ -429,7 +571,6 @@ export default function AdministratorWorkspace({
   // ==========================================================================
   // Permissions
   // ==========================================================================
-
 
   async function refreshPermissions(
     roleId: string,
@@ -525,14 +666,14 @@ export default function AdministratorWorkspace({
 
 
   // ==========================================================================
-  // Initialization
+  // Initial loading
   // ==========================================================================
-
 
   useEffect(() => {
     void Promise.all([
       loadUsers(),
       loadRoles(),
+      loadStaff(),
     ])
   }, [])
 
@@ -541,9 +682,12 @@ export default function AdministratorWorkspace({
   // Render
   // ==========================================================================
 
-
   return (
     <section className="admin-workspace">
+
+      {/* ==================================================================== */}
+      {/* Header                                                               */}
+      {/* ==================================================================== */}
 
       <div className="admin-heading">
 
@@ -557,8 +701,9 @@ export default function AdministratorWorkspace({
           </h2>
 
           <p>
-            Manage hospital users, roles,
-            and authorization permissions.
+            Manage hospital users, staff,
+            roles, and authorization
+            permissions.
           </p>
         </div>
 
@@ -569,12 +714,20 @@ export default function AdministratorWorkspace({
       </div>
 
 
+      {/* ==================================================================== */}
+      {/* Global Error                                                         */}
+      {/* ==================================================================== */}
+
       {error && (
         <div className="admin-error">
           {error}
         </div>
       )}
 
+
+      {/* ==================================================================== */}
+      {/* Navigation                                                           */}
+      {/* ==================================================================== */}
 
       <nav className="admin-tabs">
 
@@ -605,6 +758,36 @@ export default function AdministratorWorkspace({
           }
         >
           Users
+        </button>
+
+
+        <button
+          type="button"
+          className={
+            tab === 'staff'
+              ? 'admin-tab active'
+              : 'admin-tab'
+          }
+          onClick={() =>
+            setTab('staff')
+          }
+        >
+          Staff
+        </button>
+
+
+        <button
+          type="button"
+          className={
+            tab === 'departments'
+              ? 'admin-tab active'
+              : 'admin-tab'
+          }
+          onClick={() =>
+            setTab('departments')
+          }
+        >
+          Departments
         </button>
 
 
@@ -656,6 +839,7 @@ export default function AdministratorWorkspace({
           }
         />
       )}
+
 
       {/* ==================================================================== */}
       {/* Users                                                                */}
@@ -712,7 +896,52 @@ export default function AdministratorWorkspace({
 
 
       {/* ==================================================================== */}
-      {/* Roles                                                                */}
+      {/* Staff                                                                */}
+      {/* ==================================================================== */}
+
+      {tab === 'staff' && (
+        <AdministrationStaff
+          hospitalId={hospitalId}
+
+          staff={staff}
+          users={users}
+          loading={loading}
+
+          onRefresh={() =>
+            void loadStaff()
+          }
+
+          onLinkUser={(
+            member,
+            userId,
+          ) =>
+            handleLinkUser(
+              member,
+              userId,
+            )
+          }
+
+          onCreateStaff={
+            handleCreateStaff
+          }
+        />
+      )}
+
+
+      {/* ==================================================================== */}
+      {/* Departments                                                          */}
+      {/* ==================================================================== */}
+
+      {tab === 'departments' && (
+        <AdministrationDepartments
+          accessToken={accessToken}
+          hospitalId={hospitalId}
+        />
+      )}
+
+
+      {/* ==================================================================== */}
+      {/* Roles / Permissions                                                  */}
       {/* ==================================================================== */}
 
       {(tab === 'roles' ||
@@ -724,12 +953,17 @@ export default function AdministratorWorkspace({
           availablePermissions={
             availablePermissions
           }
+
           roleName={roleName}
+
           roleDescription={
             roleDescription
           }
+
           editingRole={editingRole}
+
           savingRole={savingRole}
+
           selectedPermission={
             selectedPermission
           }

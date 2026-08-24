@@ -127,7 +127,7 @@ class ClinicalDocumentService:
         self.event_service = event_service
 
     # =========================================================================
-    # Internal helpers
+    # Internal Helpers
     # =========================================================================
 
     def _get_encounter(
@@ -157,7 +157,7 @@ class ClinicalDocumentService:
         encounter,
     ) -> None:
         """
-        Ensure the Encounter is still open for new documentation.
+        Ensure the Encounter is still open for documentation.
         """
 
         if encounter.status != EncounterStatus.OPEN:
@@ -200,16 +200,13 @@ class ClinicalDocumentService:
         Other Clinical Document types do not require an admitted Episode.
         """
 
-        if document_type != ClinicalDocumentType.DISCHARGE_SUMMARY:
-            return self._get_episode_for_encounter(
-                context=context,
-                encounter=encounter,
-            )
-
         episode = self._get_episode_for_encounter(
             context=context,
             encounter=encounter,
         )
+
+        if document_type != ClinicalDocumentType.DISCHARGE_SUMMARY:
+            return episode
 
         if episode.status != EpisodeStatus.ADMITTED:
             raise EpisodeNotAdmittedError(
@@ -225,7 +222,10 @@ class ClinicalDocumentService:
         staff_id: UUID,
     ):
         """
-        Retrieve a Staff member and enforce Hospital ownership.
+        Retrieve a Staff member by Staff ID and enforce Hospital ownership.
+
+        This helper is appropriate when the caller genuinely supplies a
+        Staff.id.
         """
 
         staff = self.staff_repository.get_by_id(
@@ -235,6 +235,37 @@ class ClinicalDocumentService:
         if staff is None:
             raise StaffNotFoundError(
                 "Staff member not found.",
+            )
+
+        if staff.hospital_id != context.hospital_id:
+            raise StaffHospitalMismatchError(
+                "Staff member belongs to another Hospital.",
+            )
+
+        return staff
+
+    def _get_authenticated_staff(
+        self,
+        *,
+        context: RequestContext,
+    ):
+        """
+        Resolve the authenticated UserAccount to its Staff profile.
+
+        RequestContext.user_id is a UserAccount.id, not a Staff.id.
+
+        Therefore authenticated clinical operations must resolve the Staff
+        record through Staff.user_account_id.
+        """
+
+        staff = self.staff_repository.get_by_user_account_id(
+            hospital_id=context.hospital_id,
+            user_account_id=context.user_id,
+        )
+
+        if staff is None:
+            raise StaffNotFoundError(
+                "Authenticated user does not have a Staff profile.",
             )
 
         if staff.hospital_id != context.hospital_id:
@@ -260,14 +291,12 @@ class ClinicalDocumentService:
         """
         Create a new Clinical Document in DRAFT status.
 
-        Business Rules
-        --------------
+        The authenticated user's Staff profile is used as the author.
 
-        • Encounter must exist.
-        • Encounter must belong to the authenticated Hospital.
-        • Encounter must be OPEN.
-        • Author must belong to the authenticated Hospital.
-        • DISCHARGE_SUMMARY requires an ADMITTED Episode.
+        The authored_by argument remains part of the service contract for
+        compatibility with the API layer, but authorship is resolved from
+        the authenticated RequestContext to prevent users from impersonating
+        another Staff member.
         """
 
         encounter = self._get_encounter(
@@ -285,9 +314,8 @@ class ClinicalDocumentService:
             document_type=document_type,
         )
 
-        author = self._get_staff(
+        author = self._get_authenticated_staff(
             context=context,
-            staff_id=authored_by,
         )
 
         if isinstance(content, BaseModel):
@@ -421,6 +449,10 @@ class ClinicalDocumentService:
         Update an existing DRAFT.
 
         Signed documents cannot be edited.
+
+        The editor is resolved from the authenticated RequestContext.
+        The edited_by argument remains in the method signature for API
+        compatibility, but it is not trusted as a Staff.id.
         """
 
         document = self.get_document(
@@ -433,9 +465,10 @@ class ClinicalDocumentService:
                 "Only draft Clinical Documents can be edited.",
             )
 
-        editor = self._get_staff(
+        # RequestContext.user_id identifies UserAccount, not Staff.
+        # Resolve the authenticated Staff profile correctly.
+        editor = self._get_authenticated_staff(
             context=context,
-            staff_id=edited_by,
         )
 
         if isinstance(content, BaseModel):
@@ -461,13 +494,14 @@ class ClinicalDocumentService:
         *,
         context: RequestContext,
         document_id: UUID,
-        signed_by: UUID,
         signed_at: datetime | None = None,
     ) -> ClinicalDocument:
         """
         Sign a Clinical Document.
 
         Only DRAFT documents can be signed.
+
+        The signer is resolved from the authenticated RequestContext.
 
         Additional Discharge Summary rule:
 
@@ -485,9 +519,9 @@ class ClinicalDocumentService:
                 "Only draft Clinical Documents can be signed.",
             )
 
-        signer = self._get_staff(
+        # RequestContext.user_id is UserAccount.id.
+        signer = self._get_authenticated_staff(
             context=context,
-            staff_id=signed_by,
         )
 
         # ------------------------------------------------------------------
@@ -568,6 +602,9 @@ class ClinicalDocumentService:
         Create a new DRAFT version from a SIGNED document.
 
         Only the latest version may be amended.
+
+        The authenticated user's Staff profile becomes the author of the
+        amended document.
         """
 
         document = self.get_document(
@@ -601,9 +638,9 @@ class ClinicalDocumentService:
                 "Only the latest Clinical Document version can be amended.",
             )
 
-        author = self._get_staff(
+        # Resolve the authenticated Staff correctly.
+        author = self._get_authenticated_staff(
             context=context,
-            staff_id=authored_by,
         )
 
         if isinstance(content, BaseModel):

@@ -5,40 +5,81 @@ LIGHTBURGH EMR
 Vitals Service
 ==============================================================================
 
-Business logic for recording patient vital signs.
+Business logic for recording and retrieving patient vital signs.
 
 Vitals are represented as Clinical Events:
 
     event_type = VITALS_RECORDED
 
-The VitalsService is intentionally thin. It is responsible for:
-
-    • validating the Vitals-specific request
-    • constructing the structured clinical payload
-    • delegating persistence and tenancy enforcement to ClinicalEventService
-
-Persistence remains owned by the Events module.
+The authenticated UserAccount is resolved to its Staff profile by the
+VitalsService. The frontend therefore does not need to provide a Staff UUID.
 ==============================================================================
 """
 
+from uuid import UUID
+
 from app.core.context import RequestContext
+
 from app.modules.events.enums import EventType
+from app.modules.events.exceptions import (
+    StaffHospitalMismatchError,
+    StaffNotFoundError,
+)
 from app.modules.events.models import ClinicalEvent
-from app.modules.events.services.event_service import ClinicalEventService
+from app.modules.events.services.event_service import (
+    ClinicalEventService,
+)
+
+from app.modules.staff.repository import StaffRepository
+
 from app.modules.vitals.schemas import CreateVitalsRequest
 
 
 class VitalsService:
     """
-    Service responsible for recording patient vital signs.
+    Service responsible for recording and retrieving patient vital signs.
     """
 
     def __init__(
         self,
         *,
         event_service: ClinicalEventService,
+        staff_repository: StaffRepository,
     ) -> None:
         self.event_service = event_service
+        self.staff_repository = staff_repository
+
+    # ------------------------------------------------------------------
+    # Authenticated Staff
+    # ------------------------------------------------------------------
+
+    def _get_authenticated_staff(
+        self,
+        *,
+        context: RequestContext,
+    ):
+        """
+        Resolve the authenticated UserAccount to its Staff profile.
+        """
+
+        staff = (
+            self.staff_repository.get_by_user_account_id(
+                hospital_id=context.hospital_id,
+                user_account_id=context.user_id,
+            )
+        )
+
+        if staff is None:
+            raise StaffNotFoundError(
+                "Authenticated user does not have a Staff profile.",
+            )
+
+        if staff.hospital_id != context.hospital_id:
+            raise StaffHospitalMismatchError(
+                "Staff member belongs to another hospital.",
+            )
+
+        return staff
 
     # ------------------------------------------------------------------
     # Record Vitals
@@ -53,15 +94,14 @@ class VitalsService:
         """
         Record patient vital signs as a Clinical Event.
 
-        The event is persisted with:
-
-            event_type = VITALS_RECORDED
-
-        Only measurements actually supplied by the caller are included
-        in the payload.
+        The authenticated user's Staff profile is used as the performer.
         """
 
-        payload = {}
+        staff = self._get_authenticated_staff(
+            context=context,
+        )
+
+        payload: dict = {}
 
         # --------------------------------------------------------------
         # Measurements
@@ -96,7 +136,34 @@ class VitalsService:
             context=context,
             encounter_id=request.encounter_id,
             event_type=EventType.VITALS_RECORDED,
-            performed_by=request.performed_by,
+            performed_by=staff.id,
             occurred_at=request.occurred_at,
             payload=payload,
         )
+
+    # ------------------------------------------------------------------
+    # List Encounter Vitals
+    # ------------------------------------------------------------------
+
+    def list_encounter_vitals(
+        self,
+        *,
+        context: RequestContext,
+        encounter_id: UUID,
+    ) -> list[ClinicalEvent]:
+        """
+        Return all VITALS_RECORDED events belonging to an Encounter.
+
+        Hospital tenancy is enforced by ClinicalEventService.
+        """
+
+        events = self.event_service.list_encounter_events(
+            context=context,
+            encounter_id=encounter_id,
+        )
+
+        return [
+            event
+            for event in events
+            if event.event_type == EventType.VITALS_RECORDED
+        ]

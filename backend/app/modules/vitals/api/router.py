@@ -5,13 +5,15 @@ LIGHTBURGH EMR
 Vitals API Router
 ==============================================================================
 
-Exposes HTTP endpoints for recording patient vital signs.
+Exposes HTTP endpoints for recording and retrieving patient vital signs.
 
 HTTP concerns remain in this router.
 Business logic belongs in VitalsService.
 Clinical event persistence belongs in ClinicalEventService.
 ==============================================================================
 """
+
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -33,6 +35,7 @@ from app.modules.events.repositories import (
 from app.modules.events.services.event_service import (
     ClinicalEventService,
 )
+from app.modules.staff.repository import StaffRepository
 
 from app.modules.vitals.schemas import (
     CreateVitalsRequest,
@@ -53,6 +56,7 @@ router = APIRouter(
 # Dependencies
 # ============================================================================
 
+
 def get_vitals_service(
     db: Session = Depends(get_db),
 ) -> VitalsService:
@@ -66,12 +70,14 @@ def get_vitals_service(
 
     return VitalsService(
         event_service=event_service,
+        staff_repository=StaffRepository(db),
     )
 
 
 # ============================================================================
 # Record Vitals
 # ============================================================================
+
 
 @router.post(
     "",
@@ -81,8 +87,12 @@ def get_vitals_service(
 )
 def record_vitals(
     request: CreateVitalsRequest,
-    context: RequestContext = Depends(get_request_context),
-    service: VitalsService = Depends(get_vitals_service),
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: VitalsService = Depends(
+        get_vitals_service,
+    ),
 ):
     """
     Record patient vital signs within an Encounter.
@@ -94,7 +104,9 @@ def record_vitals(
             request=request,
         )
 
-        return VitalsResponse.model_validate(event)
+        return VitalsResponse.model_validate(
+            event,
+        )
 
     except EncounterNotFoundError as exc:
         raise HTTPException(
@@ -114,4 +126,47 @@ def record_vitals(
             detail=(
                 "Staff member does not belong to the authenticated Hospital."
             ),
+        ) from exc
+
+
+# ============================================================================
+# List Encounter Vitals
+# ============================================================================
+
+
+@router.get(
+    "/encounters/{encounter_id}",
+    response_model=list[VitalsResponse],
+    summary="List Encounter Vitals",
+)
+def list_encounter_vitals(
+    encounter_id: UUID,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: VitalsService = Depends(
+        get_vitals_service,
+    ),
+):
+    """
+    Return all recorded vital-sign observations for an Encounter.
+    """
+
+    try:
+        events = service.list_encounter_vitals(
+            context=context,
+            encounter_id=encounter_id,
+        )
+
+        return [
+            VitalsResponse.model_validate(
+                event,
+            )
+            for event in events
+        ]
+
+    except EncounterNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Encounter not found.",
         ) from exc

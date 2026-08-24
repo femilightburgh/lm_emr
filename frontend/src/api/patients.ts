@@ -7,6 +7,21 @@ import type {
 import { apiRequest } from './client'
 
 
+// ============================================================================
+// Patient Types
+// ============================================================================
+
+export type {
+  Patient,
+  PatientListResponse,
+  CreatePatientRequest,
+}
+
+
+// ============================================================================
+// List Patients
+// ============================================================================
+
 export async function listPatients(
   accessToken: string,
 ): Promise<PatientListResponse> {
@@ -18,17 +33,26 @@ export async function listPatients(
 }
 
 
+// ============================================================================
+// Search Patients
+// ============================================================================
+
 export async function searchPatients(
   accessToken: string,
   query: string,
 ): Promise<PatientListResponse> {
-  const params = new URLSearchParams()
+  const params =
+    new URLSearchParams()
 
   if (query.trim()) {
-    params.set('name', query.trim())
+    params.set(
+      'name',
+      query.trim(),
+    )
   }
 
-  const queryString = params.toString()
+  const queryString =
+    params.toString()
 
   return apiRequest<PatientListResponse>(
     queryString
@@ -39,6 +63,10 @@ export async function searchPatients(
   )
 }
 
+
+// ============================================================================
+// Retrieve Patient
+// ============================================================================
 
 export async function getPatient(
   accessToken: string,
@@ -51,6 +79,10 @@ export async function getPatient(
   )
 }
 
+
+// ============================================================================
+// Create Patient
+// ============================================================================
 
 export async function createPatient(
   accessToken: string,

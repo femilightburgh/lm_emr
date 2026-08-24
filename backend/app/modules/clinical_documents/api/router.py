@@ -46,7 +46,6 @@ from app.modules.clinical_documents.schemas import (
     AmendClinicalDocumentRequest,
     ClinicalDocumentResponse,
     CreateClinicalDocumentRequest,
-    SignClinicalDocumentRequest,
     UpdateClinicalDocumentRequest,
     get_document_content_schema,
 )
@@ -337,7 +336,6 @@ def update_clinical_document(
 )
 def sign_clinical_document(
     document_id: UUID,
-    request: SignClinicalDocumentRequest,
     context: RequestContext = Depends(
         get_request_context,
     ),
@@ -356,8 +354,7 @@ def sign_clinical_document(
         document = service.sign_document(
             context=context,
             document_id=document_id,
-            signed_by=request.signed_by,
-            signed_at=request.signed_at,
+            signed_at=None,
         )
 
         return ClinicalDocumentResponse.model_validate(

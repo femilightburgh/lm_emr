@@ -4,29 +4,28 @@ import type {
 
 import type {
   AuthenticatedUser,
+  WorkspaceView,
 } from '../types'
 
 import Sidebar from '../components/layout/Sidebar'
 import Header from '../components/layout/Header'
 
 
-type WorkspaceView =
-  | 'dashboard'
-  | 'patients'
-  | 'register'
-  | 'administrator'
-
-
 interface AppShellProps {
   user: AuthenticatedUser
   view: WorkspaceView
+
   isReceptionist: boolean
   isAdministrator: boolean
+  isNurse: boolean
+
   onDashboard: () => void
   onPatients: () => void
   onRegistration: () => void
   onAdministrator: () => void
+  onNursing: () => void
   onSignOut: () => void
+
   children: ReactNode
 }
 
@@ -34,13 +33,18 @@ interface AppShellProps {
 export default function AppShell({
   user,
   view,
+
   isReceptionist,
   isAdministrator,
+  isNurse,
+
   onDashboard,
   onPatients,
   onRegistration,
   onAdministrator,
+  onNursing,
   onSignOut,
+
   children,
 }: AppShellProps) {
   return (
@@ -49,12 +53,16 @@ export default function AppShell({
       <Sidebar
         user={user}
         view={view}
+
         isReceptionist={isReceptionist}
         isAdministrator={isAdministrator}
+        isNurse={isNurse}
+
         onDashboard={onDashboard}
         onPatients={onPatients}
         onRegistration={onRegistration}
         onAdministrator={onAdministrator}
+        onNursing={onNursing}
         onSignOut={onSignOut}
       />
 

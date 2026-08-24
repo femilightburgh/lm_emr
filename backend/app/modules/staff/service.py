@@ -155,13 +155,15 @@ class StaffService:
         # Attach the employment through the ORM relationship.
         # SQLAlchemy will establish staff_id automatically and
         # insert Staff before StaffEmployment.
-        staff.employments.append(
-            employment,
-        )
-
         self.repository.create(
             staff,
         )
+
+        self.repository.flush()
+
+        self.repository.commit()
+
+        return staff
 
         # Flush so generated IDs and database state are available
         # to the caller, without committing the transaction.
@@ -311,9 +313,13 @@ class StaffService:
 
         staff.user_account_id = user_account_id
 
-        return self.repository.save(
+        staff = self.repository.save(
             staff,
         )
+
+        self.repository.commit()
+
+        return staff
 
     # =========================================================================
     # Employment History

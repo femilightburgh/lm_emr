@@ -23,18 +23,12 @@ import {
 import type {
   AuthenticatedUser,
   LoginResponse,
+  WorkspaceView,
 } from './types'
 
 import './App.css'
 import ActivateAccount from './components/auth/ActivateAccount'
-
-
-type WorkspaceView =
-  | 'dashboard'
-  | 'patients'
-  | 'register'
-  | 'administrator'
-
+import NursingWorkspace from './components/nursing/NursingWorkspace'
 
 function App() {
   // ==========================================================================
@@ -367,17 +361,24 @@ const isReceptionist =
 const isAdministrator =
   user.roles?.includes('Administrator') ?? false
 
+const isNurse =
+  user.roles?.includes('Nurse') ?? false
+
 return (
   <AppShell
     user={user}
     view={view}
     isReceptionist={isReceptionist}
     isAdministrator={isAdministrator}
+    isNurse={isNurse}
     onDashboard={openDashboard}
     onPatients={openPatients}
     onRegistration={openRegistration}
     onAdministrator={() =>
       setView('administrator')
+    }
+    onNursing={() =>
+      setView('nursing')
     }
     onSignOut={handleSignOut}
   >
@@ -428,6 +429,14 @@ return (
       <AdministratorWorkspace
         accessToken={session.access_token}
         currentUserEmail={user.email}
+        hospitalId={user.hospital_id}
+      />
+    )}
+
+    {view === 'nursing' && (
+      <NursingWorkspace
+        accessToken={session.access_token}
+        staffId={user.id}
       />
     )}
     </AppShell>

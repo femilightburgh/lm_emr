@@ -116,12 +116,10 @@ class UpdateClinicalDocumentRequest(BaseModel):
 class SignClinicalDocumentRequest(BaseModel):
     """
     Request to sign a Clinical Document.
-    """
 
-    signed_by: UUID = Field(
-        ...,
-        description="Staff member signing the document.",
-    )
+    The signer is resolved from the authenticated UserAccount.
+    The client does not supply a signed_by Staff ID.
+    """
 
     signed_at: datetime | None = Field(
         default=None,

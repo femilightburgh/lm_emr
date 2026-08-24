@@ -1,12 +1,7 @@
-import type { AuthenticatedUser } from '../../types'
-
-
-type WorkspaceView =
-  | 'dashboard'
-  | 'patients'
-  | 'register'
-  | 'administrator'
-
+import type {
+  AuthenticatedUser,
+  WorkspaceView,
+} from '../../types'
 
 interface HeaderProps {
   user: AuthenticatedUser
@@ -30,6 +25,9 @@ function getWorkspaceTitle(
 
     case 'administrator':
       return 'Administration'
+
+    case 'nursing':
+      return 'Nursing'
 
     default:
       return 'LIGHTBURGH'

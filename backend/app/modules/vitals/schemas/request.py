@@ -34,11 +34,6 @@ class CreateVitalsRequest(BaseModel):
         description="Encounter in which the vital signs were recorded.",
     )
 
-    performed_by: UUID = Field(
-        ...,
-        description="Staff member who recorded the vital signs.",
-    )
-
     occurred_at: datetime = Field(
         ...,
         description="Time at which the vital signs were actually obtained.",
