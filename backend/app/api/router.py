@@ -123,6 +123,12 @@ from app.modules.vitals.api.router import (
 from app.modules.clinical_documents.api.router import (
     router as clinical_documents_router,
 )
+from app.modules.diagnoses.api.router import (
+    router as diagnoses_router,
+)
+from app.modules.terminology.api.router import (
+    router as terminology_router,
+)
 
 # ============================================================================
 # Clinical Orders
@@ -242,6 +248,14 @@ api_router.include_router(
 
 api_router.include_router(
     clinical_documents_router,
+)
+
+api_router.include_router(
+    diagnoses_router,
+)
+
+api_router.include_router(
+    terminology_router,
 )
 
 # ============================================================================

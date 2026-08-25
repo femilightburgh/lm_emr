@@ -83,6 +83,11 @@ class Permissions:
     CLINICAL_ORDER_READ = "clinical_order.read"
     CLINICAL_ORDER_CANCEL = "clinical_order.cancel"
 
+    DIAGNOSIS_CREATE = "diagnosis.create"
+    DIAGNOSIS_READ = "diagnosis.read"
+
+    TERMINOLOGY_READ = "terminology.read"
+
     # ------------------------------------------------------------------
     # Clinical Results
     # ------------------------------------------------------------------

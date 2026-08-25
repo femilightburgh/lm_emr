@@ -59,6 +59,9 @@ DEFAULT_ROLES = [
             Permissions.CLINICAL_ORDER_READ,
             Permissions.CLINICAL_ORDER_CANCEL,
             Permissions.CLINICAL_RESULT_READ,
+            Permissions.DIAGNOSIS_CREATE,
+            Permissions.DIAGNOSIS_READ,
+            Permissions.TERMINOLOGY_READ,
         ],
     ),
     (
@@ -69,6 +72,8 @@ DEFAULT_ROLES = [
             Permissions.PATIENT_UPDATE,
             Permissions.CLINICAL_ORDER_READ,
             Permissions.CLINICAL_RESULT_READ,
+            Permissions.DIAGNOSIS_READ,
+            Permissions.TERMINOLOGY_READ,
         ],
     ),
     (
@@ -87,6 +92,8 @@ DEFAULT_ROLES = [
             Permissions.PATIENT_READ,
             Permissions.PATIENT_CREATE,
             Permissions.PATIENT_UPDATE,
+            Permissions.DIAGNOSIS_READ,
+            Permissions.TERMINOLOGY_READ,
         ],
     ),
     (

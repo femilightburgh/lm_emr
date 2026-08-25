@@ -188,6 +188,28 @@ PERMISSIONS: list[PermissionDefinition] = [
     ),
 
     # ==============================================================
+    # Clinical Diagnoses
+    # ==============================================================
+
+    PermissionDefinition(
+        code=Permissions.DIAGNOSIS_CREATE,
+        name="Create Clinical Diagnoses",
+        description="Allows recording clinical diagnoses.",
+    ),
+
+    PermissionDefinition(
+        code=Permissions.DIAGNOSIS_READ,
+        name="Read Clinical Diagnoses",
+        description="Allows viewing clinical diagnoses.",
+    ),
+
+    PermissionDefinition(
+        code=Permissions.TERMINOLOGY_READ,
+        name="Read Clinical Terminology",
+        description="Allows searching supported clinical terminology.",
+    ),
+
+    # ==============================================================
     # Clinical Results
     # ==============================================================
 

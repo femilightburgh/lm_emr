@@ -113,6 +113,50 @@ def cleanup_hospital(db: Session, hospital_id) -> None:
         {"hospital_id": hospital_id},
     )
     # ------------------------------------------------------------------
+    # Terminology
+    # ------------------------------------------------------------------
+
+    db.execute(
+        text(
+            '''
+            DELETE FROM terminology_synonyms
+            WHERE concept_id IN (
+                SELECT id
+                FROM terminology_concepts
+            )
+            '''
+        )
+    )
+
+    db.execute(
+        text(
+            '''
+            DELETE FROM terminology_concepts
+            '''
+        )
+    )
+
+    # ------------------------------------------------------------------
+    # Clinical Diagnoses
+    # ------------------------------------------------------------------
+
+    db.execute(
+        text(
+            '''
+            DELETE FROM clinical_diagnoses
+            WHERE encounter_id IN (
+                SELECT e.id
+                FROM encounters e
+                JOIN episodes ep
+                    ON e.episode_id = ep.id
+                WHERE ep.hospital_id = :hospital_id
+            )
+            '''
+        ),
+        {"hospital_id": hospital_id},
+    )
+
+    # ------------------------------------------------------------------
     # Clinical Orders
     # ------------------------------------------------------------------
 
