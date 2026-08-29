@@ -165,6 +165,33 @@ class EncounterService:
         return encounter
 
     # ------------------------------------------------------------------
+    # Doctor Queue
+    # ------------------------------------------------------------------
+
+    def list_doctor_queue(
+        self,
+        *,
+        context: RequestContext,
+    ) -> list[Encounter]:
+        # Return the authenticated doctor's active clinical Encounters.
+
+        staff = self.staff_repository.get_by_user_account_id(
+            hospital_id=context.hospital_id,
+            user_account_id=context.user_id,
+        )
+
+        if staff is None:
+            raise StaffNotFoundError()
+
+        if staff.hospital_id != context.hospital_id:
+            raise StaffHospitalMismatchError()
+
+        return self.repository.list_doctor_queue(
+            hospital_id=context.hospital_id,
+            staff_id=staff.id,
+        )
+
+    # ------------------------------------------------------------------
     # Close
     # ------------------------------------------------------------------
 

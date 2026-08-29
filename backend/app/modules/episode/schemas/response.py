@@ -21,6 +21,24 @@ from app.modules.episode.models import (
 )
 
 
+class DoctorQueueItemResponse(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
+
+    id: UUID
+    patient_id: UUID
+    patient_name: str
+    hospital_number: str
+    episode_number: str
+    title: str
+    status: EpisodeStatus
+    flow_status: EpisodeFlowStatus
+    managing_doctor_id: UUID | None
+    checked_in_at: datetime | None
+    routed_at: datetime | None
+
+
 class EpisodeResponse(BaseModel):
     """
     Episode response.

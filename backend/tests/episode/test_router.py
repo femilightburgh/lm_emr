@@ -235,6 +235,173 @@ def client(
     app.dependency_overrides.clear()
 
 
+
+# ============================================================================
+# Doctor Queues
+# ============================================================================
+
+
+def test_list_doctor_clinic_queue_endpoint(
+    db,
+    hospital,
+):
+    """
+    Routed open Episodes should appear in the Doctor Clinic Queue
+    with patient-facing identity fields.
+    """
+
+    _, staff, context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+    )
+
+    episode = create_episode(
+        db=db,
+        hospital=hospital,
+        context=context,
+    )
+
+    episode.flow_status = EpisodeFlowStatus.ROUTED
+    db.commit()
+    db.refresh(episode)
+
+    patient = db.get(
+        type(episode.patient),
+        episode.patient_id,
+    )
+
+    def override_get_db():
+        yield db
+
+    def override_get_request_context():
+        return context
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_request_context] = (
+        override_get_request_context
+    )
+
+    try:
+        client = TestClient(app)
+
+        response = client.get(
+            "/api/v1/episodes/queue/doctor/clinic",
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert any(
+        item["id"] == str(episode.id)
+        for item in body
+    )
+
+    item = next(
+        item
+        for item in body
+        if item["id"] == str(episode.id)
+    )
+
+    assert item["patient_id"] == str(patient.id)
+    assert item["patient_name"] == (
+        f"{patient.first_name} {patient.last_name}"
+    )
+    assert item["hospital_number"] == (
+        patient.hospital_number
+    )
+    assert item["episode_number"] == (
+        episode.episode_number
+    )
+    assert item["status"] == "OPEN"
+    assert item["flow_status"] == "ROUTED"
+    assert item["managing_doctor_id"] is None
+
+
+def test_list_doctor_ward_queue_endpoint(
+    db,
+    hospital,
+):
+    """
+    An admitted Episode managed by the authenticated Doctor should
+    appear in the Doctor Ward Queue.
+    """
+
+    _, staff, context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+    )
+
+    episode = create_episode(
+        db=db,
+        hospital=hospital,
+        context=context,
+    )
+
+    episode.status = "ADMITTED"
+    episode.managing_doctor_id = staff.id
+
+    db.commit()
+    db.refresh(episode)
+
+    patient = db.get(
+        type(episode.patient),
+        episode.patient_id,
+    )
+
+    def override_get_db():
+        yield db
+
+    def override_get_request_context():
+        return context
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_request_context] = (
+        override_get_request_context
+    )
+
+    try:
+        client = TestClient(app)
+
+        response = client.get(
+            "/api/v1/episodes/queue/doctor/ward",
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert any(
+        item["id"] == str(episode.id)
+        for item in body
+    )
+
+    item = next(
+        item
+        for item in body
+        if item["id"] == str(episode.id)
+    )
+
+    assert item["patient_id"] == str(patient.id)
+    assert item["patient_name"] == (
+        f"{patient.first_name} {patient.last_name}"
+    )
+    assert item["hospital_number"] == (
+        patient.hospital_number
+    )
+    assert item["episode_number"] == (
+        episode.episode_number
+    )
+    assert item["status"] == "ADMITTED"
+    assert item["managing_doctor_id"] == (
+        str(staff.id)
+    )
+
+
 # ============================================================================
 # Check-In
 # ============================================================================

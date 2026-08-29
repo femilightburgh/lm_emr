@@ -15,6 +15,7 @@ class ClinicalOrderStatus(str, Enum):
     """
 
     REQUESTED = "REQUESTED"
+    RECEIVED = "RECEIVED"
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"

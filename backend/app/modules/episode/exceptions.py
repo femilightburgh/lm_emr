@@ -86,6 +86,12 @@ class EncounterNotOpenError(EpisodeError):
     Raised when an operation requires an OPEN Encounter.
     """
 
+class InvalidConsultationDispositionError(EpisodeError):
+    """
+    Raised when a Doctor Consultation disposition is not supported
+    by the current Episode workflow.
+    """
+
 
 # ============================================================================
 # Staff

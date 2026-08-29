@@ -31,6 +31,17 @@ import pytest
 
 from app.core.context import RequestContext
 
+from app.modules.clinical_documents.enums import (
+    ClinicalDocumentStatus,
+    ClinicalDocumentType,
+)
+from app.modules.clinical_documents.repositories import (
+    ClinicalDocumentRepository,
+)
+from app.modules.clinical_documents.services.clinical_document_service import (
+    ClinicalDocumentService,
+)
+
 from app.modules.episode.exceptions import (
     EncounterNotBelongingToEpisodeError,
     EncounterNotOpenError,
@@ -46,6 +57,10 @@ from app.modules.episode.exceptions import (
 from app.modules.episode.models import (
     EpisodeFlowStatus,
     EpisodeStatus,
+)
+
+from app.modules.episode.schemas.request import (
+    ConsultationDisposition,
 )
 
 from app.modules.patients.repositories.patient_repository import (
@@ -73,6 +88,9 @@ from app.modules.events.enums import EventType
 
 from app.modules.events.repositories import (
     ClinicalEventRepository,
+)
+from app.modules.events.services.event_service import (
+    ClinicalEventService,
 )
 
 from app.modules.staff.employment_repository import (
@@ -181,6 +199,8 @@ def create_staff(
 def create_authenticated_staff(
     db,
     hospital,
+    *,
+    staff_number=None,
 ):
     """
     Create a Staff member linked to a real UserAccount.
@@ -203,6 +223,10 @@ def create_authenticated_staff(
     staff = create_staff(
         db=db,
         hospital=hospital,
+        staff_number=(
+            staff_number
+            or f"STF-{uuid4().hex[:8]}"
+        ),
     )
 
     staff.user_account_id = user.id
@@ -306,6 +330,242 @@ def create_episode_with_encounter(
         encounter,
         service,
     )
+
+
+
+# =============================================================================
+# Doctor Queues
+# =============================================================================
+
+
+def test_list_doctor_clinic_queue_includes_routed_open_episode(
+    db,
+    hospital,
+):
+    context = build_context(hospital.id)
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number="PAT-DOC-C-001",
+    )
+
+    service = build_episode_service(db)
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    episode.flow_status = EpisodeFlowStatus.ROUTED
+    episode.routed_at = datetime.now(UTC)
+
+    db.commit()
+    db.refresh(episode)
+
+    results = service.list_doctor_clinic_queue(
+        context=context,
+    )
+
+    assert episode.id in {
+        item.id
+        for item in results
+    }
+
+
+def test_list_doctor_clinic_queue_excludes_non_routed_open_episode(
+    db,
+    hospital,
+):
+    context = build_context(hospital.id)
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number="PAT-DOC-C-002",
+    )
+
+    service = build_episode_service(db)
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    results = service.list_doctor_clinic_queue(
+        context=context,
+    )
+
+    assert episode.id not in {
+        item.id
+        for item in results
+    }
+
+
+def test_list_doctor_clinic_queue_excludes_closed_routed_episode(
+    db,
+    hospital,
+):
+    context = build_context(hospital.id)
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number="PAT-DOC-C-003",
+    )
+
+    service = build_episode_service(db)
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    episode.flow_status = EpisodeFlowStatus.ROUTED
+    episode.status = EpisodeStatus.CLOSED
+    episode.routed_at = datetime.now(UTC)
+
+    db.commit()
+    db.refresh(episode)
+
+    results = service.list_doctor_clinic_queue(
+        context=context,
+    )
+
+    assert episode.id not in {
+        item.id
+        for item in results
+    }
+
+
+def test_list_doctor_ward_queue_includes_managed_admitted_episode(
+    db,
+    hospital,
+):
+    _, staff, context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+    )
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number="PAT-DOC-W-001",
+    )
+
+    service = build_episode_service(db)
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    episode.status = EpisodeStatus.ADMITTED
+    episode.managing_doctor_id = staff.id
+
+    db.commit()
+    db.refresh(episode)
+
+    results = service.list_doctor_ward_queue(
+        context=context,
+    )
+
+    assert episode.id in {
+        item.id
+        for item in results
+    }
+
+
+def test_list_doctor_ward_queue_excludes_episode_managed_by_another_doctor(
+    db,
+    hospital,
+):
+    _, current_doctor, current_context = (
+        create_authenticated_staff(
+            db=db,
+            hospital=hospital,
+        )
+    )
+
+    _, other_doctor, _ = (
+        create_authenticated_staff(
+            db=db,
+            hospital=hospital,
+        )
+    )
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number="PAT-DOC-W-002",
+    )
+
+    service = build_episode_service(db)
+
+    episode = service.create_episode(
+        context=current_context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    episode.status = EpisodeStatus.ADMITTED
+    episode.managing_doctor_id = other_doctor.id
+
+    db.commit()
+    db.refresh(episode)
+
+    results = service.list_doctor_ward_queue(
+        context=current_context,
+    )
+
+    assert episode.id not in {
+        item.id
+        for item in results
+    }
+
+    assert current_doctor.id != other_doctor.id
+
+
+def test_list_doctor_ward_queue_excludes_open_episode(
+    db,
+    hospital,
+):
+    _, staff, context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+    )
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number="PAT-DOC-W-003",
+    )
+
+    service = build_episode_service(db)
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    episode.managing_doctor_id = staff.id
+
+    db.commit()
+    db.refresh(episode)
+
+    results = service.list_doctor_ward_queue(
+        context=context,
+    )
+
+    assert episode.id not in {
+        item.id
+        for item in results
+    }
 
 
 # =============================================================================
@@ -579,16 +839,16 @@ def test_admit_episode_changes_open_to_admitted(
     assert admitted.closed_at is None
 
 
-def test_admit_episode_keeps_encounter_open(
+def test_admit_episode_closes_consultation_encounter(
     db,
     hospital,
 ):
     """
-    Admitting an Episode must not close the Encounter through which
-    the admission was performed.
+    Admitting an Episode completes the Doctor Consultation encounter
+    through which the admission was performed.
 
-    The Episode transitions to ADMITTED while the Encounter remains
-    OPEN so that the professional interaction can continue.
+    The Episode transitions to ADMITTED and the consultation Encounter
+    is closed atomically.
     """
 
     (
@@ -612,8 +872,108 @@ def test_admit_episode_keeps_encounter_open(
     db.refresh(encounter)
 
     assert admitted.status == EpisodeStatus.ADMITTED
-    assert encounter.status == EncounterStatus.OPEN
-    assert encounter.ended_at is None
+    assert encounter.status == EncounterStatus.CLOSED
+    assert encounter.ended_at is not None
+
+
+def test_complete_consultation_orders_investigations(
+    db,
+    hospital,
+):
+    """
+    Completing an outpatient Doctor Consultation for investigations
+    closes the consultation while keeping the Episode OPEN.
+    """
+
+    _, staff, context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+        staff_number="STF-DOC-COMPLETE-001",
+    )
+
+    service = build_episode_service(
+        db,
+    )
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number="PAT-DOC-COMPLETE-001",
+    )
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    encounter = create_open_encounter(
+        db=db,
+        hospital=hospital,
+        episode=episode,
+        staff=staff,
+    )
+
+    encounter.title = "Doctor Consultation"
+    db.commit()
+    db.refresh(encounter)
+
+    document_service = ClinicalDocumentService(
+        repository=ClinicalDocumentRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+    )
+
+    document = document_service.create_draft(
+        context=context,
+        encounter_id=encounter.id,
+        document_type=ClinicalDocumentType.INITIAL_CLERKING,
+        authored_by=staff.id,
+        content={
+            "presenting_complaints": [
+                "Fever",
+            ],
+            "history_of_presenting_complaints": (
+                "Two days of fever."
+            ),
+        },
+    )
+
+    signed_at = datetime(
+        2026,
+        8,
+        26,
+        15,
+        0,
+        tzinfo=UTC,
+    )
+
+    signed = document_service.sign_document(
+        context=context,
+        document_id=document.id,
+        signed_at=signed_at,
+    )
+
+    assert signed.status == ClinicalDocumentStatus.SIGNED
+
+    completed = service.complete_consultation(
+        context=context,
+        episode_id=episode.id,
+        encounter_id=encounter.id,
+        disposition=ConsultationDisposition.ORDER_INVESTIGATIONS,
+    )
+
+    db.refresh(encounter)
+
+    assert completed.status == EpisodeStatus.OPEN
+    assert (
+        completed.flow_status
+        == EpisodeFlowStatus.AWAITING_INVESTIGATIONS
+    )
+    assert encounter.status == EncounterStatus.CLOSED
+    assert encounter.ended_at is not None
+    assert encounter.ended_at > signed_at
 
 
 def test_admit_episode_creates_admission_event(

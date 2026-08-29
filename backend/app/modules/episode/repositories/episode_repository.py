@@ -22,7 +22,10 @@ from sqlalchemy.orm import Session
 from app.modules.episode.models import (
     Episode,
     EpisodeFlowStatus,
+    EpisodeStatus,
 )
+
+from app.modules.patients.models import Patient
 
 
 class EpisodeRepository:
@@ -157,6 +160,78 @@ class EpisodeRepository:
             )
             .order_by(
                 Episode.checked_in_at.asc(),
+            )
+        )
+
+        return list(
+            self.db.scalars(statement),
+        )
+
+    # =========================================================================
+    # Doctor Clinic Queue
+    # =========================================================================
+
+    def list_doctor_clinic_queue(
+        self,
+        *,
+        hospital_id: UUID,
+    ) -> list[Episode]:
+        """
+        Return open Episodes routed to the Doctor workflow.
+        """
+
+        statement = (
+            select(Episode)
+            .join(
+                Patient,
+                Patient.id == Episode.patient_id,
+            )
+            .where(
+                Episode.hospital_id == hospital_id,
+                Episode.status == EpisodeStatus.OPEN,
+                Episode.flow_status.in_(
+                    (
+                        EpisodeFlowStatus.ROUTED,
+                        EpisodeFlowStatus.AWAITING_REVIEW,
+                    ),
+                ),
+            )
+            .order_by(
+                Episode.routed_at.asc(),
+            )
+        )
+
+        return list(
+            self.db.scalars(statement),
+        )
+
+    # =========================================================================
+    # Doctor Ward Queue
+    # =========================================================================
+
+    def list_doctor_ward_queue(
+        self,
+        *,
+        hospital_id: UUID,
+        managing_doctor_id: UUID,
+    ) -> list[Episode]:
+        """
+        Return admitted Episodes managed by the authenticated Doctor.
+        """
+
+        statement = (
+            select(Episode)
+            .join(
+                Patient,
+                Patient.id == Episode.patient_id,
+            )
+            .where(
+                Episode.hospital_id == hospital_id,
+                Episode.status == EpisodeStatus.ADMITTED,
+                Episode.managing_doctor_id == managing_doctor_id,
+            )
+            .order_by(
+                Episode.routed_at.asc(),
             )
         )
 

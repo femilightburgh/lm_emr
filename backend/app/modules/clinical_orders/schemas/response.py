@@ -18,6 +18,32 @@ from app.modules.clinical_orders.enums import (
 )
 
 
+class PrescriptionResponse(BaseModel):
+    """
+    Structured medication prescription response.
+    """
+
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
+
+    id: UUID
+    clinical_order_id: UUID
+    medicine_name: str
+    strength: str | None
+    dose: str
+    dose_unit: str | None
+    route: str
+    frequency: str
+    duration: str | None
+    duration_unit: str | None
+    quantity: str | None
+    directions: str | None
+    indication: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
 class ClinicalOrderResponse(BaseModel):
     """
     Clinical Order response.
@@ -52,3 +78,39 @@ class ClinicalOrderResponse(BaseModel):
     created_at: datetime
 
     updated_at: datetime
+
+
+class LaboratoryQueueItemResponse(BaseModel):
+    """
+    Clinical Order worklist item for Laboratory staff.
+    """
+
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
+
+    id: UUID
+
+    encounter_id: UUID
+
+    patient_id: UUID
+
+    patient_name: str
+
+    hospital_number: str
+
+    episode_number: str
+
+    ordering_clinician_name: str
+
+    order_type: ClinicalOrderType
+
+    status: ClinicalOrderStatus
+
+    priority: str
+
+    details: dict[str, Any]
+
+    ordered_at: datetime
+
+    started_at: datetime | None

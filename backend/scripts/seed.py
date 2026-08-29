@@ -20,6 +20,18 @@ from app.bootstrap.permissions import bootstrap_permissions
 from app.db.session import SessionLocal
 from app.modules.identity.repository import IdentityRepository
 from app.modules.identity.user_service import UserService
+from app.modules.staff.employment_repository import (
+    StaffEmploymentRepository,
+)
+from app.modules.staff.enums import (
+    EmploymentStatus,
+    EmploymentType,
+    Gender,
+    Profession,
+)
+from app.modules.staff.repository import StaffRepository
+from app.modules.staff.schemas import StaffCreate
+from app.modules.staff.service import StaffService
 from app.modules.organization.enums import (
     HospitalOwnership,
     HospitalType,
@@ -47,6 +59,11 @@ DEMO_HOSPITAL = HospitalCreate(
 DEMO_USER_EMAIL = "receptionist@lightburgh.com"
 DEMO_USER_PASSWORD = "password123"
 DEMO_USER_ROLE = "Receptionist"
+
+DEMO_DOCTOR_EMAIL = "doctor@lightburgh.com"
+DEMO_DOCTOR_PASSWORD = "password123"
+DEMO_DOCTOR_ROLE = "Doctor"
+DEMO_DOCTOR_STAFF_NUMBER = "STF-DEMO-DOCTOR"
 
 
 def seed_database() -> None:
@@ -125,6 +142,115 @@ def seed_database() -> None:
                 f"{DEMO_USER_EMAIL}"
             )
 
+        # --------------------------------------------------------------
+        # Demo Doctor
+        # --------------------------------------------------------------
+
+        doctor_repository = IdentityRepository(db)
+
+        doctor_user = doctor_repository.get_user_by_email(
+            hospital_id=hospital.id,
+            email=DEMO_DOCTOR_EMAIL,
+        )
+
+        if doctor_user is None:
+            doctor_service = UserService(
+                doctor_repository,
+            )
+
+            doctor_user = doctor_service.create_user(
+                hospital_code=hospital.code,
+                email=DEMO_DOCTOR_EMAIL,
+                password=DEMO_DOCTOR_PASSWORD,
+                role_name=DEMO_DOCTOR_ROLE,
+            )
+
+            print(
+                f"  • Created {DEMO_DOCTOR_ROLE}: "
+                f"{DEMO_DOCTOR_EMAIL}"
+            )
+        else:
+            print(
+                f"  • User already exists: "
+                f"{DEMO_DOCTOR_EMAIL}"
+            )
+
+        staff_repository = StaffRepository(db)
+
+        doctor_staff = (
+            staff_repository.get_by_staff_number(
+                hospital_id=hospital.id,
+                staff_number=DEMO_DOCTOR_STAFF_NUMBER,
+            )
+        )
+
+        if doctor_staff is None:
+            staff_service = StaffService(
+                repository=staff_repository,
+                hospital_repository=hospital_service.repository,
+                employment_repository=(
+                    StaffEmploymentRepository(db)
+                ),
+                identity_repository=doctor_repository,
+            )
+
+            doctor_staff = staff_service.create_staff(
+                StaffCreate(
+                    hospital_id=hospital.id,
+                    staff_number=DEMO_DOCTOR_STAFF_NUMBER,
+                    first_name="Demo",
+                    last_name="Doctor",
+                    gender=Gender.MALE,
+                    date_of_birth=__import__("datetime").date(
+                        1985,
+                        1,
+                        1,
+                    ),
+                    profession=Profession.DOCTOR,
+                    employment_status=EmploymentStatus.ACTIVE,
+                    employment_type=EmploymentType.FULL_TIME,
+                    date_employed=__import__("datetime").date(
+                        2026,
+                        1,
+                        1,
+                    ),
+                )
+            )
+
+            staff_service.link_user_account(
+                doctor_staff.id,
+                doctor_user.id,
+            )
+
+            print(
+                f"  • Created Doctor Staff profile and linked account: "
+                f"{DEMO_DOCTOR_STAFF_NUMBER}"
+            )
+        elif doctor_staff.user_account_id != doctor_user.id:
+            staff_service = StaffService(
+                repository=staff_repository,
+                hospital_repository=hospital_service.repository,
+                employment_repository=(
+                    StaffEmploymentRepository(db)
+                ),
+                identity_repository=doctor_repository,
+            )
+
+            staff_service.link_user_account(
+                doctor_staff.id,
+                doctor_user.id,
+            )
+
+            print(
+                f"  • Linked Doctor Staff profile: "
+                f"{DEMO_DOCTOR_STAFF_NUMBER}"
+            )
+        else:
+            print(
+                f"  • Doctor Staff profile already exists: "
+                f"{DEMO_DOCTOR_STAFF_NUMBER}"
+            )
+
         db.commit()
 
         print("\nDatabase successfully seeded.\n")
@@ -135,6 +261,13 @@ def seed_database() -> None:
         print(f"Email:         {DEMO_USER_EMAIL}")
         print(f"Password:      {DEMO_USER_PASSWORD}")
         print(f"Role:          {DEMO_USER_ROLE}")
+        print()
+        print("Demo doctor login")
+        print("------------------")
+        print(f"Hospital code: {hospital.code}")
+        print(f"Email:         {DEMO_DOCTOR_EMAIL}")
+        print(f"Password:      {DEMO_DOCTOR_PASSWORD}")
+        print(f"Role:          {DEMO_DOCTOR_ROLE}")
         print()
 
     except Exception:

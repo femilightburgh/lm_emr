@@ -19,6 +19,14 @@ class ClinicalOrderAlreadyCompletedError(Exception):
     """Raised when a completed order is cancelled."""
 
 
+class ClinicalOrderAlreadyInProgressError(Exception):
+    """Raised when an already-in-progress order is started."""
+
+
+class ClinicalOrderCannotStartError(Exception):
+    """Raised when a Clinical Order cannot be started."""
+
+
 class ClinicalOrderEncounterClosedError(Exception):
     """Raised when an order is attempted on a closed Encounter."""
 
@@ -37,3 +45,11 @@ class ClinicalOrderStaffNotFoundError(Exception):
 
 class ClinicalOrderStaffHospitalMismatchError(Exception):
     """Raised when the Staff member belongs to another Hospital."""
+
+
+class ClinicalOrderAlreadyReceivedError(Exception):
+    """Raised when an already-received order is received again."""
+
+
+class ClinicalOrderCannotReceiveError(Exception):
+    """Raised when a Clinical Order cannot be received."""

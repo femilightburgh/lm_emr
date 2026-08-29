@@ -101,6 +101,176 @@ class ClinicalOrderRepository:
         )
 
     # ------------------------------------------------------------------
+    # Laboratory Queue
+    # ------------------------------------------------------------------
+
+    def list_laboratory_queue(
+        self,
+        *,
+        hospital_id: UUID,
+    ) -> list[ClinicalOrder]:
+        """
+        Return open laboratory orders requiring laboratory attention.
+
+        Includes:
+            REQUESTED
+            IN_PROGRESS
+
+        Only laboratory orders belonging to the authenticated
+        Hospital are returned.
+        """
+
+        from app.modules.clinical_orders.enums import (
+            ClinicalOrderStatus,
+            ClinicalOrderType,
+        )
+
+        statement = (
+            select(ClinicalOrder)
+            .join(
+                Encounter,
+                ClinicalOrder.encounter_id == Encounter.id,
+            )
+            .join(
+                Episode,
+                Encounter.episode_id == Episode.id,
+            )
+            .where(
+                Episode.hospital_id == hospital_id,
+                ClinicalOrder.order_type
+                == ClinicalOrderType.LABORATORY,
+                ClinicalOrder.status.in_(
+                    (
+                        ClinicalOrderStatus.REQUESTED,
+                        ClinicalOrderStatus.RECEIVED,
+                        ClinicalOrderStatus.IN_PROGRESS,
+                    ),
+                ),
+            )
+            .order_by(
+                ClinicalOrder.ordered_at.asc(),
+            )
+        )
+
+        return list(
+            self.db.scalars(statement),
+        )
+
+    # ------------------------------------------------------------------
+    # Pharmacy Queue
+    # ------------------------------------------------------------------
+
+    def list_pharmacy_queue(
+        self,
+        *,
+        hospital_id: UUID,
+    ) -> list[ClinicalOrder]:
+        """
+        Return open medication orders requiring pharmacy attention.
+
+        Includes:
+            REQUESTED
+            RECEIVED
+            IN_PROGRESS
+
+        Only medication orders belonging to the authenticated
+        Hospital are returned.
+        """
+
+        from app.modules.clinical_orders.enums import (
+            ClinicalOrderStatus,
+            ClinicalOrderType,
+        )
+
+        statement = (
+            select(ClinicalOrder)
+            .join(
+                Encounter,
+                ClinicalOrder.encounter_id == Encounter.id,
+            )
+            .join(
+                Episode,
+                Encounter.episode_id == Episode.id,
+            )
+            .where(
+                Episode.hospital_id == hospital_id,
+                ClinicalOrder.order_type
+                == ClinicalOrderType.MEDICATION,
+                ClinicalOrder.status.in_(
+                    (
+                        ClinicalOrderStatus.REQUESTED,
+                        ClinicalOrderStatus.RECEIVED,
+                        ClinicalOrderStatus.IN_PROGRESS,
+                    ),
+                ),
+            )
+            .order_by(
+                ClinicalOrder.ordered_at.asc(),
+            )
+        )
+
+        return list(
+            self.db.scalars(statement),
+        )
+
+    # ------------------------------------------------------------------
+    # Episode Outstanding Investigations
+    # ------------------------------------------------------------------
+
+    def list_outstanding_investigation_orders_for_episode(
+        self,
+        *,
+        hospital_id: UUID,
+        episode_id: UUID,
+    ) -> list[ClinicalOrder]:
+        """
+        Return outstanding laboratory/radiology orders for an Episode.
+
+        REQUESTED and IN_PROGRESS investigation orders are considered
+        outstanding. COMPLETED and CANCELLED orders are terminal.
+        """
+
+        from app.modules.clinical_orders.enums import (
+            ClinicalOrderStatus,
+            ClinicalOrderType,
+        )
+
+        statement = (
+            select(ClinicalOrder)
+            .join(
+                Encounter,
+                ClinicalOrder.encounter_id == Encounter.id,
+            )
+            .join(
+                Episode,
+                Encounter.episode_id == Episode.id,
+            )
+            .where(
+                Episode.id == episode_id,
+                Episode.hospital_id == hospital_id,
+                ClinicalOrder.order_type.in_(
+                    (
+                        ClinicalOrderType.LABORATORY,
+                        ClinicalOrderType.RADIOLOGY,
+                    ),
+                ),
+                ClinicalOrder.status.in_(
+                    (
+                        ClinicalOrderStatus.REQUESTED,
+                        ClinicalOrderStatus.IN_PROGRESS,
+                    ),
+                ),
+            )
+            .order_by(
+                ClinicalOrder.ordered_at.asc(),
+            )
+        )
+
+        return list(
+            self.db.scalars(statement),
+        )
+
+    # ------------------------------------------------------------------
     # Persistence
     # ------------------------------------------------------------------
 

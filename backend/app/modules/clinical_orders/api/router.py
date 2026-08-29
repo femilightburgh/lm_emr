@@ -24,19 +24,25 @@ from app.modules.clinical_orders.enums import (
 from app.modules.clinical_orders.exceptions import (
     ClinicalOrderAlreadyCancelledError,
     ClinicalOrderAlreadyCompletedError,
+    ClinicalOrderAlreadyInProgressError,
+    ClinicalOrderCannotStartError,
     ClinicalOrderEncounterClosedError,
     ClinicalOrderEpisodeCancelledError,
     ClinicalOrderEpisodeClosedError,
     ClinicalOrderNotFoundError,
     ClinicalOrderStaffHospitalMismatchError,
     ClinicalOrderStaffNotFoundError,
+    ClinicalOrderAlreadyReceivedError,
+    ClinicalOrderCannotReceiveError,
 )
 from app.modules.clinical_orders.repositories import (
     ClinicalOrderRepository,
+    PrescriptionRepository,
 )
 from app.modules.clinical_orders.schemas import (
     CreateClinicalOrderRequest,
     ClinicalOrderResponse,
+    LaboratoryQueueItemResponse,
 )
 from app.modules.clinical_orders.services import (
     ClinicalOrderService,
@@ -83,6 +89,7 @@ def get_clinical_order_service(
         encounter_repository=EncounterRepository(db),
         episode_repository=EpisodeRepository(db),
         staff_repository=StaffRepository(db),
+        prescription_repository=PrescriptionRepository(db),
     )
 
 
@@ -245,6 +252,187 @@ def list_encounter_clinical_orders(
             encounter_id=encounter_id,
         )
     ]
+
+
+# ============================================================================
+# Laboratory Queue
+# ============================================================================
+
+
+@router.get(
+    "/queue/laboratory",
+    response_model=list[LaboratoryQueueItemResponse],
+    summary="List Laboratory Queue",
+    dependencies=[
+        Depends(
+            require_permission(
+                Permissions.CLINICAL_ORDER_READ,
+            ),
+        ),
+    ],
+)
+def list_laboratory_queue(
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: ClinicalOrderService = Depends(
+        get_clinical_order_service,
+    ),
+):
+    """
+    Return laboratory orders currently requiring laboratory attention.
+    """
+
+    return [
+        LaboratoryQueueItemResponse(
+            id=order.id,
+            encounter_id=order.encounter_id,
+            patient_id=order.encounter.episode.patient_id,
+            patient_name=(
+                f"{order.encounter.episode.patient.first_name} "
+                f"{order.encounter.episode.patient.last_name}"
+            ),
+            hospital_number=(
+                order.encounter.episode.patient.hospital_number
+            ),
+            episode_number=(
+                order.encounter.episode.episode_number
+            ),
+            ordering_clinician_name=(
+                f"{order.ordering_staff.first_name} "
+                f"{order.ordering_staff.last_name}"
+            ),
+            order_type=order.order_type,
+            status=order.status,
+            priority=order.priority,
+            details=order.details,
+            ordered_at=order.ordered_at,
+            started_at=order.started_at,
+        )
+        for order in service.list_laboratory_queue(
+            context=context,
+        )
+    ]
+
+
+# ============================================================================
+# Receive
+# ============================================================================
+
+
+@router.post(
+    "/{order_id}/receive",
+    response_model=ClinicalOrderResponse,
+    summary="Receive Clinical Order",
+    dependencies=[
+        Depends(
+            require_permission(
+                Permissions.CLINICAL_ORDER_READ,
+            ),
+        ),
+    ],
+)
+def receive_clinical_order(
+    order_id: UUID,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: ClinicalOrderService = Depends(
+        get_clinical_order_service,
+    ),
+):
+    try:
+        order = service.receive_order(
+            context=context,
+            order_id=order_id,
+        )
+
+        return ClinicalOrderResponse.model_validate(
+            order,
+        )
+
+    except ClinicalOrderNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Clinical Order not found.",
+        ) from exc
+
+    except ClinicalOrderAlreadyReceivedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    except ClinicalOrderCannotReceiveError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+
+# ============================================================================
+# Start
+# ============================================================================
+
+
+@router.post(
+    "/{order_id}/start",
+    response_model=ClinicalOrderResponse,
+    summary="Start Clinical Order",
+    dependencies=[
+        Depends(
+            require_permission(
+                Permissions.CLINICAL_ORDER_READ,
+            ),
+        ),
+    ],
+)
+def start_clinical_order(
+    order_id: UUID,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: ClinicalOrderService = Depends(
+        get_clinical_order_service,
+    ),
+):
+    """
+    Move a Clinical Order from REQUESTED to IN_PROGRESS.
+    """
+
+    try:
+        order = service.start_order(
+            context=context,
+            order_id=order_id,
+        )
+
+        return ClinicalOrderResponse.model_validate(
+            order,
+        )
+
+    except ClinicalOrderNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Clinical Order not found.",
+        ) from exc
+
+    except ClinicalOrderAlreadyInProgressError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    except ClinicalOrderAlreadyCompletedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    except ClinicalOrderCannotStartError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
 
 # ============================================================================

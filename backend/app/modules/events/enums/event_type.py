@@ -44,6 +44,8 @@ class EventType(str, Enum):
 
     MEDICATION_PRESCRIBED = "MEDICATION_PRESCRIBED"
 
+    MEDICATION_DISPENSED = "MEDICATION_DISPENSED"
+
     MEDICATION_GIVEN = "MEDICATION_GIVEN"
 
     # ------------------------------------------------------------------

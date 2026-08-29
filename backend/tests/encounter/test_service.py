@@ -23,6 +23,8 @@ from app.modules.encounter.services.encounter_service import (
     EncounterService,
 )
 
+from app.modules.identity.repository import IdentityRepository
+
 from app.modules.episode.models import EpisodeStatus
 from app.modules.episode.repositories.episode_repository import (
     EpisodeRepository,
@@ -105,6 +107,7 @@ def test_create_encounter_creates_open_encounter(
         repository=StaffRepository(db),
         hospital_repository=HospitalRepository(db),
         employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
     )
 
     staff = staff_service.create_staff(
@@ -171,6 +174,361 @@ def test_create_encounter_creates_open_encounter(
     assert encounter.status.value == "OPEN"
     assert encounter.started_at is not None
     assert encounter.ended_at is None
+
+
+
+def test_list_doctor_queue_returns_only_active_doctor_encounters(
+    db,
+    hospital,
+):
+    from app.modules.identity.models import UserAccount
+
+    user = UserAccount(
+        hospital_id=hospital.id,
+        email=f"doctor-{uuid4()}@example.com",
+        password_hash="test",
+    )
+    db.add(user)
+    db.flush()
+
+    context = RequestContext(
+        user_id=user.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
+    staff_service = StaffService(
+        repository=StaffRepository(db),
+        hospital_repository=HospitalRepository(db),
+        employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
+    )
+
+    staff = staff_service.create_staff(
+        StaffCreate(
+            hospital_id=hospital.id,
+            staff_number=f"STF-QUEUE-{uuid4().hex[:8]}",
+            first_name="Doctor",
+            last_name="Queue",
+            gender=Gender.MALE,
+            date_of_birth=date(1988, 1, 1),
+            profession=Profession.DOCTOR,
+            employment_status=EmploymentStatus.ACTIVE,
+            employment_type=EmploymentType.FULL_TIME,
+            date_employed=date(2026, 1, 1),
+        )
+    )
+
+    staff_service.link_user_account(
+        staff.id,
+        user.id,
+    )
+
+    episode_repository = EpisodeRepository(db)
+
+    episode_service = EpisodeService(
+        repository=episode_repository,
+        patient_repository=PatientRepository(db),
+        number_generator=EpisodeNumberGenerator(
+            repository=episode_repository,
+        ),
+        encounter_repository=EncounterRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+        staff_repository=StaffRepository(db),
+    )
+
+    patient = PatientService(
+        repository=PatientRepository(db),
+    ).create_patient(
+        context=context,
+        request=CreatePatientRequest(
+            hospital_id=hospital.id,
+            hospital_number=f"PAT-{uuid4().hex[:8]}",
+            first_name="Queue",
+            last_name="Patient",
+            sex="Male",
+            date_of_birth=date(1990, 1, 1),
+        ),
+    )
+
+    episode = episode_service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Doctor Queue Episode",
+    )
+
+    encounter_service = EncounterService(
+        repository=EncounterRepository(db),
+        episode_repository=EpisodeRepository(db),
+        staff_repository=StaffRepository(db),
+    )
+
+    encounter = encounter_service.create_encounter(
+        context=context,
+        episode_id=episode.id,
+        staff_id=staff.id,
+        title="Doctor Consultation",
+    )
+
+    results = encounter_service.list_doctor_queue(
+        context=context,
+    )
+
+    assert [item.id for item in results] == [encounter.id]
+
+
+def test_list_doctor_queue_excludes_closed_encounters(
+    db,
+    hospital,
+):
+    from app.modules.identity.models import UserAccount
+
+    user = UserAccount(
+        hospital_id=hospital.id,
+        email=f"doctor-{uuid4()}@example.com",
+        password_hash="test",
+    )
+    db.add(user)
+    db.flush()
+
+    context = RequestContext(
+        user_id=user.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
+    staff_service = StaffService(
+        repository=StaffRepository(db),
+        hospital_repository=HospitalRepository(db),
+        employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
+    )
+
+    staff = staff_service.create_staff(
+        StaffCreate(
+            hospital_id=hospital.id,
+            staff_number=f"STF-QUEUE-{uuid4().hex[:8]}",
+            first_name="Doctor",
+            last_name="Closed",
+            gender=Gender.MALE,
+            date_of_birth=date(1988, 1, 1),
+            profession=Profession.DOCTOR,
+            employment_status=EmploymentStatus.ACTIVE,
+            employment_type=EmploymentType.FULL_TIME,
+            date_employed=date(2026, 1, 1),
+        )
+    )
+
+    staff_service.link_user_account(
+        staff.id,
+        user.id,
+    )
+
+    patient = PatientService(
+        repository=PatientRepository(db),
+    ).create_patient(
+        context=context,
+        request=CreatePatientRequest(
+            hospital_id=hospital.id,
+            hospital_number=f"PAT-{uuid4().hex[:8]}",
+            first_name="Closed",
+            last_name="Encounter",
+            sex="Female",
+            date_of_birth=date(1990, 1, 1),
+        ),
+    )
+
+    episode_repository = EpisodeRepository(db)
+
+    episode_service = EpisodeService(
+        repository=episode_repository,
+        patient_repository=PatientRepository(db),
+        number_generator=EpisodeNumberGenerator(
+            repository=episode_repository,
+        ),
+        encounter_repository=EncounterRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+        staff_repository=StaffRepository(db),
+    )
+
+    episode = episode_service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Closed Encounter Episode",
+    )
+
+    encounter_service = EncounterService(
+        repository=EncounterRepository(db),
+        episode_repository=EpisodeRepository(db),
+        staff_repository=StaffRepository(db),
+    )
+
+    encounter = encounter_service.create_encounter(
+        context=context,
+        episode_id=episode.id,
+        staff_id=staff.id,
+        title="Closed Doctor Encounter",
+    )
+
+    encounter_service.close_encounter(
+        context=context,
+        encounter_id=encounter.id,
+    )
+
+    results = encounter_service.list_doctor_queue(
+        context=context,
+    )
+
+    assert results == []
+
+
+def test_list_doctor_queue_excludes_other_doctors(
+    db,
+    hospital,
+):
+    from app.modules.identity.models import UserAccount
+
+    user_one = UserAccount(
+        hospital_id=hospital.id,
+        email=f"doctor-one-{uuid4()}@example.com",
+        password_hash="test",
+    )
+
+    user_two = UserAccount(
+        hospital_id=hospital.id,
+        email=f"doctor-two-{uuid4()}@example.com",
+        password_hash="test",
+    )
+
+    db.add_all([user_one, user_two])
+    db.flush()
+
+    context_one = RequestContext(
+        user_id=user_one.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
+    context_two = RequestContext(
+        user_id=user_two.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
+    staff_service = StaffService(
+        repository=StaffRepository(db),
+        hospital_repository=HospitalRepository(db),
+        employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
+    )
+
+    staff_one = staff_service.create_staff(
+        StaffCreate(
+            hospital_id=hospital.id,
+            staff_number=f"STF-Q1-{uuid4().hex[:8]}",
+            first_name="Doctor",
+            last_name="One",
+            gender=Gender.MALE,
+            date_of_birth=date(1988, 1, 1),
+            profession=Profession.DOCTOR,
+            employment_status=EmploymentStatus.ACTIVE,
+            employment_type=EmploymentType.FULL_TIME,
+            date_employed=date(2026, 1, 1),
+        )
+    )
+
+    staff_service.link_user_account(
+        staff_one.id,
+        user_one.id,
+    )
+
+    staff_two = staff_service.create_staff(
+        StaffCreate(
+            hospital_id=hospital.id,
+            staff_number=f"STF-Q2-{uuid4().hex[:8]}",
+            first_name="Doctor",
+            last_name="Two",
+            gender=Gender.FEMALE,
+            date_of_birth=date(1989, 1, 1),
+            profession=Profession.DOCTOR,
+            employment_status=EmploymentStatus.ACTIVE,
+            employment_type=EmploymentType.FULL_TIME,
+            date_employed=date(2026, 1, 1),
+        )
+    )
+
+    staff_service.link_user_account(
+        staff_two.id,
+        user_two.id,
+    )
+
+    patient_service = PatientService(
+        repository=PatientRepository(db),
+    )
+
+    patient = patient_service.create_patient(
+        context=context_one,
+        request=CreatePatientRequest(
+            hospital_id=hospital.id,
+            hospital_number=f"PAT-{uuid4().hex[:8]}",
+            first_name="Shared",
+            last_name="Queue",
+            sex="Male",
+            date_of_birth=date(1990, 1, 1),
+        ),
+    )
+
+    episode_repository = EpisodeRepository(db)
+
+    episode_service = EpisodeService(
+        repository=episode_repository,
+        patient_repository=PatientRepository(db),
+        number_generator=EpisodeNumberGenerator(
+            repository=episode_repository,
+        ),
+        encounter_repository=EncounterRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+        staff_repository=StaffRepository(db),
+    )
+
+    episode = episode_service.create_episode(
+        context=context_one,
+        patient_id=patient.id,
+        title="Shared Queue Episode",
+    )
+
+    encounter_service = EncounterService(
+        repository=EncounterRepository(db),
+        episode_repository=EpisodeRepository(db),
+        staff_repository=StaffRepository(db),
+    )
+
+    encounter_service.create_encounter(
+        context=context_one,
+        episode_id=episode.id,
+        staff_id=staff_one.id,
+        title="Doctor One Encounter",
+    )
+
+    encounter_service.create_encounter(
+        context=context_two,
+        episode_id=episode.id,
+        staff_id=staff_two.id,
+        title="Doctor Two Encounter",
+    )
+
+    results = encounter_service.list_doctor_queue(
+        context=context_one,
+    )
+
+    assert len(results) == 1
+    assert results[0].staff_id == staff_one.id
 
 
 def test_create_encounter_rejects_closed_episode(

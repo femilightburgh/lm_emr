@@ -90,6 +90,15 @@ from app.modules.encounter.models import Encounter, EncounterStatus
 from app.modules.events.models import ClinicalEvent
 from app.modules.clinical_documents.models import ClinicalDocument
 from app.modules.clinical_orders.models import ClinicalOrder
+from app.modules.pharmacy.models import Dispensing
+from app.modules.laboratory.models import (
+    LaboratoryTest,
+    LaboratoryTestAnalyte,
+)
+from app.modules.clinical_results.models import (
+    ClinicalResult,
+    ClinicalResultValue,
+)
 from app.modules.diagnoses.models import ClinicalDiagnosis
 from app.modules.terminology.models import (
     TerminologyConcept,
@@ -132,6 +141,15 @@ __all__ = [
 
     # Clinical Orders
     "ClinicalOrder",
+    "Dispensing",
+
+    # Laboratory
+    "LaboratoryTest",
+    "LaboratoryTestAnalyte",
+
+    # Clinical Results
+    "ClinicalResult",
+    "ClinicalResultValue",
 
     # Clinical Diagnoses
     "ClinicalDiagnosis",

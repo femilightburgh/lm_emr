@@ -130,6 +130,11 @@ class ClinicalOrder(BaseEntity):
 
     encounter: Mapped["Encounter"] = relationship()
 
+    prescription: Mapped["Prescription | None"] = relationship(
+        back_populates="clinical_order",
+        uselist=False,
+    )
+
     ordering_staff: Mapped["Staff"] = relationship(
         foreign_keys=[ordered_by],
     )

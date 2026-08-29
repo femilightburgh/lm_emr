@@ -83,6 +83,9 @@ class Permissions:
     CLINICAL_ORDER_READ = "clinical_order.read"
     CLINICAL_ORDER_CANCEL = "clinical_order.cancel"
 
+    LABORATORY_CATALOGUE_READ = "laboratory_catalogue.read"
+    LABORATORY_CATALOGUE_UPDATE = "laboratory_catalogue.update"
+
     DIAGNOSIS_CREATE = "diagnosis.create"
     DIAGNOSIS_READ = "diagnosis.read"
 

@@ -555,10 +555,24 @@ class ClinicalDocumentService:
         if signed_at is None:
             signed_at = datetime.now(timezone.utc)
 
+        encounter = self._get_encounter(
+            context=context,
+            encounter_id=document.encounter_id,
+        )
+
         try:
             document.status = ClinicalDocumentStatus.SIGNED
             document.signed_at = signed_at
             document.signed_by = signer.id
+
+            if (
+                document.document_type
+                == ClinicalDocumentType.PROGRESS_NOTE
+                and encounter.title == "Ward Review"
+                and encounter.status == EncounterStatus.OPEN
+            ):
+                encounter.status = EncounterStatus.CLOSED
+                encounter.ended_at = signed_at
 
             self.repository.db.flush()
 

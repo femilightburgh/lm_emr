@@ -19,7 +19,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.modules.encounter.models import Encounter
+from app.modules.encounter.models import Encounter, EncounterStatus
 from app.modules.episode.models import Episode
 
 
@@ -105,6 +105,46 @@ class EncounterRepository:
             .where(
                 Encounter.episode_id == episode_id,
                 Episode.hospital_id == hospital_id,
+            )
+            .order_by(
+                Encounter.started_at.asc(),
+            )
+        )
+
+        return list(
+            self.db.scalars(statement),
+        )
+
+    # ------------------------------------------------------------------
+    # Doctor Queue
+    # ------------------------------------------------------------------
+
+    def list_doctor_queue(
+        self,
+        *,
+        hospital_id: UUID,
+        staff_id: UUID,
+    ) -> list[Encounter]:
+        # Return open Encounters assigned to the authenticated doctor.
+
+        from app.modules.episode.models import EpisodeStatus
+
+        statement = (
+            select(Encounter)
+            .join(
+                Episode,
+                Encounter.episode_id == Episode.id,
+            )
+            .where(
+                Episode.hospital_id == hospital_id,
+                Encounter.staff_id == staff_id,
+                Encounter.status == EncounterStatus.OPEN,
+                Episode.status.in_(
+                    (
+                        EpisodeStatus.OPEN,
+                        EpisodeStatus.ADMITTED,
+                    ),
+                ),
             )
             .order_by(
                 Encounter.started_at.asc(),

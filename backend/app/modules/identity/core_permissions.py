@@ -187,6 +187,18 @@ PERMISSIONS: list[PermissionDefinition] = [
         description="Allows cancelling clinical orders that have not been completed.",
     ),
 
+    PermissionDefinition(
+        code=Permissions.LABORATORY_CATALOGUE_READ,
+        name="Read Laboratory Catalogue",
+        description="Allows viewing laboratory tests and analyte definitions.",
+    ),
+
+    PermissionDefinition(
+        code=Permissions.LABORATORY_CATALOGUE_UPDATE,
+        name="Update Laboratory Catalogue",
+        description="Allows maintaining laboratory analyte metadata and reference intervals.",
+    ),
+
     # ==============================================================
     # Clinical Diagnoses
     # ==============================================================

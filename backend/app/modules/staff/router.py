@@ -28,8 +28,12 @@ StaffService and StaffRepository respectively.
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.core.context import (
+    RequestContext,
+    get_request_context,
+)
 from app.core.security.authorization import require_permission
 from app.modules.identity.permissions import Permissions
 from app.modules.staff.dependencies import get_staff_service
@@ -50,6 +54,44 @@ router = APIRouter(
     prefix="/staff",
     tags=["Staff"],
 )
+
+
+# ============================================================================
+# Current Staff
+# ============================================================================
+
+
+@router.get(
+    "/me",
+    response_model=StaffResponse,
+    summary="Get the current user's staff profile",
+)
+def get_current_staff(
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: StaffService = Depends(
+        get_staff_service,
+    ),
+) -> StaffResponse:
+    """
+    Return the Staff profile linked to the authenticated UserAccount.
+    """
+
+    member = service.repository.get_by_user_account_id(
+        hospital_id=context.hospital_id,
+        user_account_id=context.user_id,
+    )
+
+    if member is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Authenticated user does not have a Staff profile.",
+        )
+
+    return StaffResponse.model_validate(
+        member,
+    )
 
 
 # ============================================================================

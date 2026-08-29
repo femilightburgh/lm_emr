@@ -59,6 +59,8 @@ DEFAULT_ROLES = [
             Permissions.CLINICAL_ORDER_READ,
             Permissions.CLINICAL_ORDER_CANCEL,
             Permissions.CLINICAL_RESULT_READ,
+            Permissions.LABORATORY_CATALOGUE_READ,
+            Permissions.LABORATORY_CATALOGUE_UPDATE,
             Permissions.DIAGNOSIS_CREATE,
             Permissions.DIAGNOSIS_READ,
             Permissions.TERMINOLOGY_READ,

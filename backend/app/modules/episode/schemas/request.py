@@ -35,3 +35,25 @@ class CreateEpisodeRequest(BaseModel):
         max_length=255,
         description="Human-readable title of the Episode.",
     )
+
+from enum import Enum
+
+
+class ConsultationDisposition(str, Enum):
+    ORDER_INVESTIGATIONS = "ORDER_INVESTIGATIONS"
+
+
+class CompleteConsultationRequest(BaseModel):
+    """
+    Complete an outpatient Doctor Consultation.
+    """
+
+    encounter_id: UUID = Field(
+        ...,
+        description="OPEN Doctor Consultation encounter being completed.",
+    )
+
+    disposition: ConsultationDisposition = Field(
+        ...,
+        description="Clinical disposition selected by the doctor.",
+    )

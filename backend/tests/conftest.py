@@ -157,6 +157,70 @@ def cleanup_hospital(db: Session, hospital_id) -> None:
     )
 
     # ------------------------------------------------------------------
+    # Clinical Results
+    # ------------------------------------------------------------------
+
+    db.execute(
+        text(
+            '''
+            DELETE FROM clinical_result_values
+            WHERE clinical_result_id IN (
+                SELECT cr.id
+                FROM clinical_results cr
+                JOIN clinical_orders co
+                    ON cr.order_id = co.id
+                JOIN encounters e
+                    ON co.encounter_id = e.id
+                JOIN episodes ep
+                    ON e.episode_id = ep.id
+                WHERE ep.hospital_id = :hospital_id
+            )
+            '''
+        ),
+        {"hospital_id": hospital_id},
+    )
+
+    db.execute(
+        text(
+            '''
+            DELETE FROM clinical_results
+            WHERE order_id IN (
+                SELECT co.id
+                FROM clinical_orders co
+                JOIN encounters e
+                    ON co.encounter_id = e.id
+                JOIN episodes ep
+                    ON e.episode_id = ep.id
+                WHERE ep.hospital_id = :hospital_id
+            )
+            '''
+        ),
+        {"hospital_id": hospital_id},
+    )
+
+    # ------------------------------------------------------------------
+    # Prescriptions
+    # ------------------------------------------------------------------
+
+    db.execute(
+        text(
+            '''
+            DELETE FROM prescriptions
+            WHERE clinical_order_id IN (
+                SELECT co.id
+                FROM clinical_orders co
+                JOIN encounters e
+                    ON co.encounter_id = e.id
+                JOIN episodes ep
+                    ON e.episode_id = ep.id
+                WHERE ep.hospital_id = :hospital_id
+            )
+            '''
+        ),
+        {"hospital_id": hospital_id},
+    )
+
+    # ------------------------------------------------------------------
     # Clinical Orders
     # ------------------------------------------------------------------
 

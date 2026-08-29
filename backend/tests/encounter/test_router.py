@@ -14,6 +14,10 @@ from app.db.session import get_db
 from app.main import app
 
 from app.modules.encounter.models import EncounterStatus
+from app.modules.identity.auth_service import AuthService
+from app.modules.identity.repository import IdentityRepository
+from app.modules.identity.token_service import TokenService
+from app.modules.identity.user_service import UserService
 
 from app.modules.episode.repositories.episode_repository import (
     EpisodeRepository,
@@ -56,7 +60,15 @@ from app.modules.staff.enums import (
 from app.modules.staff.repository import StaffRepository
 from app.modules.staff.schemas import StaffCreate
 from app.modules.staff.service import StaffService
+
+from tests.clinical_orders.test_router import (
+    authenticate,
+    auth_headers,
+    create_hospital,
+    create_user,
+)
 from app.modules.encounter.repositories.encounter_repository import EncounterRepository
+from app.modules.encounter.services.encounter_service import EncounterService
 
 
 # ============================================================================
@@ -87,6 +99,179 @@ def client(
     yield TestClient(app)
 
     app.dependency_overrides.clear()
+
+
+
+def create_test_user(
+    db,
+    *,
+    hospital,
+    email: str,
+    role_name: str = "Doctor",
+):
+    user_service = UserService(
+        repository=IdentityRepository(db),
+    )
+
+    user = user_service.create_user(
+        hospital_code=hospital.code,
+        email=email,
+        password="password123",
+        role_name=role_name,
+    )
+
+    repository = IdentityRepository(db)
+    repository.save()
+    repository.refresh(user)
+
+    return user
+
+
+def authenticate_test_user(
+    db,
+    *,
+    hospital,
+    email: str,
+) -> str:
+    auth_service = AuthService(
+        repository=IdentityRepository(db),
+        token_service=TokenService(),
+    )
+
+    response = auth_service.login(
+        hospital_code=hospital.code,
+        email=email,
+        password="password123",
+    )
+
+    return response.access_token
+
+
+
+def test_list_doctor_queue_endpoint(
+    client,
+    db,
+):
+    hospital = create_hospital(db)
+
+    user = create_user(
+        db,
+        hospital=hospital,
+        email=f"doctor-{uuid4()}@example.com",
+        role_name="Doctor",
+    )
+
+    # Resolve the UserAccount to a Staff profile.
+    staff_service = StaffService(
+        repository=StaffRepository(db),
+        hospital_repository=HospitalRepository(db),
+        employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
+    )
+
+    staff = staff_service.create_staff(
+        StaffCreate(
+            hospital_id=hospital.id,
+            staff_number=f"API-QUEUE-{uuid4().hex[:8]}",
+            first_name="Doctor",
+            last_name="Queue",
+            gender=Gender.MALE,
+            date_of_birth=date(1988, 1, 1),
+            profession=Profession.DOCTOR,
+            employment_status=EmploymentStatus.ACTIVE,
+            employment_type=EmploymentType.FULL_TIME,
+            date_employed=date(2026, 1, 1),
+        )
+    )
+
+    staff_service.link_user_account(
+        staff.id,
+        user.id,
+    )
+
+    # Build an Episode + Encounter owned by this doctor.
+    context = RequestContext(
+        user_id=user.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
+    patient = PatientService(
+        repository=PatientRepository(db),
+    ).create_patient(
+        context=context,
+        request=CreatePatientRequest(
+            hospital_id=hospital.id,
+            hospital_number=f"PAT-{uuid4().hex[:8]}",
+            first_name="Queue",
+            last_name="Patient",
+            sex="Male",
+            date_of_birth=date(1990, 1, 1),
+        ),
+    )
+
+    episode_repository = EpisodeRepository(db)
+
+    episode_service = EpisodeService(
+        repository=episode_repository,
+        patient_repository=PatientRepository(db),
+        number_generator=EpisodeNumberGenerator(
+            repository=episode_repository,
+        ),
+        encounter_repository=EncounterRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+        staff_repository=StaffRepository(db),
+    )
+
+    episode = episode_service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Doctor Queue Episode",
+    )
+
+    encounter_service = EncounterService(
+        repository=EncounterRepository(db),
+        episode_repository=EpisodeRepository(db),
+        staff_repository=StaffRepository(db),
+    )
+
+    encounter = encounter_service.create_encounter(
+        context=context,
+        episode_id=episode.id,
+        staff_id=staff.id,
+        title="Doctor Consultation",
+    )
+
+    token = authenticate(
+        db,
+        hospital=hospital,
+        email=user.email,
+    )
+
+    app.dependency_overrides[get_request_context] = (
+        lambda: RequestContext(
+            user_id=user.id,
+            hospital_id=hospital.id,
+            permissions=frozenset(),
+        )
+    )
+
+    response = client.get(
+        "/api/v1/encounters/queue/doctor",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert [item["id"] for item in body] == [
+        str(encounter.id),
+    ]
+    assert body[0]["staff_id"] == str(staff.id)
+    assert body[0]["status"] == "OPEN"
 
 
 # ============================================================================

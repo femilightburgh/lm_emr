@@ -26,6 +26,10 @@ from app.core.context import (
 )
 from app.db.session import get_db
 
+from app.modules.encounter.exceptions import (
+    EncounterNotFoundError,
+)
+
 from app.modules.encounter.repositories.encounter_repository import (
     EncounterRepository,
 )
@@ -41,6 +45,7 @@ from app.modules.episode.exceptions import (
     EpisodeAlreadyInNursingError,
     EpisodeAlreadyRoutedError,
     EpisodeNotAwaitingCheckInError,
+    InvalidConsultationDispositionError,
     EpisodeNotFoundError,
     EpisodeNotInNursingError,
     EpisodeNotOpenError,
@@ -55,7 +60,9 @@ from app.modules.episode.repositories.episode_repository import (
 )
 
 from app.modules.episode.schemas import (
+    CompleteConsultationRequest,
     CreateEpisodeRequest,
+    DoctorQueueItemResponse,
     EpisodeResponse,
 )
 
@@ -340,6 +347,100 @@ def list_nursing_queue(
 
 
 # ============================================================================
+# Doctor Clinic Queue
+# ============================================================================
+
+
+@router.get(
+    "/queue/doctor/clinic",
+    response_model=list[DoctorQueueItemResponse],
+    summary="List the doctor's clinic queue",
+)
+def list_doctor_clinic_queue(
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: EpisodeService = Depends(
+        get_episode_service,
+    ),
+):
+    """
+    Return open Episodes routed to the Doctor workflow.
+    """
+
+    episodes = service.list_doctor_clinic_queue(
+        context=context,
+    )
+
+    return [
+        DoctorQueueItemResponse(
+            id=episode.id,
+            patient_id=episode.patient_id,
+            patient_name=(
+                f"{episode.patient.first_name} "
+                f"{episode.patient.last_name}"
+            ),
+            hospital_number=episode.patient.hospital_number,
+            episode_number=episode.episode_number,
+            title=episode.title,
+            status=episode.status,
+            flow_status=episode.flow_status,
+            managing_doctor_id=episode.managing_doctor_id,
+            checked_in_at=episode.checked_in_at,
+            routed_at=episode.routed_at,
+        )
+        for episode in episodes
+    ]
+
+
+# ============================================================================
+# Doctor Ward Queue
+# ============================================================================
+
+
+@router.get(
+    "/queue/doctor/ward",
+    response_model=list[DoctorQueueItemResponse],
+    summary="List the doctor's ward queue",
+)
+def list_doctor_ward_queue(
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: EpisodeService = Depends(
+        get_episode_service,
+    ),
+):
+    """
+    Return admitted Episodes managed by the authenticated Doctor.
+    """
+
+    episodes = service.list_doctor_ward_queue(
+        context=context,
+    )
+
+    return [
+        DoctorQueueItemResponse(
+            id=episode.id,
+            patient_id=episode.patient_id,
+            patient_name=(
+                f"{episode.patient.first_name} "
+                f"{episode.patient.last_name}"
+            ),
+            hospital_number=episode.patient.hospital_number,
+            episode_number=episode.episode_number,
+            title=episode.title,
+            status=episode.status,
+            flow_status=episode.flow_status,
+            managing_doctor_id=episode.managing_doctor_id,
+            checked_in_at=episode.checked_in_at,
+            routed_at=episode.routed_at,
+        )
+        for episode in episodes
+    ]
+
+
+# ============================================================================
 # Start Nursing
 # ============================================================================
 
@@ -496,6 +597,92 @@ def route_episode(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Authenticated user does not have a Staff profile.",
+        ) from exc
+
+
+
+# ============================================================================
+# Complete Doctor Consultation
+# ============================================================================
+
+
+@router.post(
+    "/{episode_id}/complete-consultation",
+    response_model=EpisodeResponse,
+    summary="Complete an outpatient Doctor Consultation",
+)
+def complete_consultation(
+    episode_id: UUID,
+    payload: CompleteConsultationRequest,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: EpisodeService = Depends(
+        get_episode_service,
+    ),
+):
+    """
+    Complete an outpatient Doctor Consultation.
+    """
+
+    try:
+        episode = service.complete_consultation(
+            context=context,
+            episode_id=episode_id,
+            encounter_id=payload.encounter_id,
+            disposition=payload.disposition,
+        )
+
+        return EpisodeResponse.model_validate(
+            episode,
+        )
+
+    except EpisodeNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Episode not found.",
+        ) from exc
+
+    except EpisodeAlreadyClosedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Closed episodes cannot be completed.",
+        ) from exc
+
+    except EpisodeAlreadyCancelledError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cancelled episodes cannot be completed.",
+        ) from exc
+
+    except EpisodeNotOpenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Episode is not open.",
+        ) from exc
+
+    except EncounterNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Encounter not found.",
+        ) from exc
+
+    except EncounterNotBelongingToEpisodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Encounter does not belong to the Episode.",
+        ) from exc
+
+    except EncounterNotOpenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Encounter is not open.",
+        ) from exc
+
+    except InvalidConsultationDispositionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
         ) from exc
 
 

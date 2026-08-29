@@ -176,6 +176,57 @@ def create_encounter(
         ) from exc
 
 
+
+# ============================================================================
+# Doctor Queue
+# ============================================================================
+
+
+@router.get(
+    "/queue/doctor",
+    response_model=list[EncounterResponse],
+    summary="List the doctor's queue",
+)
+def list_doctor_queue(
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: EncounterService = Depends(
+        get_encounter_service,
+    ),
+):
+    """
+    Return active open Encounters assigned to the authenticated doctor.
+    """
+
+    try:
+        encounters = service.list_doctor_queue(
+            context=context,
+        )
+
+        return [
+            EncounterResponse.model_validate(
+                encounter,
+            )
+            for encounter in encounters
+        ]
+
+    except StaffNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Authenticated user does not have a Staff profile.",
+        ) from exc
+
+    except StaffHospitalMismatchError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Staff member does not belong to the "
+                "authenticated Hospital."
+            ),
+        ) from exc
+
+
 # ============================================================================
 # Encounter Timeline
 # ============================================================================

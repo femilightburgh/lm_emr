@@ -721,6 +721,100 @@ def test_sign_document(
     assert result.signed_at == signed_at
 
 
+
+def test_sign_progress_note_closes_ward_review(
+    db,
+    hospital,
+):
+    """
+    Signing a Progress Note on a Ward Review completes and closes
+    that Ward Review encounter atomically.
+    """
+
+    context, staff, encounter, _, service = create_document(
+        db,
+        hospital,
+        hospital_number="PAT-CD-SVC-010A",
+        staff_number="STF-CD-SVC-010A",
+    )
+
+    encounter.title = "Ward Review"
+    db.flush()
+
+    document = service.create_draft(
+        context=context,
+        encounter_id=encounter.id,
+        document_type=ClinicalDocumentType.PROGRESS_NOTE,
+        authored_by=staff.id,
+        content={
+            "subjective": "Patient reports improved symptoms.",
+            "objective": "Patient clinically stable.",
+            "working_diagnosis": "Improving condition",
+            "differentials": [],
+            "plan": "Continue current management.",
+        },
+    )
+
+    signed_at = datetime(
+        2026,
+        8,
+        26,
+        14,
+        0,
+        tzinfo=timezone.utc,
+    )
+
+    signed = service.sign_document(
+        context=context,
+        document_id=document.id,
+        signed_at=signed_at,
+    )
+
+    db.refresh(encounter)
+
+    assert signed.status == ClinicalDocumentStatus.SIGNED
+    assert encounter.status == EncounterStatus.CLOSED
+    assert encounter.ended_at == signed_at
+
+
+def test_sign_initial_clerking_does_not_close_doctor_consultation(
+    db,
+    hospital,
+):
+    """
+    Signing Initial Clerking alone does not close the Doctor Consultation
+    encounter. Admission/disposition owns that lifecycle transition.
+    """
+
+    context, _, encounter, document, service = create_document(
+        db,
+        hospital,
+        hospital_number="PAT-CD-SVC-010B",
+        staff_number="STF-CD-SVC-010B",
+    )
+
+    signed_at = datetime(
+        2026,
+        8,
+        26,
+        14,
+        5,
+        tzinfo=timezone.utc,
+    )
+
+    service.sign_document(
+        context=context,
+        document_id=document.id,
+        signed_at=signed_at,
+    )
+
+    db.refresh(encounter)
+
+    assert document.status == ClinicalDocumentStatus.SIGNED
+    assert encounter.status == EncounterStatus.OPEN
+    assert encounter.ended_at is None
+
+
 def test_sign_document_creates_clinical_event(
     db,
     hospital,

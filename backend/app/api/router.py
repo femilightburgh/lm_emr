@@ -137,6 +137,15 @@ from app.modules.terminology.api.router import (
 from app.modules.clinical_orders.api.router import (
     router as clinical_orders_router,
 )
+from app.modules.clinical_results.api.router import (
+    router as clinical_results_router,
+)
+from app.modules.laboratory.api.router import (
+    router as laboratory_router,
+)
+from app.modules.pharmacy.api.router import (
+    router as pharmacy_router,
+)
 
 # ============================================================================
 # Future Modules
@@ -156,10 +165,6 @@ from app.modules.clinical_orders.api.router import (
 
 # from app.modules.radiology.api.router import (
 #     router as radiology_router,
-# )
-
-# from app.modules.pharmacy.api.router import (
-#     router as pharmacy_router,
 # )
 
 # from app.modules.billing.api.router import (
@@ -264,6 +269,18 @@ api_router.include_router(
 
 api_router.include_router(
     clinical_orders_router,
+)
+
+api_router.include_router(
+    clinical_results_router,
+)
+
+api_router.include_router(
+    laboratory_router,
+)
+
+api_router.include_router(
+    pharmacy_router,
 )
 
 # ============================================================================

@@ -68,6 +68,7 @@ from app.modules.episode.exceptions import (
     EpisodeAlreadyInNursingError,
     EpisodeAlreadyRoutedError,
     EpisodeNotAwaitingCheckInError,
+    InvalidConsultationDispositionError,
     EpisodeNotFoundError,
     EpisodeNotInNursingError,
     EpisodeNotOpenError,
@@ -460,6 +461,47 @@ class EpisodeService:
         )
 
     # =========================================================================
+    # Doctor Clinic Queue
+    # =========================================================================
+
+    def list_doctor_clinic_queue(
+        self,
+        *,
+        context: RequestContext,
+    ) -> list[Episode]:
+        """
+        Return open Episodes routed to the Doctor workflow.
+        """
+
+        return self.repository.list_doctor_clinic_queue(
+            hospital_id=context.hospital_id,
+        )
+
+
+    # =========================================================================
+    # Doctor Ward Queue
+    # =========================================================================
+
+    def list_doctor_ward_queue(
+        self,
+        *,
+        context: RequestContext,
+    ) -> list[Episode]:
+        """
+        Return admitted Episodes managed by the authenticated Doctor.
+        """
+
+        staff = self._get_authenticated_staff(
+            context=context,
+        )
+
+        return self.repository.list_doctor_ward_queue(
+            hospital_id=context.hospital_id,
+            managing_doctor_id=staff.id,
+        )
+
+
+    # =========================================================================
     # Start Nursing
     # =========================================================================
 
@@ -620,6 +662,43 @@ class EpisodeService:
         )
 
         # ------------------------------------------------------------------
+        # Complete Nursing Encounter
+        # ------------------------------------------------------------------
+
+        encounters = (
+            self.encounter_repository.list_by_episode(
+                hospital_id=context.hospital_id,
+                episode_id=episode.id,
+            )
+        )
+
+        nursing_encounter = next(
+            (
+                encounter
+                for encounter in encounters
+                if (
+                    encounter.title == "Nursing Intake"
+                    and encounter.status == EncounterStatus.OPEN
+                )
+            ),
+            None,
+        )
+
+        if nursing_encounter is None:
+            raise EncounterNotFoundError(
+                "Open Nursing Intake encounter not found.",
+            )
+
+        completed_at = datetime.now(UTC)
+
+        nursing_encounter.status = (
+            EncounterStatus.CLOSED
+        )
+        nursing_encounter.ended_at = (
+            completed_at
+        )
+
+        # ------------------------------------------------------------------
         # Route
         # ------------------------------------------------------------------
 
@@ -640,6 +719,107 @@ class EpisodeService:
         except Exception:
             self.repository.rollback()
             raise
+
+    # =========================================================================
+    # Complete Doctor Consultation
+    # =========================================================================
+
+    def complete_consultation(
+        self,
+        *,
+        context: RequestContext,
+        episode_id: UUID,
+        encounter_id: UUID,
+        disposition: str,
+    ) -> Episode:
+        """
+        Complete an outpatient Doctor Consultation.
+
+        Supported disposition:
+
+            ORDER_INVESTIGATIONS
+
+        Completing the consultation closes the Doctor Consultation
+        encounter while keeping the Episode OPEN.
+        """
+
+        episode = self._get_episode(
+            context=context,
+            episode_id=episode_id,
+        )
+
+        if episode.status != EpisodeStatus.OPEN:
+            raise EpisodeNotOpenError()
+
+        if disposition != "ORDER_INVESTIGATIONS":
+            raise InvalidConsultationDispositionError(
+                "Unsupported consultation disposition.",
+            )
+
+        encounter = self.encounter_repository.get_by_id(
+            hospital_id=context.hospital_id,
+            encounter_id=encounter_id,
+        )
+
+        if encounter is None:
+            raise EncounterNotFoundError()
+
+        if encounter.episode_id != episode.id:
+            raise EncounterNotBelongingToEpisodeError()
+
+        if encounter.title != "Doctor Consultation":
+            raise InvalidConsultationDispositionError(
+                "Only a Doctor Consultation can be completed "
+                "through this workflow.",
+            )
+
+        if encounter.status != EncounterStatus.OPEN:
+            raise EncounterNotOpenError()
+
+        documents = (
+            self.clinical_document_repository.list_by_encounter(
+                hospital_id=context.hospital_id,
+                encounter_id=encounter.id,
+            )
+        )
+
+        has_signed_initial_clerking = any(
+            document.document_type
+            == ClinicalDocumentType.INITIAL_CLERKING
+            and document.status
+            == ClinicalDocumentStatus.SIGNED
+            for document in documents
+        )
+
+        if not has_signed_initial_clerking:
+            raise InvalidConsultationDispositionError(
+                "A signed Initial Clerking is required "
+                "before completing the Doctor Consultation.",
+            )
+
+        completed_at = datetime.now(UTC)
+
+        try:
+            encounter.status = EncounterStatus.CLOSED
+            encounter.ended_at = completed_at
+
+            episode.flow_status = (
+                EpisodeFlowStatus.AWAITING_INVESTIGATIONS
+            )
+
+            self.repository.db.flush()
+            self.repository.db.commit()
+
+        except Exception:
+            self.repository.db.rollback()
+            raise
+
+        self.repository.refresh(
+            episode,
+        )
+
+        return episode
+
 
     # =========================================================================
     # Admit Episode
@@ -735,6 +915,9 @@ class EpisodeService:
         try:
             episode.status = EpisodeStatus.ADMITTED
             episode.managing_doctor_id = staff.id
+
+            encounter.status = EncounterStatus.CLOSED
+            encounter.ended_at = admitted_at
 
             self.repository.db.flush()
 

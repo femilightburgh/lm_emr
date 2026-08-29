@@ -20,6 +20,7 @@ from app.modules.clinical_orders.exceptions import (
 )
 from app.modules.clinical_orders.repositories import (
     ClinicalOrderRepository,
+    PrescriptionRepository,
 )
 from app.modules.clinical_orders.services import (
     ClinicalOrderService,
@@ -177,6 +178,7 @@ def create_order_service(db):
         encounter_repository=EncounterRepository(db),
         episode_repository=EpisodeRepository(db),
         staff_repository=StaffRepository(db),
+        prescription_repository=PrescriptionRepository(db),
     )
 
 
@@ -229,20 +231,50 @@ def test_create_medication_order_creates_prescription_event(
 
     service = create_order_service(db)
 
+    medicine_id = str(uuid4())
+
     order = service.create_order(
         context=context,
         encounter_id=encounter.id,
         order_type=ClinicalOrderType.MEDICATION,
         priority="URGENT",
         details={
-            "medication_id": str(uuid4()),
-            "dose": "500 mg",
+            "medication_id": medicine_id,
+            "medicine_name": "Amoxicillin",
+            "strength": "500 mg",
+            "dose": "500",
+            "dose_unit": "mg",
             "route": "ORAL",
             "frequency": "TDS",
+            "duration": "5",
+            "duration_unit": "days",
+            "quantity": "15 capsules",
+            "directions": "Take after food.",
+            "indication": "Bacterial infection.",
         },
     )
 
     assert order.order_type == ClinicalOrderType.MEDICATION
+
+    prescription = PrescriptionRepository(
+        db,
+    ).get_by_order_id(
+        order_id=order.id,
+    )
+
+    assert prescription is not None
+    assert prescription.clinical_order_id == order.id
+    assert prescription.medicine_name == "Amoxicillin"
+    assert prescription.strength == "500 mg"
+    assert prescription.dose == "500"
+    assert prescription.dose_unit == "mg"
+    assert prescription.route == "ORAL"
+    assert prescription.frequency == "TDS"
+    assert prescription.duration == "5"
+    assert prescription.duration_unit == "days"
+    assert prescription.quantity == "15 capsules"
+    assert prescription.directions == "Take after food."
+    assert prescription.indication == "Bacterial infection."
 
     event = db.query(ClinicalEvent).filter(
         ClinicalEvent.encounter_id == encounter.id,

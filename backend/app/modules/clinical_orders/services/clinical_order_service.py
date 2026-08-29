@@ -37,9 +37,13 @@ from app.modules.clinical_orders.exceptions import (
     ClinicalOrderStaffHospitalMismatchError,
     ClinicalOrderStaffNotFoundError,
 )
-from app.modules.clinical_orders.models import ClinicalOrder
+from app.modules.clinical_orders.models import (
+    ClinicalOrder,
+    Prescription,
+)
 from app.modules.clinical_orders.repositories import (
     ClinicalOrderRepository,
+    PrescriptionRepository,
 )
 from app.modules.encounter.exceptions import (
     EncounterAlreadyClosedError,
@@ -77,12 +81,14 @@ class ClinicalOrderService:
         encounter_repository: EncounterRepository,
         episode_repository: EpisodeRepository,
         staff_repository: StaffRepository,
+        prescription_repository: PrescriptionRepository,
     ) -> None:
         self.repository = repository
         self.event_service = event_service
         self.encounter_repository = encounter_repository
         self.episode_repository = episode_repository
         self.staff_repository = staff_repository
+        self.prescription_repository = prescription_repository
 
     # ------------------------------------------------------------------
     # Internal Helpers
@@ -224,6 +230,75 @@ class ClinicalOrderService:
 
             self.repository.db.flush()
 
+            if order_type == ClinicalOrderType.MEDICATION:
+                self.prescription_repository.create(
+                    prescription=Prescription(
+                        clinical_order_id=order.id,
+                        medicine_name=str(
+                            details.get(
+                                "medicine_name",
+                                details.get(
+                                    "medication_id",
+                                    "",
+                                ),
+                            )
+                        ).strip(),
+                        strength=(
+                            str(details["strength"]).strip()
+                            if details.get("strength") is not None
+                            else None
+                        ),
+                        dose=str(
+                            details.get(
+                                "dose",
+                                "",
+                            )
+                        ).strip(),
+                        dose_unit=(
+                            str(details["dose_unit"]).strip()
+                            if details.get("dose_unit") is not None
+                            else None
+                        ),
+                        route=str(
+                            details.get(
+                                "route",
+                                "",
+                            )
+                        ).strip(),
+                        frequency=str(
+                            details.get(
+                                "frequency",
+                                "",
+                            )
+                        ).strip(),
+                        duration=(
+                            str(details["duration"]).strip()
+                            if details.get("duration") is not None
+                            else None
+                        ),
+                        duration_unit=(
+                            str(details["duration_unit"]).strip()
+                            if details.get("duration_unit") is not None
+                            else None
+                        ),
+                        quantity=(
+                            str(details["quantity"]).strip()
+                            if details.get("quantity") is not None
+                            else None
+                        ),
+                        directions=(
+                            str(details["directions"]).strip()
+                            if details.get("directions") is not None
+                            else None
+                        ),
+                        indication=(
+                            str(details["indication"]).strip()
+                            if details.get("indication") is not None
+                            else None
+                        ),
+                    )
+                )
+
             event_type = {
                 ClinicalOrderType.LABORATORY: EventType.INVESTIGATION_ORDERED,
                 ClinicalOrderType.RADIOLOGY: EventType.INVESTIGATION_ORDERED,
@@ -278,6 +353,42 @@ class ClinicalOrderService:
         return order
 
     # ------------------------------------------------------------------
+    # Laboratory Queue
+    # ------------------------------------------------------------------
+
+    def list_laboratory_queue(
+        self,
+        *,
+        context: RequestContext,
+    ) -> list[ClinicalOrder]:
+        """
+        Return laboratory orders requiring laboratory attention.
+        """
+
+        return self.repository.list_laboratory_queue(
+            hospital_id=context.hospital_id,
+        )
+
+
+    # ------------------------------------------------------------------
+    # Pharmacy Queue
+    # ------------------------------------------------------------------
+
+    def list_pharmacy_queue(
+        self,
+        *,
+        context: RequestContext,
+    ) -> list[ClinicalOrder]:
+        """
+        Return medication orders requiring pharmacy attention.
+        """
+
+        return self.repository.list_pharmacy_queue(
+            hospital_id=context.hospital_id,
+        )
+
+
+    # ------------------------------------------------------------------
     # List Encounter Orders
     # ------------------------------------------------------------------
 
@@ -296,6 +407,127 @@ class ClinicalOrderService:
             hospital_id=context.hospital_id,
             encounter_id=encounter.id,
         )
+
+    # ------------------------------------------------------------------
+    # Receive
+    # ------------------------------------------------------------------
+
+    def receive_order(
+        self,
+        *,
+        context: RequestContext,
+        order_id: UUID,
+    ) -> ClinicalOrder:
+        """
+        Move a Clinical Order from REQUESTED to RECEIVED.
+        """
+
+        from app.modules.clinical_orders.exceptions import (
+            ClinicalOrderAlreadyReceivedError,
+            ClinicalOrderCannotReceiveError,
+        )
+
+        order = self.get_order(
+            context=context,
+            order_id=order_id,
+        )
+
+        if order.status == ClinicalOrderStatus.RECEIVED:
+            raise ClinicalOrderAlreadyReceivedError(
+                "Clinical Order has already been received.",
+            )
+
+        if order.status in (
+            ClinicalOrderStatus.IN_PROGRESS,
+            ClinicalOrderStatus.COMPLETED,
+            ClinicalOrderStatus.CANCELLED,
+        ):
+            raise ClinicalOrderCannotReceiveError(
+                "Clinical Order cannot be received from its current status.",
+            )
+
+        self._get_authenticated_staff(
+            context=context,
+        )
+
+        order.status = ClinicalOrderStatus.RECEIVED
+
+        try:
+            self.repository.db.commit()
+        except Exception:
+            self.repository.db.rollback()
+            raise
+
+        self.repository.refresh(order)
+
+        return order
+
+
+    # ------------------------------------------------------------------
+    # Start
+    # ------------------------------------------------------------------
+
+    def start_order(
+        self,
+        *,
+        context: RequestContext,
+        order_id: UUID,
+    ) -> ClinicalOrder:
+        """
+        Move a Clinical Order from REQUESTED to IN_PROGRESS.
+        """
+
+        from app.modules.clinical_orders.exceptions import (
+            ClinicalOrderAlreadyInProgressError,
+            ClinicalOrderAlreadyCompletedError,
+            ClinicalOrderCannotStartError,
+        )
+
+        order = self.get_order(
+            context=context,
+            order_id=order_id,
+        )
+
+        if order.status == ClinicalOrderStatus.REQUESTED:
+            from app.modules.clinical_orders.exceptions import (
+                ClinicalOrderCannotStartError,
+            )
+
+            raise ClinicalOrderCannotStartError(
+                "Clinical Order must be received before it can be started.",
+            )
+
+        if order.status == ClinicalOrderStatus.IN_PROGRESS:
+            raise ClinicalOrderAlreadyInProgressError(
+                "Clinical Order is already in progress.",
+            )
+
+        if order.status == ClinicalOrderStatus.COMPLETED:
+            raise ClinicalOrderAlreadyCompletedError(
+                "Completed Clinical Orders cannot be started.",
+            )
+
+        if order.status == ClinicalOrderStatus.CANCELLED:
+            raise ClinicalOrderCannotStartError(
+                "Cancelled Clinical Orders cannot be started.",
+            )
+
+        self._get_authenticated_staff(
+            context=context,
+        )
+
+        order.status = ClinicalOrderStatus.IN_PROGRESS
+        order.started_at = datetime.now(UTC)
+
+        try:
+            self.repository.db.commit()
+        except Exception:
+            self.repository.db.rollback()
+            raise
+
+        self.repository.refresh(order)
+
+        return order
 
     # ------------------------------------------------------------------
     # Cancel
