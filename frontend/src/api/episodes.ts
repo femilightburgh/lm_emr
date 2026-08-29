@@ -12,6 +12,36 @@ export interface CreateEpisodeRequest {
 }
 
 
+export interface DoctorQueueItem {
+  id: string
+  patient_id: string
+  patient_name: string
+  hospital_number: string
+
+  episode_number: string
+  title: string
+
+  status:
+    | 'OPEN'
+    | 'ADMITTED'
+    | 'CLOSED'
+    | 'CANCELLED'
+
+  flow_status:
+    | 'AWAITING_CHECK_IN'
+    | 'WAITING_FOR_NURSING'
+    | 'NURSING_IN_PROGRESS'
+    | 'ROUTED'
+    | 'AWAITING_INVESTIGATIONS'
+    | 'AWAITING_REVIEW'
+
+  managing_doctor_id: string | null
+
+  checked_in_at: string | null
+  routed_at: string | null
+}
+
+
 export interface Episode {
   id: string
   hospital_id: string
@@ -31,6 +61,8 @@ export interface Episode {
     | 'WAITING_FOR_NURSING'
     | 'NURSING_IN_PROGRESS'
     | 'ROUTED'
+    | 'AWAITING_INVESTIGATIONS'
+    | 'AWAITING_REVIEW'
 
   checked_in_at: string | null
   checked_in_by: string | null
@@ -105,6 +137,38 @@ export async function checkInEpisode(
 
 
 // ============================================================================
+// Doctor Clinic Queue
+// ============================================================================
+
+
+export async function listDoctorClinicQueue(
+  accessToken: string,
+): Promise<DoctorQueueItem[]> {
+  return apiRequest<DoctorQueueItem[]>(
+    '/episodes/queue/doctor/clinic',
+    {},
+    accessToken,
+  )
+}
+
+
+// ============================================================================
+// Doctor Ward Queue
+// ============================================================================
+
+
+export async function listDoctorWardQueue(
+  accessToken: string,
+): Promise<DoctorQueueItem[]> {
+  return apiRequest<DoctorQueueItem[]>(
+    '/episodes/queue/doctor/ward',
+    {},
+    accessToken,
+  )
+}
+
+
+// ============================================================================
 // Nursing Queue
 // ============================================================================
 
@@ -155,6 +219,51 @@ export async function routeEpisode(
     )}`,
     {
       method: 'POST',
+    },
+    accessToken,
+  )
+}
+
+
+// ============================================================================
+// Admit Episode
+// ============================================================================
+
+
+export async function admitEpisode(
+  accessToken: string,
+  episodeId: string,
+  encounterId: string,
+): Promise<Episode> {
+  return apiRequest<Episode>(
+    `/episodes/${episodeId}/admit?encounter_id=${encodeURIComponent(
+      encounterId,
+    )}`,
+    {
+      method: 'POST',
+    },
+    accessToken,
+  )
+}
+
+
+export type ConsultationDisposition =
+  | 'ORDER_INVESTIGATIONS'
+
+
+export async function completeConsultation(
+  accessToken: string,
+  episodeId: string,
+  payload: {
+    encounter_id: string
+    disposition: ConsultationDisposition
+  },
+): Promise<Episode> {
+  return apiRequest<Episode>(
+    `/episodes/${episodeId}/complete-consultation`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
     },
     accessToken,
   )

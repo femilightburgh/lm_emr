@@ -91,7 +91,7 @@ async function parseError(
   response: Response,
 ): Promise<string> {
   let detail =
-    'Request failed.'
+    `Request failed (${response.status}).`
 
   try {
     const body =
@@ -108,15 +108,38 @@ async function parseError(
       detail = body.detail
         .map(
           (item: {
+            loc?: unknown
             msg?: string
-          }) =>
-            item.msg ??
-            'Validation error.',
+            type?: string
+          }) => {
+            const location =
+              Array.isArray(item.loc)
+                ? item.loc.join('.')
+                : ''
+
+            const message =
+              item.msg ??
+              'Validation error.'
+
+            return location
+              ? `${location}: ${message}`
+              : message
+          },
         )
         .join(' ')
+    } else {
+      detail = JSON.stringify(body)
     }
   } catch {
-    // Ignore non-JSON responses.
+    const raw =
+      await response.text().catch(
+        () => '',
+      )
+
+    if (raw) {
+      detail =
+        `Request failed (${response.status}): ${raw}`
+    }
   }
 
   return detail

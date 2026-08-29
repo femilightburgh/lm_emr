@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useRef,
   useState,
   type FormEvent,
 } from 'react'
@@ -46,6 +47,12 @@ export default function AdministrationDepartments({
   const [error, setError] =
     useState<string | null>(null)
 
+  const [formMode, setFormMode] =
+    useState<'create' | 'edit' | null>(null)
+
+  const formPanelRef =
+    useRef<HTMLElement | null>(null)
+
   const [editingDepartment, setEditingDepartment] =
     useState<Department | null>(null)
 
@@ -64,6 +71,9 @@ export default function AdministrationDepartments({
     useState<DepartmentStatus>(
       'Active',
     )
+
+  const [searchQuery, setSearchQuery] =
+    useState('')
 
 
   // ==========================================================================
@@ -104,17 +114,20 @@ export default function AdministrationDepartments({
   // ==========================================================================
 
   function resetForm() {
+    setFormMode(null)
     setEditingDepartment(null)
     setName('')
     setCode('')
     setCategory('Clinical')
     setStatus('Active')
+    setError(null)
   }
 
 
   function beginEdit(
     department: Department,
   ) {
+    setFormMode('edit')
     setEditingDepartment(
       department,
     )
@@ -136,6 +149,13 @@ export default function AdministrationDepartments({
     )
 
     setError(null)
+
+    requestAnimationFrame(() => {
+      formPanelRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    })
   }
 
 
@@ -278,325 +298,454 @@ export default function AdministrationDepartments({
   }
 
 
-  // ==========================================================================
-  // Render
-  // ==========================================================================
+  const filteredDepartments =
+    departments.filter(department => {
+      const query =
+        searchQuery.trim().toLowerCase()
+
+      if (!query) {
+        return true
+      }
+
+      return (
+        department.name
+          .toLowerCase()
+          .includes(query) ||
+        department.code
+          .toLowerCase()
+          .includes(query) ||
+        department.category
+          .toLowerCase()
+          .includes(query)
+      )
+    })
+
 
   return (
-    <div>
+    <div className="admin-panel">
+
+      {/* ================================================================== */}
+      {/* Header                                                             */}
+      {/* ================================================================== */}
+
+      <div className="page-header">
+
+        <div>
+          <p className="eyebrow">
+            ORGANIZATION
+          </p>
+
+          <h2>
+            Departments
+          </h2>
+
+          <p>
+            Configure the organizational departments
+            available to this hospital.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className="primary-button"
+          onClick={() => {
+            if (formMode === 'create') {
+              resetForm()
+              return
+            }
+
+            setFormMode('create')
+            setEditingDepartment(null)
+            setError(null)
+            setName('')
+            setCode('')
+            setCategory('Clinical')
+            setStatus('Active')
+          }}
+        >
+          {formMode === 'create'
+            ? 'Cancel'
+            : 'Create Department'}
+        </button>
+
+      </div>
+
+
+      {/* ================================================================== */}
+      {/* Error                                                              */}
+      {/* ================================================================== */}
 
       {error && (
-        <div className="admin-error">
+        <div className="error-state">
           {error}
         </div>
       )}
 
 
-      {/* ==================================================================== */}
-      {/* Department Form                                                      */}
-      {/* ==================================================================== */}
+      {/* ================================================================== */}
+      {/* Department Form                                                    */}
+      {/* ================================================================== */}
 
-      <section className="workspace-section">
-
-        <div className="section-heading">
-
-          <div>
-            <p className="eyebrow">
-              ORGANIZATION
-            </p>
-
-            <h3>
-              {editingDepartment
-                ? 'Edit department'
-                : 'Create department'}
-            </h3>
-
-            <p>
-              Configure the departments
-              available to the hospital.
-            </p>
-          </div>
-
-        </div>
-
-
-        <form
-          onSubmit={
-            handleSubmit
-          }
+      {formMode !== null && (
+        <section
+          ref={formPanelRef}
+          className="workspace-panel"
         >
 
-          <div className="admin-form-grid">
+          <div className="panel-header">
 
-            <label>
-              Department name
+            <div>
+              <p className="eyebrow">
+                {formMode === 'edit'
+                  ? 'EDIT DEPARTMENT'
+                  : 'NEW DEPARTMENT'}
+              </p>
 
-              <input
-                value={name}
-                onChange={event =>
-                  setName(
-                    event.target.value,
-                  )
-                }
-                placeholder="e.g. Cardiology"
-                disabled={saving}
-              />
-            </label>
+              <h3>
+                {formMode === 'edit'
+                  ? 'Edit department'
+                  : 'Create department'}
+              </h3>
 
+              <p>
+                Define the department's identity
+                and organizational classification.
+              </p>
+            </div>
 
-            <label>
-              Department code
-
-              <input
-                value={code}
-                onChange={event =>
-                  setCode(
-                    event.target.value
-                      .toUpperCase(),
-                  )
-                }
-                placeholder="e.g. CARD"
-                disabled={saving}
-              />
-            </label>
+          </div>
 
 
-            <label>
-              Category
+          <form
+            className="shared-form-section"
+            onSubmit={handleSubmit}
+          >
 
-              <select
-                value={category}
-                onChange={event =>
-                  setCategory(
-                    event.target.value as DepartmentCategory,
-                  )
-                }
-                disabled={saving}
-              >
+            <div className="form-grid">
 
-                {categories.map(
-                  item => (
+              <div className="form-field">
+                <label htmlFor="department-name">
+                  Department name
+                </label>
+
+                <input
+                  id="department-name"
+                  className="form-control"
+                  value={name}
+                  onChange={event =>
+                    setName(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="e.g. Cardiology"
+                  disabled={saving}
+                />
+              </div>
+
+
+              <div className="form-field">
+                <label htmlFor="department-code">
+                  Department code
+                </label>
+
+                <input
+                  id="department-code"
+                  className="form-control"
+                  value={code}
+                  onChange={event =>
+                    setCode(
+                      event.target.value
+                        .toUpperCase(),
+                    )
+                  }
+                  placeholder="e.g. CARD"
+                  disabled={saving}
+                />
+              </div>
+
+
+              <div className="form-field">
+                <label htmlFor="department-category">
+                  Category
+                </label>
+
+                <select
+                  id="department-category"
+                  className="form-control"
+                  value={category}
+                  onChange={event =>
+                    setCategory(
+                      event.target.value as DepartmentCategory,
+                    )
+                  }
+                  disabled={saving}
+                >
+                  {categories.map(item => (
                     <option
                       key={item}
                       value={item}
                     >
                       {item}
                     </option>
-                  ),
-                )}
-
-              </select>
-
-            </label>
+                  ))}
+                </select>
+              </div>
 
 
-            <label>
-              Status
+              <div className="form-field">
+                <label htmlFor="department-status">
+                  Status
+                </label>
 
-              <select
-                value={status}
-                onChange={event =>
-                  setStatus(
-                    event.target.value as DepartmentStatus,
-                  )
-                }
-                disabled={saving}
-              >
+                <select
+                  id="department-status"
+                  className="form-control"
+                  value={status}
+                  onChange={event =>
+                    setStatus(
+                      event.target.value as DepartmentStatus,
+                    )
+                  }
+                  disabled={saving}
+                >
+                  <option value="Active">
+                    Active
+                  </option>
 
-                <option value="Active">
-                  Active
-                </option>
+                  <option value="Inactive">
+                    Inactive
+                  </option>
+                </select>
+              </div>
 
-                <option value="Inactive">
-                  Inactive
-                </option>
-
-              </select>
-
-            </label>
-
-          </div>
-
-
-          <div className="admin-form-actions">
-
-            <button
-              type="submit"
-              className="primary-button"
-              disabled={saving}
-            >
-              {saving
-                ? 'Saving...'
-                : editingDepartment
-                  ? 'Update Department'
-                  : 'Create Department'}
-            </button>
+            </div>
 
 
-            {editingDepartment && (
+            <div className="form-actions">
+
               <button
-                type="button"
-                className="secondary-button"
-                onClick={
-                  resetForm
-                }
+                type="submit"
+                className="primary-button"
                 disabled={saving}
               >
-                Cancel
+                {saving
+                  ? 'Saving...'
+                  : editingDepartment
+                    ? 'Save Changes'
+                    : 'Create Department'}
               </button>
-            )}
 
-          </div>
+              {editingDepartment && (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={resetForm}
+                  disabled={saving}
+                >
+                  Cancel
+                </button>
+              )}
 
-        </form>
+            </div>
 
-      </section>
+          </form>
+
+        </section>
+      )}
 
 
-      {/* ==================================================================== */}
-      {/* Department List                                                      */}
-      {/* ==================================================================== */}
+      {/* ================================================================== */}
+      {/* Department Directory                                               */}
+      {/* ================================================================== */}
 
-      <section
-        className="workspace-section"
-        style={{
-          marginTop: '1rem',
-        }}
-      >
+      <section className="workspace-panel">
 
-        <div className="section-heading">
+        <div className="panel-header">
 
           <div>
             <p className="eyebrow">
-              HOSPITAL STRUCTURE
+              DEPARTMENT DIRECTORY
             </p>
 
             <h3>
-              Departments
+              Hospital departments
             </h3>
+
+            <p>
+              {departments.length}{' '}
+              department
+              {departments.length === 1
+                ? ''
+                : 's'} configured for this hospital.
+            </p>
+          </div>
+
+          <span className="staff-directory-count">
+            {filteredDepartments.length} shown
+          </span>
+
+        </div>
+
+
+        <div className="admin-staff-toolbar">
+
+          <div className="admin-search">
+            <input
+              type="search"
+              className="form-control"
+              value={searchQuery}
+              onChange={event =>
+                setSearchQuery(
+                  event.target.value,
+                )
+              }
+              placeholder="Search department name, code or category..."
+              aria-label="Search hospital departments"
+            />
           </div>
 
         </div>
 
 
-        {loading && (
-          <div className="admin-empty-state">
-            Loading departments...
+        {loading ? (
+          <div className="empty-state">
+            <strong>
+              Loading departments...
+            </strong>
           </div>
-        )}
+        ) : filteredDepartments.length === 0 ? (
+          <div className="empty-state">
 
+            <strong>
+              {departments.length === 0
+                ? 'No departments configured yet.'
+                : 'No departments match your search.'}
+            </strong>
 
-        {!loading &&
-          departments.length === 0 && (
-            <div className="admin-empty-state">
-              No departments have been
-              configured yet.
+            {departments.length > 0 && (
+              <p>
+                Try a different department name,
+                code or category.
+              </p>
+            )}
+
+          </div>
+        ) : (
+          <div className="data-table admin-departments-directory">
+
+            <div className="
+              data-table-header
+              admin-departments-directory-header
+            ">
+              <div>
+                Department
+              </div>
+
+              <div>
+                Code
+              </div>
+
+              <div>
+                Category
+              </div>
+
+              <div>
+                Status
+              </div>
+
+              <div>
+                Action
+              </div>
             </div>
-          )}
 
 
-        {!loading &&
-          departments.length > 0 && (
-            <div
-              style={{
-                display: 'grid',
-                gap: '0.75rem',
-              }}
-            >
+            {filteredDepartments.map(
+              department => (
+                <div
+                  key={department.id}
+                  className="
+                    data-table-row
+                    admin-departments-directory-row
+                  "
+                >
 
-              {departments.map(
-                department => (
-                  <div
-                    key={
-                      department.id
-                    }
-                    className="admin-staff-card"
-                  >
+                  <div className="data-table-cell">
+                    <strong>
+                      {department.name}
+                    </strong>
 
-                    <div className="admin-staff-details">
-
-                      <div>
-                        <strong>
-                          {department.name}
-                        </strong>
-
-                        <p>
-                          Code:{' '}
-                          {department.code}
-                        </p>
-                      </div>
+                    <span>
+                      Hospital department
+                    </span>
+                  </div>
 
 
-                      <div>
-                        <p>
-                          Category
-                        </p>
-
-                        <strong>
-                          {
-                            department.category
-                          }
-                        </strong>
-                      </div>
+                  <div className="data-table-cell">
+                    <strong>
+                      {department.code}
+                    </strong>
+                  </div>
 
 
-                      <div>
-                        <p>
-                          Status
-                        </p>
-
-                        <strong>
-                          {
-                            department.status
-                          }
-                        </strong>
-                      </div>
+                  <div className="data-table-cell">
+                    <span className="role-badge">
+                      {department.category}
+                    </span>
+                  </div>
 
 
-                      <div
-                        style={{
-                          display: 'flex',
-                          gap: '0.5rem',
-                          alignItems:
-                            'center',
-                        }}
-                      >
+                  <div className="data-table-cell">
 
-                        <button
-                          type="button"
-                          className="secondary-button"
-                          onClick={() =>
-                            beginEdit(
-                              department,
-                            )
-                          }
-                        >
-                          Edit
-                        </button>
-
-
-                        <button
-                          type="button"
-                          className="secondary-button"
-                          onClick={() =>
-                            void handleDelete(
-                              department,
-                            )
-                          }
-                        >
-                          Delete
-                        </button>
-
-                      </div>
-
-                    </div>
+                    <span
+                      className={
+                        department.status === 'Active'
+                          ? 'status-badge status-badge--active'
+                          : 'status-badge status-badge--inactive'
+                      }
+                    >
+                      {department.status}
+                    </span>
 
                   </div>
-                ),
-              )}
 
-            </div>
-          )}
+
+                  <div className="
+                    data-table-cell
+                    admin-departments-directory-action
+                  ">
+
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() =>
+                        beginEdit(
+                          department,
+                        )
+                      }
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      type="button"
+                      className="danger-button"
+                      onClick={() =>
+                        void handleDelete(
+                          department,
+                        )
+                      }
+                    >
+                      Delete
+                    </button>
+
+                  </div>
+
+                </div>
+              ),
+            )}
+
+          </div>
+        )}
 
       </section>
 

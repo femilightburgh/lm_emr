@@ -10,6 +10,36 @@ interface HeaderProps {
 }
 
 
+function getWorkspaceEyebrow(
+  view: WorkspaceView,
+  isReceptionist: boolean,
+): string {
+  if (view === 'administrator') {
+    return 'ADMINISTRATION'
+  }
+
+  if (view === 'nursing') {
+    return 'NURSING'
+  }
+
+  if (view === 'doctor') {
+    return 'DOCTOR'
+  }
+
+  if (view === 'laboratory') {
+    return 'LABORATORY'
+  }
+
+  if (view === 'pharmacy') {
+    return 'PHARMACY'
+  }
+
+  return isReceptionist
+    ? 'RECEPTION'
+    : 'STAFF WORKSPACE'
+}
+
+
 function getWorkspaceTitle(
   view: WorkspaceView,
 ): string {
@@ -46,9 +76,10 @@ export default function Header({
       <div>
 
         <p className="eyebrow">
-          {isReceptionist
-            ? 'RECEPTION'
-            : 'STAFF WORKSPACE'}
+          {getWorkspaceEyebrow(
+            view,
+            isReceptionist,
+          )}
         </p>
 
         <h1>

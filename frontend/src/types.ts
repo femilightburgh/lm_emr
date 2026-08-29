@@ -45,6 +45,9 @@ export type Profession =
   | 'register'
   | 'administrator'
   | 'nursing'
+  | 'doctor'
+  | 'laboratory'
+  | 'pharmacy'
 
 
 export interface LoginRequest {

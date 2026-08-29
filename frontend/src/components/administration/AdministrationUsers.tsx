@@ -187,16 +187,21 @@ export default function AdministrationUsers({
       {/* Header                                                             */}
       {/* ================================================================== */}
 
-      <div className="admin-panel-header">
+      <div className="page-header">
 
         <div>
           <p className="eyebrow">
-            USERS
+            USER ACCOUNTS
           </p>
 
-          <h3>
+          <h2>
             Hospital users
-          </h3>
+          </h2>
+
+          <p>
+            Manage LIGHTBURGH login accounts,
+            roles, and access.
+          </p>
         </div>
 
         <button
@@ -205,304 +210,365 @@ export default function AdministrationUsers({
           onClick={onRefresh}
           disabled={loading}
         >
-          Refresh
+          {loading
+            ? 'Refreshing...'
+            : 'Refresh'}
         </button>
 
       </div>
 
 
       {/* ================================================================== */}
-      {/* Add Staff                                                          */}
+      {/* Invitation                                                          */}
       {/* ================================================================== */}
 
-      <div className="admin-onboarding-card">
+      <section className="workspace-panel">
 
-        <h4>
-          Add hospital staff
-        </h4>
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">
+              ACCOUNT ONBOARDING
+            </p>
 
-        <p>
-          Create a pending staff account and
-          generate a one-time activation
-          invitation.
-        </p>
+            <h3>
+              Add hospital staff
+            </h3>
+
+            <p>
+              Create a pending LIGHTBURGH account
+              and generate a one-time activation
+              invitation.
+            </p>
+          </div>
+        </div>
 
 
         <form
-          className="admin-onboarding-form"
+          className="shared-form-section"
           onSubmit={handleSubmit}
         >
 
-          <div className="admin-field">
+          <div className="form-grid">
 
-            <label htmlFor="staff-email">
-              Work email
-            </label>
+            <div className="form-field">
+              <label htmlFor="staff-email">
+                Work email
+              </label>
 
-            <input
-              id="staff-email"
-              type="email"
-              value={email}
-              onChange={event =>
-                setEmail(
-                  event.target.value,
-                )
-              }
-              placeholder="staff@hospital.com"
-              disabled={submitting}
-            />
+              <input
+                id="staff-email"
+                type="email"
+                className="form-control"
+                value={email}
+                onChange={event =>
+                  setEmail(
+                    event.target.value,
+                  )
+                }
+                placeholder="staff@hospital.com"
+                disabled={submitting}
+              />
+            </div>
+
+
+            <div className="form-field">
+              <label htmlFor="staff-role">
+                Initial role
+              </label>
+
+              <select
+                id="staff-role"
+                className="form-control"
+                value={roleName}
+                onChange={event =>
+                  setRoleName(
+                    event.target.value,
+                  )
+                }
+                disabled={submitting}
+              >
+                <option value="">
+                  Select a role
+                </option>
+
+                {roles.map(role => (
+                  <option
+                    key={role.id}
+                    value={role.name}
+                  >
+                    {role.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
           </div>
 
 
-          <div className="admin-field">
+          {onboardingError && (
+            <div className="error-state">
+              {onboardingError}
+            </div>
+          )}
 
-            <label htmlFor="staff-role">
-              Initial role
-            </label>
 
-            <select
-              id="staff-role"
-              value={roleName}
-              onChange={event =>
-                setRoleName(
-                  event.target.value,
-                )
-              }
+          <div className="form-actions">
+            <button
+              type="submit"
+              className="primary-button"
               disabled={submitting}
             >
-              <option value="">
-                Select a role
-              </option>
-
-              {roles.map(role => (
-                <option
-                  key={role.id}
-                  value={role.name}
-                >
-                  {role.name}
-                </option>
-              ))}
-            </select>
-
+              {submitting
+                ? 'Creating...'
+                : 'Create invitation'}
+            </button>
           </div>
-
-
-          <button
-            type="submit"
-            className="primary-button"
-            disabled={submitting}
-          >
-            {submitting
-              ? 'Creating...'
-              : 'Create invitation'}
-          </button>
 
         </form>
 
-
-        {onboardingError && (
-          <div className="admin-form-error">
-            {onboardingError}
-          </div>
-        )}
-
-      </div>
+      </section>
 
 
       {/* ================================================================== */}
-      {/* Invitation Result                                                 */}
+      {/* Invitation Result                                                   */}
       {/* ================================================================== */}
 
       {invitation && (
-        <div className="admin-invitation">
+        <section className="workspace-panel">
 
-          <h4>
-            Invitation created
-          </h4>
+          <div className="panel-header">
 
-          <p>
-            {invitation.user.email} has been
-            added as a pending staff member.
-          </p>
+            <div>
+              <p className="eyebrow">
+                INVITATION
+              </p>
 
-          <p>
-            The invitation expires on{' '}
-            {new Date(
-              invitation.invitation_expires_at,
-            ).toLocaleString()}.
-          </p>
+              <h3>
+                Invitation created
+              </h3>
 
-
-          <code className="admin-invitation-token">
-            {invitation.invitation_token}
-          </code>
-
-
-          <div className="admin-invitation-actions">
-
-            <button
-              type="button"
-              className="primary-button"
-              onClick={() =>
-                void copyInvitationToken()
-              }
-            >
-              Copy invitation token
-            </button>
-
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={resetInvitation}
-            >
-              Dismiss
-            </button>
+              <p>
+                {invitation.user.email} has been
+                added as a pending staff member.
+              </p>
+            </div>
 
           </div>
 
-        </div>
-      )}
 
+          <div className="detail-panel">
 
-      {/* ================================================================== */}
-      {/* Search                                                             */}
-      {/* ================================================================== */}
+            <p>
+              The invitation expires on{' '}
+              {new Date(
+                invitation.invitation_expires_at,
+              ).toLocaleString()}.
+            </p>
 
-      <div className="admin-users-toolbar">
+            <code className="admin-invitation-token">
+              {invitation.invitation_token}
+            </code>
 
-        <div className="admin-search">
+            <div className="form-actions">
 
-          <input
-            type="search"
-            value={search}
-            onChange={event =>
-              setSearch(
-                event.target.value,
-              )
-            }
-            placeholder="Search staff by email..."
-            aria-label="Search hospital users"
-          />
-
-        </div>
-
-        <span>
-          {filteredUsers.length}{' '}
-          {filteredUsers.length === 1
-            ? 'user'
-            : 'users'}
-        </span>
-
-      </div>
-
-
-      {/* ================================================================== */}
-      {/* Users Table                                                        */}
-      {/* ================================================================== */}
-
-      {loading ? (
-        <div className="admin-empty">
-          Loading users...
-        </div>
-      ) : filteredUsers.length === 0 ? (
-        <div className="admin-empty">
-          <strong>
-            {search
-              ? 'No matching users.'
-              : 'No users found.'}
-          </strong>
-        </div>
-      ) : (
-        <div className="admin-table">
-
-          <div className="admin-table-header">
-            <span>
-              Email
-            </span>
-
-            <span>
-              Status
-            </span>
-
-            <span>
-              Roles
-            </span>
-
-            <span>
-              Action
-            </span>
-          </div>
-
-
-          {filteredUsers.map(user => (
-            <div
-              className="admin-table-row"
-              key={user.id}
-            >
-
-              <strong>
-                {user.email}
-              </strong>
-
-
-              <span
-                className={statusClass(
-                  user.status,
-                )}
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() =>
+                  void copyInvitationToken()
+                }
               >
-                {user.status}
-              </span>
-
-
-              <span className="role-badges">
-
-                {user.roles.length === 0 ? (
-                  <span>
-                    No roles
-                  </span>
-                ) : (
-                  user.roles.map(role => (
-                    <span
-                      className="role-badge"
-                      key={role.id}
-                    >
-                      {role.role_name}
-                    </span>
-                  ))
-                )}
-
-              </span>
-
+                Copy invitation token
+              </button>
 
               <button
                 type="button"
                 className="secondary-button"
-                onClick={() =>
-                  onSelectUser(user)
-                }
+                onClick={resetInvitation}
               >
-                Manage
+                Dismiss
               </button>
 
             </div>
-          ))}
 
-        </div>
+          </div>
+
+        </section>
       )}
 
 
       {/* ================================================================== */}
-      {/* User Manager                                                       */}
+      {/* Search                                                              */}
+      {/* ================================================================== */}
+
+      <section className="workspace-panel">
+
+        <div className="admin-users-toolbar">
+
+          <div className="admin-search">
+            <input
+              type="search"
+              className="form-control"
+              value={search}
+              onChange={event =>
+                setSearch(
+                  event.target.value,
+                )
+              }
+              placeholder="Search users by email..."
+              aria-label="Search hospital users"
+            />
+          </div>
+
+          <span className="staff-directory-count">
+            {filteredUsers.length}{' '}
+            {filteredUsers.length === 1
+              ? 'user'
+              : 'users'}
+          </span>
+
+        </div>
+
+
+        {/* ================================================================ */}
+        {/* Users Table                                                       */}
+        {/* ================================================================ */}
+
+        {loading ? (
+          <div className="empty-state">
+            <strong>
+              Loading users...
+            </strong>
+          </div>
+        ) : filteredUsers.length === 0 ? (
+          <div className="empty-state">
+
+            <strong>
+              {search
+                ? 'No matching users.'
+                : 'No users found.'}
+            </strong>
+
+            {search && (
+              <p>
+                Try a different email address.
+              </p>
+            )}
+
+          </div>
+        ) : (
+          <div className="data-table admin-users-directory">
+
+            <div className="
+              data-table-header
+              admin-users-directory-header
+            ">
+              <div>
+                User
+              </div>
+
+              <div>
+                Status
+              </div>
+
+              <div>
+                Roles
+              </div>
+
+              <div>
+                Action
+              </div>
+            </div>
+
+
+            {filteredUsers.map(user => (
+              <div
+                className="
+                  data-table-row
+                  admin-users-directory-row
+                "
+                key={user.id}
+              >
+
+                <div className="data-table-cell">
+                  <strong>
+                    {user.email}
+                  </strong>
+
+                  <span>
+                    LIGHTBURGH account
+                  </span>
+                </div>
+
+
+                <div className="data-table-cell">
+                  <span
+                    className={statusClass(
+                      user.status,
+                    )}
+                  >
+                    {user.status}
+                  </span>
+                </div>
+
+
+                <div className="
+                  data-table-cell
+                  role-badges
+                ">
+
+                  {user.roles.length === 0 ? (
+                    <span>
+                      No roles
+                    </span>
+                  ) : (
+                    user.roles.map(role => (
+                      <span
+                        className="role-badge"
+                        key={role.id}
+                      >
+                        {role.role_name}
+                      </span>
+                    ))
+                  )}
+
+                </div>
+
+
+                <div className="
+                  data-table-cell
+                  admin-users-directory-action
+                ">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() =>
+                      onSelectUser(user)
+                    }
+                  >
+                    Manage
+                  </button>
+                </div>
+
+              </div>
+            ))}
+
+          </div>
+        )}
+
+      </section>
+
+
+      {/* ================================================================== */}
+      {/* User Manager                                                        */}
       {/* ================================================================== */}
 
       {selectedUser && (
-        <div className="admin-user-manager">
+        <section className="workspace-panel">
 
-          <div className="admin-panel-header">
+          <div className="panel-header">
 
             <div>
-
               <p className="eyebrow">
                 USER ACCESS
               </p>
@@ -511,8 +577,11 @@ export default function AdministrationUsers({
                 {selectedUser.email}
               </h3>
 
+              <p>
+                Manage roles assigned to this
+                LIGHTBURGH account.
+              </p>
             </div>
-
 
             <button
               type="button"
@@ -525,99 +594,127 @@ export default function AdministrationUsers({
           </div>
 
 
-          <div className="current-roles">
+          <div className="detail-panel">
 
-            <h4>
-              Current roles
-            </h4>
+            <div className="section-heading">
+              <div>
+                <h3>
+                  Current roles
+                </h3>
+
+                <p>
+                  Roles determine the capabilities
+                  available to this account.
+                </p>
+              </div>
+            </div>
 
 
             {selectedUser.roles.length === 0 ? (
-              <p>
-                No active roles.
-              </p>
+              <div className="empty-state">
+                <strong>
+                  No active roles.
+                </strong>
+
+                <p>
+                  Assign a role below to provide
+                  system access.
+                </p>
+              </div>
             ) : (
-              selectedUser.roles.map(role => (
-                <div
-                  className="permission-item"
-                  key={role.id}
-                >
-
-                  <div>
-                    <strong>
-                      {role.role_name}
-                    </strong>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="danger-button"
-                    onClick={() =>
-                      onRemoveRole(
-                        selectedUser,
-                        role.role_name,
-                      )
-                    }
-                  >
-                    Remove
-                  </button>
-
-                </div>
-              ))
-            )}
-
-          </div>
-
-
-          <div className="admin-role-assignment">
-
-            <h4>
-              Assign role
-            </h4>
-
-            <div className="inline-form">
-
-              <select
-                defaultValue=""
-                onChange={event => {
-
-                  const role =
-                    roles.find(
-                      item =>
-                        item.name ===
-                        event.target.value,
-                    )
-
-                  if (role) {
-                    onAssignRole(
-                      selectedUser,
-                      role,
-                    )
-                  }
-
-                }}
-              >
-
-                <option value="">
-                  Select a role
-                </option>
-
-                {roles.map(role => (
-                  <option
-                    value={role.name}
+              <div>
+                {selectedUser.roles.map(role => (
+                  <div
+                    className="permission-item"
                     key={role.id}
                   >
-                    {role.name}
-                  </option>
-                ))}
 
-              </select>
+                    <div>
+                      <strong>
+                        {role.role_name}
+                      </strong>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="danger-button"
+                      onClick={() =>
+                        onRemoveRole(
+                          selectedUser,
+                          role.role_name,
+                        )
+                      }
+                    >
+                      Remove
+                    </button>
+
+                  </div>
+                ))}
+              </div>
+            )}
+
+
+            <div className="admin-role-assignment">
+
+              <div className="section-heading">
+                <div>
+                  <h3>
+                    Assign role
+                  </h3>
+
+                  <p>
+                    Select a role to grant its
+                    configured permissions.
+                  </p>
+                </div>
+              </div>
+
+
+              <div className="inline-form">
+
+                <select
+                  className="form-control"
+                  defaultValue=""
+                  onChange={event => {
+
+                    const role =
+                      roles.find(
+                        item =>
+                          item.name ===
+                          event.target.value,
+                      )
+
+                    if (role) {
+                      onAssignRole(
+                        selectedUser,
+                        role,
+                      )
+                    }
+
+                  }}
+                >
+                  <option value="">
+                    Select a role
+                  </option>
+
+                  {roles.map(role => (
+                    <option
+                      value={role.name}
+                      key={role.id}
+                    >
+                      {role.name}
+                    </option>
+                  ))}
+
+                </select>
+
+              </div>
 
             </div>
 
           </div>
 
-        </div>
+        </section>
       )}
 
     </div>

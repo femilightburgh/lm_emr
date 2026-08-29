@@ -18,12 +18,18 @@ interface AppShellProps {
   isReceptionist: boolean
   isAdministrator: boolean
   isNurse: boolean
+  isDoctor: boolean
+  isLaboratoryScientist: boolean
+  isPharmacist: boolean
 
   onDashboard: () => void
   onPatients: () => void
   onRegistration: () => void
   onAdministrator: () => void
   onNursing: () => void
+  onDoctor: () => void
+  onLaboratory: () => void
+  onPharmacy: () => void
   onSignOut: () => void
 
   children: ReactNode
@@ -37,12 +43,18 @@ export default function AppShell({
   isReceptionist,
   isAdministrator,
   isNurse,
+  isDoctor,
+  isLaboratoryScientist,
+  isPharmacist,
 
   onDashboard,
   onPatients,
   onRegistration,
   onAdministrator,
   onNursing,
+  onDoctor,
+  onLaboratory,
+  onPharmacy,
   onSignOut,
 
   children,
@@ -57,12 +69,18 @@ export default function AppShell({
         isReceptionist={isReceptionist}
         isAdministrator={isAdministrator}
         isNurse={isNurse}
+        isDoctor={isDoctor}
+        isLaboratoryScientist={isLaboratoryScientist}
+        isPharmacist={isPharmacist}
 
         onDashboard={onDashboard}
         onPatients={onPatients}
         onRegistration={onRegistration}
         onAdministrator={onAdministrator}
         onNursing={onNursing}
+        onDoctor={onDoctor}
+        onLaboratory={onLaboratory}
+        onPharmacy={onPharmacy}
         onSignOut={onSignOut}
       />
 

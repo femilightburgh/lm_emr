@@ -11,12 +11,18 @@ interface SidebarProps {
   isReceptionist: boolean
   isAdministrator: boolean
   isNurse: boolean
+  isDoctor: boolean
+  isLaboratoryScientist: boolean
+  isPharmacist: boolean
 
   onDashboard: () => void
   onPatients: () => void
   onRegistration: () => void
   onAdministrator: () => void
   onNursing: () => void
+  onDoctor: () => void
+  onLaboratory: () => void
+  onPharmacy: () => void
   onSignOut: () => void
 }
 
@@ -28,12 +34,18 @@ export default function Sidebar({
   isReceptionist,
   isAdministrator,
   isNurse,
+  isDoctor,
+  isLaboratoryScientist,
+  isPharmacist,
 
   onDashboard,
   onPatients,
   onRegistration,
   onAdministrator,
   onNursing,
+  onDoctor,
+  onLaboratory,
+  onPharmacy,
   onSignOut,
 }: SidebarProps) {
   return (
@@ -149,6 +161,60 @@ export default function Sidebar({
         )}
 
 
+        {/* Doctor */}
+
+        {isDoctor && (
+          <button
+            type="button"
+            className={
+              view === 'doctor'
+                ? 'nav-item active'
+                : 'nav-item'
+            }
+            onClick={onDoctor}
+          >
+            <span>Doctor Workspace</span>
+            <small>Clinical</small>
+          </button>
+        )}
+
+
+        {/* Laboratory */}
+
+        {isLaboratoryScientist && (
+          <button
+            type="button"
+            className={
+              view === 'laboratory'
+                ? 'nav-item active'
+                : 'nav-item'
+            }
+            onClick={onLaboratory}
+          >
+            <span>Laboratory</span>
+            <small>Clinical</small>
+          </button>
+        )}
+
+
+        {/* Pharmacy */}
+
+        {isPharmacist && (
+          <button
+            type="button"
+            className={
+              view === 'pharmacy'
+                ? 'nav-item active'
+                : 'nav-item'
+            }
+            onClick={onPharmacy}
+          >
+            <span>Pharmacy</span>
+            <small>Clinical</small>
+          </button>
+        )}
+
+
         {/* Administration */}
 
         {isAdministrator && (
@@ -193,7 +259,9 @@ export default function Sidebar({
                   ? 'Nurse'
                   : isReceptionist
                     ? 'Receptionist'
-                    : 'Staff'}
+                    : isDoctor
+                      ? 'Doctor'
+                      : 'Staff'}
             </span>
 
           </div>

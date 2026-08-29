@@ -29,6 +29,9 @@ import type {
 import './App.css'
 import ActivateAccount from './components/auth/ActivateAccount'
 import NursingWorkspace from './components/nursing/NursingWorkspace'
+import DoctorWorkspace from './components/doctor/DoctorWorkspace'
+import LaboratoryWorkspace from './components/laboratory/LaboratoryWorkspace'
+import PharmacyWorkspace from './components/pharmacy/PharmacyWorkspace'
 
 function App() {
   // ==========================================================================
@@ -364,6 +367,15 @@ const isAdministrator =
 const isNurse =
   user.roles?.includes('Nurse') ?? false
 
+const isDoctor =
+  user.roles?.includes('Doctor') ?? false
+
+const isLaboratoryScientist =
+  user.roles?.includes('Laboratory Scientist') ?? false
+
+const isPharmacist =
+  user.roles?.includes('Pharmacist') ?? false
+
 return (
   <AppShell
     user={user}
@@ -371,6 +383,9 @@ return (
     isReceptionist={isReceptionist}
     isAdministrator={isAdministrator}
     isNurse={isNurse}
+    isDoctor={isDoctor}
+    isLaboratoryScientist={isLaboratoryScientist}
+    isPharmacist={isPharmacist}
     onDashboard={openDashboard}
     onPatients={openPatients}
     onRegistration={openRegistration}
@@ -379,6 +394,15 @@ return (
     }
     onNursing={() =>
       setView('nursing')
+    }
+    onDoctor={() =>
+      setView('doctor')
+    }
+    onLaboratory={() =>
+      setView('laboratory')
+    }
+    onPharmacy={() =>
+      setView('pharmacy')
     }
     onSignOut={handleSignOut}
   >
@@ -437,6 +461,26 @@ return (
       <NursingWorkspace
         accessToken={session.access_token}
         staffId={user.id}
+      />
+    )}
+
+    {view === 'doctor' && isDoctor && (
+      <DoctorWorkspace
+        accessToken={session.access_token}
+      />
+    )}
+
+    {view === 'laboratory' &&
+      isLaboratoryScientist && (
+      <LaboratoryWorkspace
+        accessToken={session.access_token}
+      />
+    )}
+
+    {view === 'pharmacy' &&
+      isPharmacist && (
+      <PharmacyWorkspace
+        accessToken={session.access_token}
       />
     )}
     </AppShell>

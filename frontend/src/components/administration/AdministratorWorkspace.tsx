@@ -12,6 +12,7 @@ import {
   createStaff,
   deleteRole,
   getRole,
+  listDepartments,
   listPermissions,
   listRoles,
   listStaff,
@@ -23,6 +24,7 @@ import {
   removeRoleFromUser,
   updateRole,
   type AdminUser,
+  type Department,
   type OnboardStaffResponse,
   type Permission,
   type Role,
@@ -41,6 +43,7 @@ import AdministrationRoles from './AdministrationRoles'
 import AdministrationStaff from './AdministrationStaff'
 import AdministrationUsers from './AdministrationUsers'
 import AdministrationDepartments from './AdministrationDepartments'
+import AdministrationLaboratoryCatalogue from './AdministrationLaboratoryCatalogue'
 
 
 type AdminTab =
@@ -49,7 +52,17 @@ type AdminTab =
   | 'staff'
   | 'roles'
   | 'departments'
+  | 'laboratory'
   | 'permissions'
+
+
+type AdminNavCategory =
+  | 'overview'
+  | 'people'
+  | 'organization'
+  | 'access'
+  | 'clinical'
+  | 'hospital'
 
 
 interface Props {
@@ -83,11 +96,13 @@ interface CreateStaffPayload {
 
 export default function AdministratorWorkspace({
   accessToken,
-  currentUserEmail,
   hospitalId,
 }: Props) {
   const [tab, setTab] =
     useState<AdminTab>('overview')
+
+  const [navCategory, setNavCategory] =
+    useState<AdminNavCategory>('overview')
 
   const [users, setUsers] =
     useState<AdminUser[]>([])
@@ -95,8 +110,14 @@ export default function AdministratorWorkspace({
   const [staff, setStaff] =
     useState<Staff[]>([])
 
+  const [staffTotal, setStaffTotal] =
+    useState(0)
+
   const [roles, setRoles] =
     useState<Role[]>([])
+
+  const [departments, setDepartments] =
+    useState<Department[]>([])
 
   const [selectedRole, setSelectedRole] =
     useState<Role | null>(null)
@@ -261,6 +282,7 @@ export default function AdministratorWorkspace({
         )
 
       setStaff(response.items)
+      setStaffTotal(response.total)
     } catch (err) {
       showError(
         err,
@@ -337,6 +359,28 @@ export default function AdministratorWorkspace({
       )
     }
   }
+
+  // ==========================================================================
+  // Departments
+  // ==========================================================================
+
+  async function loadDepartments() {
+    try {
+      const response =
+        await listDepartments(
+          accessToken,
+          hospitalId,
+        )
+
+      setDepartments(response)
+    } catch (err) {
+      showError(
+        err,
+        'Unable to load hospital departments.',
+      )
+    }
+  }
+
 
   // ==========================================================================
   // Roles
@@ -674,6 +718,7 @@ export default function AdministratorWorkspace({
       loadUsers(),
       loadRoles(),
       loadStaff(),
+      loadDepartments(),
     ])
   }, [])
 
@@ -692,23 +737,14 @@ export default function AdministratorWorkspace({
       <div className="admin-heading">
 
         <div>
-          <p className="eyebrow">
-            ADMINISTRATION
-          </p>
-
           <h2>
-            Administrator workspace
+            Hospital Administration
           </h2>
 
           <p>
-            Manage hospital users, staff,
-            roles, and authorization
-            permissions.
+            Configure your hospital, workforce,
+            access, and clinical services.
           </p>
-        </div>
-
-        <div className="admin-account">
-          {currentUserEmail}
         </div>
 
       </div>
@@ -729,96 +765,280 @@ export default function AdministratorWorkspace({
       {/* Navigation                                                           */}
       {/* ==================================================================== */}
 
-      <nav className="admin-tabs">
+      <nav className="admin-navigation-compact">
 
-        <button
-          type="button"
-          className={
-            tab === 'overview'
-              ? 'admin-tab active'
-              : 'admin-tab'
-          }
-          onClick={() =>
-            setTab('overview')
-          }
-        >
-          Overview
-        </button>
+        <div className="admin-navigation-primary">
 
-
-        <button
-          type="button"
-          className={
-            tab === 'users'
-              ? 'admin-tab active'
-              : 'admin-tab'
-          }
-          onClick={() =>
-            setTab('users')
-          }
-        >
-          Users
-        </button>
+          <button
+            type="button"
+            className={
+              navCategory === 'overview'
+                ? 'admin-navigation-category active'
+                : 'admin-navigation-category'
+            }
+            onClick={() => {
+              setNavCategory('overview')
+              setTab('overview')
+            }}
+          >
+            Overview
+          </button>
 
 
-        <button
-          type="button"
-          className={
-            tab === 'staff'
-              ? 'admin-tab active'
-              : 'admin-tab'
-          }
-          onClick={() =>
-            setTab('staff')
-          }
-        >
-          Staff
-        </button>
+          <button
+            type="button"
+            className={
+              navCategory === 'people'
+                ? 'admin-navigation-category active'
+                : 'admin-navigation-category'
+            }
+            onClick={() =>
+              setNavCategory('people')
+            }
+          >
+            People
+          </button>
 
 
-        <button
-          type="button"
-          className={
-            tab === 'departments'
-              ? 'admin-tab active'
-              : 'admin-tab'
-          }
-          onClick={() =>
-            setTab('departments')
-          }
-        >
-          Departments
-        </button>
+          <button
+            type="button"
+            className={
+              navCategory === 'organization'
+                ? 'admin-navigation-category active'
+                : 'admin-navigation-category'
+            }
+            onClick={() =>
+              setNavCategory('organization')
+            }
+          >
+            Organization
+          </button>
 
 
-        <button
-          type="button"
-          className={
-            tab === 'roles'
-              ? 'admin-tab active'
-              : 'admin-tab'
-          }
-          onClick={() =>
-            setTab('roles')
-          }
-        >
-          Roles
-        </button>
+          <button
+            type="button"
+            className={
+              navCategory === 'access'
+                ? 'admin-navigation-category active'
+                : 'admin-navigation-category'
+            }
+            onClick={() =>
+              setNavCategory('access')
+            }
+          >
+            Access
+          </button>
 
 
-        <button
-          type="button"
-          className={
-            tab === 'permissions'
-              ? 'admin-tab active'
-              : 'admin-tab'
-          }
-          onClick={() =>
-            setTab('permissions')
-          }
-        >
-          Permissions
-        </button>
+          <button
+            type="button"
+            className={
+              navCategory === 'clinical'
+                ? 'admin-navigation-category active'
+                : 'admin-navigation-category'
+            }
+            onClick={() =>
+              setNavCategory('clinical')
+            }
+          >
+            Clinical
+          </button>
+
+
+          <button
+            type="button"
+            className={
+              navCategory === 'hospital'
+                ? 'admin-navigation-category active'
+                : 'admin-navigation-category'
+            }
+            onClick={() =>
+              setNavCategory('hospital')
+            }
+          >
+            Hospital
+          </button>
+
+        </div>
+
+
+        {navCategory === 'people' && (
+          <div className="admin-navigation-secondary">
+
+            <span>
+              People
+            </span>
+
+            <button
+              type="button"
+              className={
+                tab === 'staff'
+                  ? 'active'
+                  : ''
+              }
+              onClick={() =>
+                setTab('staff')
+              }
+            >
+              Staff
+            </button>
+
+            <button
+              type="button"
+              className={
+                tab === 'users'
+                  ? 'active'
+                  : ''
+              }
+              onClick={() =>
+                setTab('users')
+              }
+            >
+              User Accounts
+            </button>
+
+            <span className="admin-navigation-future">
+              Onboarding
+            </span>
+
+          </div>
+        )}
+
+
+        {navCategory === 'organization' && (
+          <div className="admin-navigation-secondary">
+
+            <span>
+              Organization
+            </span>
+
+            <button
+              type="button"
+              className={
+                tab === 'departments'
+                  ? 'active'
+                  : ''
+              }
+              onClick={() =>
+                setTab('departments')
+              }
+            >
+              Departments
+            </button>
+
+            <span className="admin-navigation-future">
+              Services & Units
+            </span>
+
+            <span className="admin-navigation-future">
+              Locations
+            </span>
+
+          </div>
+        )}
+
+
+        {navCategory === 'access' && (
+          <div className="admin-navigation-secondary">
+
+            <span>
+              Access
+            </span>
+
+            <button
+              type="button"
+              className={
+                tab === 'roles'
+                  ? 'active'
+                  : ''
+              }
+              onClick={() =>
+                setTab('roles')
+              }
+            >
+              Roles
+            </button>
+
+            <button
+              type="button"
+              className={
+                tab === 'permissions'
+                  ? 'active'
+                  : ''
+              }
+              onClick={() =>
+                setTab('permissions')
+              }
+            >
+              Permissions
+            </button>
+
+            <span className="admin-navigation-future">
+              Scheduled Access
+            </span>
+
+          </div>
+        )}
+
+
+        {navCategory === 'clinical' && (
+          <div className="admin-navigation-secondary">
+
+            <span>
+              Clinical
+            </span>
+
+            <button
+              type="button"
+              className={
+                tab === 'laboratory'
+                  ? 'active'
+                  : ''
+              }
+              onClick={() =>
+                setTab('laboratory')
+              }
+            >
+              Laboratory
+            </button>
+
+            <span className="admin-navigation-future">
+              Medications
+            </span>
+
+            <span className="admin-navigation-future">
+              Procedures
+            </span>
+
+            <span className="admin-navigation-future">
+              Templates
+            </span>
+
+          </div>
+        )}
+
+
+        {navCategory === 'hospital' && (
+          <div className="admin-navigation-secondary">
+
+            <span>
+              Hospital
+            </span>
+
+            <span className="admin-navigation-future">
+              Profile
+            </span>
+
+            <span className="admin-navigation-future">
+              Settings
+            </span>
+
+            <span className="admin-navigation-future">
+              Documents & Branding
+            </span>
+
+          </div>
+        )}
 
       </nav>
 
@@ -829,13 +1049,29 @@ export default function AdministratorWorkspace({
 
       {tab === 'overview' && (
         <AdministrationOverview
+          staffTotal={staffTotal}
           userCount={users.length}
+          departmentCount={departments.length}
           roleCount={roles.length}
+          staffWithoutAccountCount={
+            staff.filter(
+              member => member.user_account_id === null,
+            ).length
+          }
           onUsers={() =>
             setTab('users')
           }
+          onStaff={() =>
+            setTab('staff')
+          }
+          onDepartments={() =>
+            setTab('departments')
+          }
           onRoles={() =>
             setTab('roles')
+          }
+          onLaboratory={() =>
+            setTab('laboratory')
           }
         />
       )}
@@ -936,6 +1172,17 @@ export default function AdministratorWorkspace({
         <AdministrationDepartments
           accessToken={accessToken}
           hospitalId={hospitalId}
+        />
+      )}
+
+
+      {/* ==================================================================== */}
+      {/* Laboratory Catalogue                                                 */}
+      {/* ==================================================================== */}
+
+      {tab === 'laboratory' && (
+        <AdministrationLaboratoryCatalogue
+          accessToken={accessToken}
         />
       )}
 

@@ -394,4 +394,16 @@ export const PLATFORM_PERMISSIONS: Permission[] = [
     description:
       'Allows deleting roles.',
   },
+  {
+    code: 'laboratory_catalogue.read',
+    name: 'Read Laboratory Catalogue',
+    description:
+      'Allows viewing laboratory tests and analyte definitions.',
+  },
+  {
+    code: 'laboratory_catalogue.update',
+    name: 'Update Laboratory Catalogue',
+    description:
+      'Allows maintaining laboratory analyte metadata and reference intervals.',
+  },
 ]

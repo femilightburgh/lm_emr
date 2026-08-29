@@ -86,6 +86,17 @@ export interface LinkUserAccountRequest {
 // Staff API
 // ============================================================================
 
+export async function getCurrentStaff(
+  accessToken: string,
+): Promise<Staff> {
+  return apiRequest<Staff>(
+    '/staff/me',
+    {},
+    accessToken,
+  )
+}
+
+
 export async function createStaff(
   accessToken: string,
   payload: CreateStaffRequest,

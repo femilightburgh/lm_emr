@@ -86,67 +86,116 @@ export default function AdministrationRoles({
   onRemovePermission,
 }: AdministrationRolesProps) {
   return (
-    <>
-      <div className="admin-two-column">
+    <div className="admin-panel">
 
-        <section className="admin-panel">
+      {/* ================================================================== */}
+      {/* Roles                                                              */}
+      {/* ================================================================== */}
 
-          <div className="admin-panel-header">
+      <div className="page-header">
+
+        <div>
+          <p className="eyebrow">
+            ACCESS CONTROL
+          </p>
+
+          <h2>
+            Roles & permissions
+          </h2>
+
+          <p>
+            Define hospital roles and the permissions
+            assigned to them.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className="primary-button"
+          onClick={onCreateRole}
+        >
+          New role
+        </button>
+
+      </div>
+
+
+      {/* ================================================================== */}
+      {/* Role Creation / Editing                                             */}
+      {/* ================================================================== */}
+
+      {editingRole && (
+        <section className="workspace-panel">
+
+          <div className="panel-header">
 
             <div>
               <p className="eyebrow">
-                ROLE MANAGEMENT
+                {editingRole
+                  ? 'EDIT ROLE'
+                  : 'NEW ROLE'}
               </p>
 
               <h3>
-                Hospital roles
+                {editingRole
+                  ? 'Edit role'
+                  : 'Create role'}
               </h3>
-            </div>
 
-            <button
-              type="button"
-              className="primary-button"
-              onClick={onCreateRole}
-            >
-              New role
-            </button>
+              <p>
+                Define the role name and its purpose
+                within the hospital.
+              </p>
+            </div>
 
           </div>
 
 
           <form
-            className="admin-role-form"
+            className="shared-form-section"
             onSubmit={onSaveRole}
           >
 
-            <label>
-              Role name
+            <div className="form-grid">
 
-              <input
-                value={roleName}
-                onChange={event =>
-                  onRoleNameChange(
-                    event.target.value,
-                  )
-                }
-                placeholder="e.g. Nurse Manager"
-              />
-            </label>
+              <div className="form-field">
+                <label htmlFor="role-name">
+                  Role name
+                </label>
+
+                <input
+                  id="role-name"
+                  className="form-control"
+                  value={roleName}
+                  onChange={event =>
+                    onRoleNameChange(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="e.g. Nurse Manager"
+                />
+              </div>
 
 
-            <label>
-              Description
+              <div className="form-field">
+                <label htmlFor="role-description">
+                  Description
+                </label>
 
-              <input
-                value={roleDescription}
-                onChange={event =>
-                  onRoleDescriptionChange(
-                    event.target.value,
-                  )
-                }
-                placeholder="Describe this role"
-              />
-            </label>
+                <input
+                  id="role-description"
+                  className="form-control"
+                  value={roleDescription}
+                  onChange={event =>
+                    onRoleDescriptionChange(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Describe this role"
+                />
+              </div>
+
+            </div>
 
 
             <div className="form-actions">
@@ -159,35 +208,108 @@ export default function AdministrationRoles({
                 {savingRole
                   ? 'Saving...'
                   : editingRole
-                    ? 'Update role'
-                    : 'Create role'}
+                    ? 'Save Changes'
+                    : 'Create Role'}
+              </button>
+
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={onBackToRoles}
+                disabled={savingRole}
+              >
+                Cancel
               </button>
 
             </div>
 
           </form>
 
+        </section>
+      )}
 
-          <div className="admin-role-list">
 
-            {roles.length === 0 ? (
-              <div className="admin-empty">
-                No roles found.
+      {/* ================================================================== */}
+      {/* Role Directory                                                      */}
+      {/* ================================================================== */}
+
+      <section className="workspace-panel">
+
+        <div className="panel-header">
+
+          <div>
+            <p className="eyebrow">
+              ROLE DIRECTORY
+            </p>
+
+            <h3>
+              Hospital roles
+            </h3>
+
+            <p>
+              {roles.length}{' '}
+              role
+              {roles.length === 1
+                ? ''
+                : 's'} configured for this hospital.
+            </p>
+          </div>
+
+          <span className="staff-directory-count">
+            {selectedRole
+              ? `Selected: ${selectedRole.name}`
+              : `${roles.length} total`}
+          </span>
+
+        </div>
+
+
+        {roles.length === 0 ? (
+          <div className="empty-state">
+            <strong>
+              No roles found.
+            </strong>
+
+            <p>
+              Create the first hospital role to
+              configure access.
+            </p>
+          </div>
+        ) : (
+          <div className="data-table admin-roles-directory">
+
+            <div className="
+              data-table-header
+              admin-roles-directory-header
+            ">
+              <div>
+                Role
               </div>
-            ) : (
-              roles.map(role => (
-                <div
-                  className={
-                    selectedRole?.id === role.id
-                      ? 'admin-role-item selected'
-                      : 'admin-role-item'
-                  }
-                  key={role.id}
-                >
+
+              <div>
+                Description
+              </div>
+
+              <div>
+                Action
+              </div>
+            </div>
+
+
+            {roles.map(role => (
+              <div
+                key={role.id}
+                className="
+                  data-table-row
+                  admin-roles-directory-row
+                "
+              >
+
+                <div className="data-table-cell">
 
                   <button
                     type="button"
-                    className="admin-role-select"
+                    className="admin-role-directory-select"
                     onClick={() =>
                       onSelectRole(role.id)
                     }
@@ -197,11 +319,37 @@ export default function AdministrationRoles({
                     </strong>
 
                     <span>
-                      {role.description ||
-                        'No description'}
+                      Role
                     </span>
                   </button>
 
+                </div>
+
+
+                <div className="data-table-cell">
+                  <strong className="
+                    admin-role-description
+                  ">
+                    {role.description ||
+                      'No description provided.'}
+                  </strong>
+                </div>
+
+
+                <div className="
+                  data-table-cell
+                  admin-roles-directory-action
+                ">
+
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() =>
+                      onSelectRole(role.id)
+                    }
+                  >
+                    Select
+                  </button>
 
                   <button
                     type="button"
@@ -214,81 +362,93 @@ export default function AdministrationRoles({
                   </button>
 
                 </div>
-              ))
-            )}
+
+              </div>
+            ))}
 
           </div>
+        )}
 
-        </section>
-
-
-        <section className="admin-panel">
-
-          <div className="admin-panel-header">
-
-            <div>
-              <p className="eyebrow">
-                ROLE DETAILS
-              </p>
-
-              <h3>
-                {selectedRole
-                  ? selectedRole.name
-                  : 'Select a role'}
-              </h3>
-            </div>
-
-          </div>
+      </section>
 
 
-          {!selectedRole ? (
-            <div className="admin-empty">
-              Select a role to manage its
-              permissions.
-            </div>
-          ) : (
-            <>
+      {/* ================================================================== */}
+      {/* Selected Role                                                       */}
+      {/* ================================================================== */}
 
-              <p className="admin-description">
+      <section className="workspace-panel">
+
+        <div className="panel-header">
+
+          <div>
+            <p className="eyebrow">
+              ROLE DETAILS
+            </p>
+
+            <h3>
+              {selectedRole
+                ? selectedRole.name
+                : 'Select a role'}
+            </h3>
+
+            {selectedRole && (
+              <p>
                 {selectedRole.description ||
                   'No description provided.'}
               </p>
+            )}
+          </div>
 
-              <button
-                type="button"
-                className="primary-button"
-                onClick={onManagePermissions}
-              >
-                Manage permissions
-              </button>
+        </div>
 
-              <button
-                type="button"
-                className="danger-button"
-                onClick={() =>
-                  onDeleteRole(
-                    selectedRole,
-                  )
-                }
-              >
-                Delete role
-              </button>
 
-            </>
-          )}
+        {!selectedRole ? (
+          <div className="empty-state">
+            <strong>
+              No role selected.
+            </strong>
 
-        </section>
+            <p>
+              Select a role above to manage its
+              permissions.
+            </p>
+          </div>
+        ) : (
+          <div className="role-detail-actions">
 
-      </div>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={onManagePermissions}
+            >
+              Manage permissions
+            </button>
+
+            <button
+              type="button"
+              className="danger-button"
+              onClick={() =>
+                onDeleteRole(
+                  selectedRole,
+                )
+              }
+            >
+              Delete role
+            </button>
+
+          </div>
+        )}
+
+      </section>
 
 
       {/* ================================================================== */}
-      {/* Permissions for selected role                                      */}
+      {/* Permissions                                                         */}
       {/* ================================================================== */}
 
-      <div className="admin-panel">
+      <section className="workspace-panel">
 
-        <div className="admin-panel-header">
+        <div className="panel-header">
 
           <div>
             <p className="eyebrow">
@@ -300,22 +460,26 @@ export default function AdministrationRoles({
                 ? `${selectedRole.name} permissions`
                 : 'Role permissions'}
             </h3>
-          </div>
 
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={onBackToRoles}
-          >
-            Back to roles
-          </button>
+            <p>
+              Assign or remove permissions for the
+              selected role.
+            </p>
+          </div>
 
         </div>
 
 
         {!selectedRole ? (
-          <div className="admin-empty">
-            Select a role first.
+          <div className="empty-state">
+            <strong>
+              Select a role first.
+            </strong>
+
+            <p>
+              Permissions will appear here once
+              a role is selected.
+            </p>
           </div>
         ) : (
           <>
@@ -323,6 +487,7 @@ export default function AdministrationRoles({
             <div className="permission-assignment">
 
               <select
+                className="form-control"
                 value={selectedPermission}
                 onChange={event =>
                   onPermissionChange(
@@ -368,15 +533,21 @@ export default function AdministrationRoles({
             </div>
 
 
-            <div className="permission-list">
+            {permissions.length === 0 ? (
+              <div className="empty-state">
+                <strong>
+                  No permissions assigned.
+                </strong>
 
-              {permissions.length === 0 ? (
-                <div className="admin-empty">
-                  This role currently has
-                  no permissions.
-                </div>
-              ) : (
-                permissions.map(
+                <p>
+                  Use the selector above to assign
+                  a permission to this role.
+                </p>
+              </div>
+            ) : (
+              <div className="permission-list">
+
+                {permissions.map(
                   permission => (
                     <div
                       className="permission-item"
@@ -401,7 +572,6 @@ export default function AdministrationRoles({
                         </p>
                       </div>
 
-
                       <button
                         type="button"
                         className="danger-button"
@@ -416,15 +586,16 @@ export default function AdministrationRoles({
 
                     </div>
                   ),
-                )
-              )}
+                )}
 
-            </div>
+              </div>
+            )}
 
           </>
         )}
 
-      </div>
-    </>
+      </section>
+
+    </div>
   )
 }

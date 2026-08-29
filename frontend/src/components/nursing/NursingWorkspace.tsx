@@ -528,9 +528,6 @@ export default function NursingWorkspace({
               encounter_id:
                 nursingEncounter.id,
 
-              patient_id:
-                selectedEpisode.patient_id,
-
               document_type:
                 'NURSING_INTAKE',
 

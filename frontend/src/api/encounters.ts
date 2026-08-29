@@ -53,6 +53,25 @@ export interface ClinicalEvent {
 // ============================================================================
 
 
+export async function createEncounter(
+  accessToken: string,
+  payload: {
+    episode_id: string
+    staff_id: string
+    title: string
+  },
+): Promise<Encounter> {
+  return apiRequest<Encounter>(
+    '/encounters',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    accessToken,
+  )
+}
+
+
 export async function listEpisodeEncounters(
   accessToken: string,
   episodeId: string,
@@ -113,6 +132,15 @@ export async function closeEncounter(
     {
       method: 'POST',
     },
+    accessToken,
+  )
+}
+export async function listDoctorQueue(
+  accessToken: string,
+): Promise<Encounter[]> {
+  return apiRequest<Encounter[]>(
+    '/encounters/queue/doctor',
+    {},
     accessToken,
   )
 }

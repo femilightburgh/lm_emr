@@ -1,0 +1,641 @@
+/* ==========================================================================
+   Shared
+   ========================================================================== */
+
+.brand {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #17212b;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: #607080;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.login-subtitle {
+  margin: 12px 0 0;
+  color: #6d7883;
+  line-height: 1.6;
+}
+
+
+/* ==========================================================================
+   Shared UI Primitives
+   ========================================================================== */
+
+.workspace-panel {
+  min-width: 0;
+  background: #ffffff;
+  border: 1px solid #dfe5e9;
+  border-radius: 12px;
+  box-shadow:
+    0 2px 5px rgba(23, 33, 43, 0.025),
+    0 8px 22px rgba(23, 33, 43, 0.025);
+}
+
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid #edf0f2;
+}
+
+.panel-header h2,
+.panel-header h3 {
+  margin: 0;
+  color: #17212b;
+  letter-spacing: -0.02em;
+}
+
+.panel-header h2 {
+  font-size: 17px;
+}
+
+.panel-header h3 {
+  font-size: 14px;
+}
+
+.panel-header p {
+  margin: 5px 0 0;
+  color: #71808c;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.panel-header > span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid #d9e1e7;
+  border-radius: 999px;
+  background: #f7f9fa;
+  color: #52616d;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.primary-button,
+.secondary-button {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.primary-button {
+  border: 1px solid #17212b;
+  background: #17212b;
+  color: #ffffff;
+}
+
+.primary-button:hover:not(:disabled) {
+  background: #273642;
+}
+
+.secondary-button {
+  border: 1px solid #d3dce2;
+  background: #ffffff;
+  color: #52616d;
+}
+
+.secondary-button:hover:not(:disabled) {
+  background: #f4f7f8;
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #7f97a7;
+  box-shadow: 0 0 0 3px rgba(96, 123, 140, 0.10);
+}
+
+
+/* ==========================================================================
+   Shared Clinical Form Controls
+   ========================================================================== */
+
+.form-control {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 40px;
+  padding: 0 11px;
+  border: 1px solid #d3dbe1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #17212b;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.form-control:focus {
+  border-color: #7e96a7;
+  box-shadow: 0 0 0 3px rgba(96, 123, 140, 0.10);
+}
+
+.form-control:disabled {
+  background: #f5f7f8;
+  color: #86939d;
+}
+
+.form-control::placeholder {
+  color: #a1acb3;
+}
+
+.form-control--textarea {
+  height: auto;
+  min-height: 96px;
+  padding: 11px 12px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+
+
+/* ==========================================================================
+   Clinical Workspace Controls
+   ========================================================================== */
+
+.doctor-workspace input:not([type="checkbox"]),
+.doctor-workspace select,
+.doctor-workspace textarea,
+.laboratory-workspace input:not([type="checkbox"]),
+.laboratory-workspace select,
+.laboratory-workspace textarea {
+  box-sizing: border-box;
+  border: 1px solid #d3dbe1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #17212b;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.doctor-workspace input:not([type="checkbox"]),
+.doctor-workspace select,
+.laboratory-workspace input:not([type="checkbox"]),
+.laboratory-workspace select {
+  min-height: 40px;
+  padding: 0 11px;
+}
+
+.doctor-workspace textarea,
+.laboratory-workspace textarea {
+  padding: 11px 12px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.doctor-workspace input:not([type="checkbox"]):focus,
+.doctor-workspace select:focus,
+.doctor-workspace textarea:focus,
+.laboratory-workspace input:not([type="checkbox"]):focus,
+.laboratory-workspace select:focus,
+.laboratory-workspace textarea:focus {
+  border-color: #7e96a7;
+  box-shadow: 0 0 0 3px rgba(96, 123, 140, 0.10);
+}
+
+.doctor-workspace input:not([type="checkbox"]):disabled,
+.doctor-workspace select:disabled,
+.doctor-workspace textarea:disabled,
+.laboratory-workspace input:not([type="checkbox"]):disabled,
+.laboratory-workspace select:disabled,
+.laboratory-workspace textarea:disabled {
+  background: #f5f7f8;
+  color: #86939d;
+}
+
+.doctor-workspace input:not([type="checkbox"])::placeholder,
+.doctor-workspace textarea::placeholder,
+.laboratory-workspace input:not([type="checkbox"])::placeholder,
+.laboratory-workspace textarea::placeholder {
+  color: #a1acb3;
+}
+
+
+/* ==========================================================================
+   LIGHTBURGH Design System
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Page Structure
+   -------------------------------------------------------------------------- */
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 22px;
+}
+
+.page-header h1,
+.page-header h2 {
+  margin: 0;
+  color: #17212b;
+  letter-spacing: -0.025em;
+}
+
+.page-header h1 {
+  font-size: 27px;
+}
+
+.page-header h2 {
+  font-size: 22px;
+}
+
+.page-header p {
+  margin: 7px 0 0;
+  color: #71808c;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+
+.section-heading h2,
+.section-heading h3 {
+  margin: 0;
+  color: #17212b;
+  letter-spacing: -0.02em;
+}
+
+.section-heading h2 {
+  font-size: 19px;
+}
+
+.section-heading h3 {
+  font-size: 15px;
+}
+
+.section-heading p {
+  margin: 5px 0 0;
+  color: #71808c;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+
+/* --------------------------------------------------------------------------
+   Form System
+   -------------------------------------------------------------------------- */
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.form-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.form-field > label,
+.form-field > span,
+.form-label {
+  color: #52616d;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid #d3dbe1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #17212b;
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.form-field input,
+.form-field select {
+  height: 40px;
+  padding: 0 11px;
+}
+
+.form-field textarea {
+  min-height: 96px;
+  padding: 10px 11px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  border-color: #7e96a7;
+  box-shadow: 0 0 0 3px rgba(96, 123, 140, 0.10);
+}
+
+.form-field input:disabled,
+.form-field select:disabled,
+.form-field textarea:disabled {
+  background: #f5f7f8;
+  color: #86939d;
+}
+
+.form-field input::placeholder,
+.form-field textarea::placeholder {
+  color: #a1acb3;
+}
+
+.form-field--full {
+  grid-column: 1 / -1;
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.inline-form {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+
+/* --------------------------------------------------------------------------
+   Data Table
+   -------------------------------------------------------------------------- */
+
+.data-table {
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #dfe5e9;
+  border-radius: 12px;
+}
+
+.data-table-header,
+.data-table-row {
+  display: grid;
+  grid-template-columns:
+    minmax(220px, 1.5fr)
+    minmax(180px, 1.1fr)
+    minmax(150px, 1fr)
+    minmax(120px, auto);
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+}
+
+.data-table-header {
+  background: #f7f9fa;
+  color: #71808c;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.data-table-row {
+  min-height: 62px;
+  border-top: 1px solid #edf0f2;
+}
+
+.data-table-row:hover {
+  background: #fbfcfc;
+}
+
+.data-table-cell {
+  min-width: 0;
+}
+
+.data-table-cell strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: #17212b;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-table-cell span {
+  display: block;
+  margin-top: 3px;
+  overflow: hidden;
+  color: #7a8791;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+/* --------------------------------------------------------------------------
+   Status
+   -------------------------------------------------------------------------- */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid #dce3e8;
+  border-radius: 999px;
+  background: #f7f9fa;
+  color: #53636f;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.status-badge--active,
+.status-badge--success {
+  border-color: #d4eadc;
+  background: #edf8f1;
+  color: #277347;
+}
+
+.status-badge--pending,
+.status-badge--warning {
+  border-color: #f0dfb7;
+  background: #fff7e6;
+  color: #96671d;
+}
+
+.status-badge--danger,
+.status-badge--inactive {
+  border-color: #efd1d1;
+  background: #fdf0f0;
+  color: #9b3030;
+}
+
+
+/* --------------------------------------------------------------------------
+   Cards / Metrics
+   -------------------------------------------------------------------------- */
+
+.metric-card {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+  background: #ffffff;
+  border: 1px solid #dfe5e9;
+  border-radius: 12px;
+}
+
+.metric-card > span {
+  color: #71808c;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.metric-card > strong {
+  color: #17212b;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.metric-card > button {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #526b7d;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.detail-panel {
+  padding: 20px;
+  background: #ffffff;
+  border: 1px solid #dfe5e9;
+  border-radius: 12px;
+}
+
+.action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid #edf0f2;
+  border-radius: 8px;
+  background: #fafbfc;
+}
+
+.action-row:hover {
+  background: #f5f7f8;
+}
+
+
+/* --------------------------------------------------------------------------
+   Empty / Feedback States
+   -------------------------------------------------------------------------- */
+
+.empty-state {
+  display: grid;
+  place-items: center;
+  min-height: 160px;
+  padding: 28px;
+  text-align: center;
+}
+
+.empty-state strong {
+  color: #52616d;
+  font-size: 12px;
+}
+
+.empty-state p {
+  margin: 6px 0 0;
+  color: #82909a;
+  font-size: 10px;
+}
+
+.error-state {
+  padding: 14px 16px;
+  border: 1px solid #efd1d1;
+  border-radius: 8px;
+  background: #fdf0f0;
+  color: #9b3030;
+  font-size: 11px;
+}
+
+.success-state {
+  padding: 14px 16px;
+  border: 1px solid #d4eadc;
+  border-radius: 8px;
+  background: #edf8f1;
+  color: #277347;
+  font-size: 11px;
+}
+
+
+@media (max-width: 760px) {
+  .page-header {
+    flex-direction: column;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-field--full {
+    grid-column: auto;
+  }
+
+  .data-table {
+    overflow-x: auto;
+  }
+
+  .data-table-header,
+  .data-table-row {
+    min-width: 680px;
+  }
+}

@@ -194,6 +194,9 @@ export default function AdministrationStaff({
     null,
   )
 
+  const [searchQuery, setSearchQuery] =
+    useState('')
+
 
   // ==========================================================================
   // Available user accounts
@@ -208,6 +211,36 @@ export default function AdministrationStaff({
       ),
     [users],
   )
+
+  const filteredStaff = useMemo(() => {
+    const query =
+      searchQuery.trim().toLowerCase()
+
+    if (!query) {
+      return staff
+    }
+
+    return staff.filter(member => {
+      const fullName = [
+        member.first_name,
+        member.middle_name,
+        member.last_name,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+
+      return (
+        fullName.includes(query) ||
+        member.staff_number
+          .toLowerCase()
+          .includes(query) ||
+        (member.email ?? '')
+          .toLowerCase()
+          .includes(query)
+      )
+    })
+  }, [searchQuery, staff])
 
 
   // ==========================================================================
@@ -852,166 +885,267 @@ export default function AdministrationStaff({
 
 
       {/* ==================================================================== */}
-      {/* Staff List                                                           */}
+      {/* ==================================================================== */}
+      {/* Staff Directory                                                      */}
       {/* ==================================================================== */}
 
-      {loading &&
-      staff.length === 0 ? (
-        <div className="admin-empty-state">
-          Loading staff...
+      <section className="workspace-panel">
+
+        <div className="panel-header">
+
+          <div>
+            <p className="eyebrow">
+              STAFF DIRECTORY
+            </p>
+
+            <h3>
+              Hospital staff
+            </h3>
+
+            <p>
+              {staff.length}{' '}
+              staff member
+              {staff.length === 1
+                ? ''
+                : 's'} registered with this hospital.
+            </p>
+          </div>
+
+          <span className="staff-directory-count">
+            {staff.length} total
+          </span>
+
         </div>
-      ) : staff.length === 0 ? (
-        <div className="admin-empty-state">
-          No staff profiles found.
+
+
+        <div className="admin-staff-toolbar">
+
+          <div className="admin-search">
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={event =>
+                setSearchQuery(
+                  event.target.value,
+                )
+              }
+              placeholder="Search name, staff number or email..."
+            />
+          </div>
+
         </div>
-      ) : (
-        <div className="admin-staff-list">
-
-          {staff.map(member => {
-
-            const linkedUser =
-              users.find(
-                user =>
-                  user.id ===
-                  member.user_account_id,
-              )
 
 
-            const selectedUserId =
-              getSelectedUserId(
-                member.id,
-              )
+        {loading &&
+        staff.length === 0 ? (
+          <div className="empty-state">
+            <strong>
+              Loading staff...
+            </strong>
+          </div>
+        ) : filteredStaff.length === 0 ? (
+          <div className="empty-state">
+
+            <strong>
+              {staff.length === 0
+                ? 'No staff profiles found.'
+                : 'No staff match your search.'}
+            </strong>
+
+            {staff.length > 0 && (
+              <p>
+                Try a different name,
+                staff number or email.
+              </p>
+            )}
+
+          </div>
+        ) : (
+          <div className="data-table admin-staff-directory">
+
+            <div className="
+              data-table-header
+              admin-staff-directory-header
+            ">
+              <div>
+                Staff
+              </div>
+
+              <div>
+                Contact
+              </div>
+
+              <div>
+                Account
+              </div>
+
+              <div>
+                Action
+              </div>
+            </div>
 
 
-            const isLinking =
-              linkingStaffId ===
-              member.id
+            {filteredStaff.map(member => {
+
+              const linkedUser =
+                users.find(
+                  user =>
+                    user.id ===
+                    member.user_account_id,
+                )
+
+              const selectedUserId =
+                getSelectedUserId(
+                  member.id,
+                )
+
+              const isLinking =
+                linkingStaffId ===
+                member.id
 
 
-            return (
-              <article
-                key={member.id}
-                className="admin-staff-card"
-              >
+              return (
+                <div
+                  key={member.id}
+                  className="
+                    data-table-row
+                    admin-staff-directory-row
+                  "
+                >
 
-                {/* ======================================================== */}
-                {/* Staff Details                                             */}
-                {/* ======================================================== */}
-
-                <div className="admin-staff-details">
-
-                  <div>
+                  <div className="data-table-cell">
                     <strong>
                       {member.first_name}{' '}
-
                       {member.middle_name
                         ? `${member.middle_name} `
                         : ''}
-
                       {member.last_name}
                     </strong>
 
-
-                    <p>
-                      Staff number:{' '}
+                    <span>
                       {member.staff_number}
-                    </p>
+                    </span>
+                  </div>
 
 
-                    <p>
+                  <div className="data-table-cell">
+                    <strong>
                       {member.email ??
                         'No email recorded'}
-                    </p>
+                    </strong>
+
+                    <span>
+                      {member.phone_number ??
+                        'No phone recorded'}
+                    </span>
+                  </div>
+
+
+                  <div className="data-table-cell">
+
+                    {member.user_account_id ? (
+                      <>
+                        <span className="
+                          status-badge
+                          status-badge--active
+                        ">
+                          Active
+                        </span>
+
+                        <span>
+                          {linkedUser?.email ??
+                            'Linked account'}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="
+                          status-badge
+                          status-badge--pending
+                        ">
+                          No account
+                        </span>
+
+                        <span>
+                          LIGHTBURGH access not linked
+                        </span>
+                      </>
+                    )}
 
                   </div>
 
 
-                  <div>
+                  <div className="
+                    data-table-cell
+                    admin-staff-directory-action
+                  ">
 
                     {member.user_account_id ? (
-                      <span>
-                        Linked to:{' '}
-
-                        {linkedUser?.email ??
-                          member.user_account_id}
+                      <span className="admin-staff-directory-placeholder">
+                        —
                       </span>
                     ) : (
-                      <span>
-                        No user account linked
-                      </span>
+                      <div className="admin-staff-link-inline">
+
+                        <select
+                          className="form-control"
+                          value={selectedUserId}
+                          onChange={event =>
+                            handleUserSelection(
+                              member.id,
+                              event.target.value,
+                            )
+                          }
+                          disabled={isLinking}
+                        >
+                          <option value="">
+                            Link account
+                          </option>
+
+                          {availableUsers.map(
+                            user => (
+                              <option
+                                key={user.id}
+                                value={user.id}
+                              >
+                                {user.email}
+                              </option>
+                            ),
+                          )}
+                        </select>
+
+                        <button
+                          type="button"
+                          className="primary-button"
+                          disabled={
+                            !selectedUserId ||
+                            isLinking
+                          }
+                          onClick={() =>
+                            void handleLinkUser(
+                              member,
+                            )
+                          }
+                        >
+                          {isLinking
+                            ? 'Linking...'
+                            : 'Link'}
+                        </button>
+
+                      </div>
                     )}
 
                   </div>
 
                 </div>
+              )
+            })}
 
+          </div>
+        )}
 
-                {/* ======================================================== */}
-                {/* Link User Account                                        */}
-                {/* ======================================================== */}
+      </section>
 
-                {!member.user_account_id && (
-                  <div className="admin-staff-link">
-
-                    <select
-                      value={
-                        selectedUserId
-                      }
-                      onChange={event =>
-                        handleUserSelection(
-                          member.id,
-                          event.target.value,
-                        )
-                      }
-                      disabled={isLinking}
-                    >
-
-                      <option value="">
-                        Select user account
-                      </option>
-
-
-                      {availableUsers.map(
-                        user => (
-                          <option
-                            key={user.id}
-                            value={user.id}
-                          >
-                            {user.email}
-                          </option>
-                        ),
-                      )}
-
-                    </select>
-
-
-                    <button
-                      type="button"
-                      className="primary-button"
-                      disabled={
-                        !selectedUserId ||
-                        isLinking
-                      }
-                      onClick={() =>
-                        void handleLinkUser(
-                          member,
-                        )
-                      }
-                    >
-                      {isLinking
-                        ? 'Linking...'
-                        : 'Link account'}
-                    </button>
-
-                  </div>
-                )}
-
-              </article>
-            )
-          })}
-
-        </div>
-      )}
 
     </section>
   )

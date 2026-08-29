@@ -8,6 +8,9 @@ import { apiRequest } from './client'
 
 export type ClinicalDocumentType =
   | 'NURSING_INTAKE'
+  | 'INITIAL_CLERKING'
+  | 'PROGRESS_NOTE'
+  | 'DISCHARGE_SUMMARY'
 
 
 export type ClinicalDocumentStatus =
@@ -48,7 +51,6 @@ export async function createClinicalDocument(
   accessToken: string,
   payload: {
     encounter_id: string
-    patient_id: string
     document_type: ClinicalDocumentType
     authored_by: string
     content: Record<string, unknown>
