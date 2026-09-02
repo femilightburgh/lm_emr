@@ -158,212 +158,226 @@ export default function NursingPatientSummary({
   return (
     <>
       {/* ================================================================== */}
-      {/* Patient Context                                                   */}
+      {/* Patient Information                                               */}
       {/* ================================================================== */}
 
-      <section className="nursing-section">
+      <section className="nursing-compact-section">
 
-        <div className="nursing-section-heading">
+        <details className="nursing-collapsible">
 
-          <div>
-            <p className="eyebrow">
-              PATIENT CONTEXT
-            </p>
+          <summary>
+            <div>
+              <span className="nursing-collapsible-label">
+                PATIENT INFORMATION
+              </span>
 
-            <h3>
-              Clinical background
-            </h3>
+              {!loadingPatient && patient && (
+                <span className="nursing-collapsible-summary">
+                  {patient.blood_group ?? 'Blood group —'}
+                  {' · '}
+                  {patient.genotype ?? 'Genotype —'}
+                  {' · '}
+                  Allergies: See nursing intake
+                </span>
+              )}
+            </div>
 
-            <p>
-              Information that may be relevant
-              to the current nursing assessment.
-            </p>
+            <span className="nursing-collapsible-chevron">
+              ▾
+            </span>
+          </summary>
+
+          <div className="nursing-compact-content">
+
+            {loadingPatient && (
+              <div className="admin-empty-state">
+                Loading patient information...
+              </div>
+            )}
+
+            {!loadingPatient && patient && (
+              <div className="nursing-detail-grid">
+
+                <ContextValue
+                  label="Blood group"
+                  value={
+                    patient.blood_group ??
+                    '—'
+                  }
+                />
+
+                <ContextValue
+                  label="Genotype"
+                  value={
+                    patient.genotype ??
+                    '—'
+                  }
+                />
+
+                <ContextValue
+                  label="Phone"
+                  value={
+                    patient.phone_number ??
+                    '—'
+                  }
+                />
+
+                <ContextValue
+                  label="Allergies"
+                  value="See nursing intake"
+                />
+
+                <ContextValue
+                  label="Next of kin"
+                  value={
+                    patient.next_of_kin_name ??
+                    '—'
+                  }
+                />
+
+                <ContextValue
+                  label="Relationship"
+                  value={
+                    patient.next_of_kin_relationship ??
+                    '—'
+                  }
+                />
+
+              </div>
+            )}
+
+            {!loadingPatient && !patient && (
+              <div className="admin-empty-state">
+                Patient information could not
+                be loaded.
+              </div>
+            )}
+
           </div>
 
-        </div>
-
-
-        {loadingPatient && (
-          <div className="admin-empty-state">
-            Loading patient information...
-          </div>
-        )}
-
-
-        {!loadingPatient &&
-          patient && (
-            <div className="nursing-section-grid">
-
-              <ContextValue
-                label="Blood group"
-                value={
-                  patient.blood_group ??
-                  '—'
-                }
-              />
-
-
-              <ContextValue
-                label="Genotype"
-                value={
-                  patient.genotype ??
-                  '—'
-                }
-              />
-
-
-              <ContextValue
-                label="Phone"
-                value={
-                  patient.phone_number ??
-                  '—'
-                }
-              />
-
-
-              <ContextValue
-                label="Allergies"
-                value="See nursing intake"
-              />
-
-
-              <ContextValue
-                label="Next of kin"
-                value={
-                  patient.next_of_kin_name ??
-                  '—'
-                }
-              />
-
-
-              <ContextValue
-                label="Relationship"
-                value={
-                  patient
-                    .next_of_kin_relationship ??
-                  '—'
-                }
-              />
-
-            </div>
-          )}
-
-
-        {!loadingPatient &&
-          !patient && (
-            <div className="admin-empty-state">
-              Patient information could not
-              be loaded.
-            </div>
-          )}
+        </details>
 
       </section>
 
 
+
       {/* ================================================================== */}
-      {/* Current Care Context                                               */}
+      {/* Current Care                                                       */}
       {/* ================================================================== */}
 
-      <section className="nursing-section">
+      <section className="nursing-compact-section">
 
-        <div className="nursing-section-heading">
+        <details className="nursing-collapsible">
 
-          <div>
-            <p className="eyebrow">
-              CURRENT CARE
-            </p>
+          <summary>
+            <div>
+              <span className="nursing-collapsible-label">
+                CURRENT CARE
+              </span>
 
-            <h3>
-              Episode and encounter
-            </h3>
+              <span className="nursing-collapsible-summary">
+                {episode.episode_number}
+                {' · '}
+                {encounter.title}
+                {' · '}
+                {encounter.status}
+              </span>
+            </div>
+
+            <span className="nursing-collapsible-chevron">
+              ▾
+            </span>
+          </summary>
+
+          <div className="nursing-compact-content">
+
+            <div className="nursing-detail-grid">
+
+              <ContextValue
+                label="Episode"
+                value={
+                  episode.episode_number
+                }
+              />
+
+              <ContextValue
+                label="Visit"
+                value={
+                  episode.title
+                }
+              />
+
+              <ContextValue
+                label="Encounter"
+                value={
+                  encounter.title
+                }
+              />
+
+              <ContextValue
+                label="Started"
+                value={
+                  formatDateTime(
+                    encounter.started_at,
+                  )
+                }
+              />
+
+              <ContextValue
+                label="Encounter status"
+                value={
+                  encounter.status
+                }
+              />
+
+              <ContextValue
+                label="Episode opened"
+                value={
+                  formatDateTime(
+                    episode.opened_at,
+                  )
+                }
+              />
+
+            </div>
+
           </div>
 
-        </div>
-
-
-        <div className="nursing-section-grid">
-
-          <ContextValue
-            label="Episode"
-            value={
-              episode.episode_number
-            }
-          />
-
-
-          <ContextValue
-            label="Visit"
-            value={
-              episode.title
-            }
-          />
-
-
-          <ContextValue
-            label="Encounter"
-            value={
-              encounter.title
-            }
-          />
-
-
-          <ContextValue
-            label="Started"
-            value={
-              formatDateTime(
-                encounter.started_at,
-              )
-            }
-          />
-
-
-          <ContextValue
-            label="Encounter status"
-            value={
-              encounter.status
-            }
-          />
-
-
-          <ContextValue
-            label="Episode opened"
-            value={
-              formatDateTime(
-                episode.opened_at,
-              )
-            }
-          />
-
-        </div>
+        </details>
 
       </section>
 
 
+
       {/* ================================================================== */}
-      {/* Previous Visits                                                   */}
+      {/* Previous Visits                                                    */}
       {/* ================================================================== */}
 
-      <section className="nursing-section nursing-history">
+      <section className="nursing-compact-section">
 
-        <div className="nursing-section-heading">
+        <details className="nursing-collapsible">
 
-          <div>
-            <p className="eyebrow">
-              HISTORY
-            </p>
+          <summary>
+            <div>
+              <span className="nursing-collapsible-label">
+                PREVIOUS VISITS
+              </span>
 
-            <h3>
-              Previous visits
-            </h3>
+              <span className="nursing-collapsible-summary">
+                {previousEpisodes.length}
+                {' '}
+                {previousEpisodes.length === 1
+                  ? 'previous episode'
+                  : 'previous episodes'}
+              </span>
+            </div>
 
-            <p>
-              Review prior episodes, encounters,
-              and recorded clinical events.
-            </p>
-          </div>
+            <span className="nursing-collapsible-chevron">
+              ▾
+            </span>
+          </summary>
 
-        </div>
-
+          <div className="nursing-compact-content">
 
         {loadingPreviousEpisodes && (
           <div className="admin-empty-state">
@@ -662,6 +676,12 @@ export default function NursingPatientSummary({
 
             </div>
           )}
+
+
+
+          </div>
+
+        </details>
 
       </section>
 

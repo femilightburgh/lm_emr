@@ -30,6 +30,9 @@ from app.modules.encounter.services.encounter_service import (
 from app.modules.episode.repositories.episode_repository import (
     EpisodeRepository,
 )
+from app.modules.episode.repositories.episode_disposition_repository import (
+    EpisodeDispositionRepository,
+)
 from app.modules.episode.services.episode_number_generator import (
     EpisodeNumberGenerator,
 )
@@ -249,11 +252,18 @@ def create_doctor_encounter(
         number_generator=EpisodeNumberGenerator(
             repository=episode_repository,
         ),
-        encounter_repository=EncounterRepository(db),
+        encounter_service=EncounterService(
+            repository=EncounterRepository(db),
+            episode_repository=episode_repository,
+            staff_repository=StaffRepository(
+                session=db,
+            ),
+        ),
         event_service=ClinicalEventService(
             repository=ClinicalEventRepository(db),
         ),
         staff_repository=StaffRepository(db),
+        disposition_repository=EpisodeDispositionRepository(db),
     ).create_episode(
         context=context,
         patient_id=patient.id,
@@ -514,3 +524,123 @@ def test_doctor_can_cancel_clinical_order(
 
     assert response.status_code == 200
     assert response.json()["status"] == "CANCELLED"
+
+
+def test_doctor_can_create_diagnostic_order_and_diagnostics_queue_returns_it(
+    client,
+    db,
+):
+    from app.core.context import RequestContext
+    from app.modules.clinical_orders.enums import ClinicalOrderType
+    from app.modules.clinical_orders.repositories import (
+        ClinicalOrderRepository,
+        PrescriptionRepository,
+    )
+    from app.modules.clinical_orders.services import (
+        ClinicalOrderService,
+    )
+    from app.modules.diagnostics.repositories import (
+        DiagnosticRepository,
+    )
+    from app.modules.encounter.repositories.encounter_repository import (
+        EncounterRepository,
+    )
+    from app.modules.episode.repositories.episode_repository import (
+        EpisodeRepository,
+    )
+    from app.modules.events.repositories import (
+        ClinicalEventRepository,
+    )
+    from app.modules.events.services.event_service import (
+        ClinicalEventService,
+    )
+    from app.modules.staff.repository import StaffRepository
+
+    hospital = create_hospital(db)
+
+    doctor_user = create_user(
+        db,
+        hospital=hospital,
+        email=f"diagnostic-doctor-{uuid4()}@example.com",
+        role_name="Doctor",
+    )
+
+    _, encounter = create_doctor_encounter(
+        db,
+        hospital,
+        doctor_user,
+    )
+
+    diagnostic_repository = DiagnosticRepository(db)
+
+    ecg = diagnostic_repository.get_investigation_by_code(
+        hospital_id=hospital.id,
+        code="ECG",
+    )
+
+    assert ecg is not None
+    assert ecg.code == "ECG"
+    assert ecg.name == "Electrocardiogram"
+    assert ecg.category.value == "CARDIOLOGY"
+
+    doctor_context = RequestContext(
+        user_id=doctor_user.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
+    order_service = ClinicalOrderService(
+        repository=ClinicalOrderRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+        encounter_repository=EncounterRepository(db),
+        episode_repository=EpisodeRepository(db),
+        staff_repository=StaffRepository(db),
+        prescription_repository=PrescriptionRepository(db),
+    )
+
+    order = order_service.create_order(
+        context=doctor_context,
+        encounter_id=encounter.id,
+        order_type=ClinicalOrderType.DIAGNOSTIC,
+        priority="ROUTINE",
+        details={
+            "investigation_id": str(ecg.id),
+        },
+    )
+
+    assert order.order_type == ClinicalOrderType.DIAGNOSTIC
+    assert order.status.value == "REQUESTED"
+    assert order.details["investigation_id"] == str(ecg.id)
+    assert order.details["investigation_code"] == "ECG"
+    assert order.details["investigation_name"] == "Electrocardiogram"
+    assert order.details["diagnostic_category"] == "CARDIOLOGY"
+
+    token = authenticate(
+        db,
+        hospital=hospital,
+        email=doctor_user.email,
+    )
+
+    response = client.get(
+        "/api/v1/clinical-orders/queue/diagnostics",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    queue_item = next(
+        item
+        for item in body
+        if item["id"] == str(order.id)
+    )
+
+    assert queue_item["order_type"] == "DIAGNOSTIC"
+    assert queue_item["status"] == "REQUESTED"
+    assert queue_item["details"]["investigation_code"] == "ECG"
+    assert queue_item["details"]["investigation_name"] == (
+        "Electrocardiogram"
+    )

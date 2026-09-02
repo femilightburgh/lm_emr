@@ -45,6 +45,24 @@ class PatientRepository:
         self.db.refresh(patient)
         return patient
 
+    def count_by_hospital(
+        self,
+        hospital_id: UUID,
+    ) -> int:
+        """
+        Count patients belonging to a specific hospital.
+        """
+        return int(
+            self.db.scalar(
+                select(
+                    func.count(Patient.id),
+                ).where(
+                    Patient.hospital_id == hospital_id,
+                )
+            )
+            or 0
+        )
+
     def get_by_id(
         self,
         hospital_id: UUID,

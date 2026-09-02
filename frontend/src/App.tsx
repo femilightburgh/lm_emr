@@ -32,6 +32,7 @@ import NursingWorkspace from './components/nursing/NursingWorkspace'
 import DoctorWorkspace from './components/doctor/DoctorWorkspace'
 import LaboratoryWorkspace from './components/laboratory/LaboratoryWorkspace'
 import PharmacyWorkspace from './components/pharmacy/PharmacyWorkspace'
+import DiagnosticsWorkspace from './components/diagnostics/DiagnosticsWorkspace'
 
 function App() {
   // ==========================================================================
@@ -66,18 +67,13 @@ function App() {
     useState<WorkspaceView>('dashboard')
 
 
-  function openPatients() {
-    setView('patients')
+  function openReception() {
+    setView('reception')
   }
 
 
   function openDashboard() {
     setView('dashboard')
-  }
-
-
-  function openRegistration() {
-    setView('register')
   }
 
 
@@ -376,6 +372,10 @@ const isLaboratoryScientist =
 const isPharmacist =
   user.roles?.includes('Pharmacist') ?? false
 
+const isDiagnosticsUser =
+  user.roles?.includes('Radiographer') === true ||
+  user.roles?.includes('Laboratory Scientist') === true
+
 return (
   <AppShell
     user={user}
@@ -386,9 +386,9 @@ return (
     isDoctor={isDoctor}
     isLaboratoryScientist={isLaboratoryScientist}
     isPharmacist={isPharmacist}
+    isDiagnosticsUser={isDiagnosticsUser}
     onDashboard={openDashboard}
-    onPatients={openPatients}
-    onRegistration={openRegistration}
+    onReception={openReception}
     onAdministrator={() =>
       setView('administrator')
     }
@@ -403,6 +403,9 @@ return (
     }
     onPharmacy={() =>
       setView('pharmacy')
+    }
+    onDiagnostics={() =>
+      setView('diagnostics')
     }
     onSignOut={handleSignOut}
   >
@@ -430,9 +433,9 @@ return (
           <button
             type="button"
             className="primary-button dashboard-action"
-            onClick={openPatients}
+            onClick={openReception}
           >
-            Find patient
+            Open reception
           </button>
 
         </div>
@@ -440,8 +443,7 @@ return (
       </section>
     )}
 
-    {(view === 'patients' ||
-      view === 'register') && (
+    {view === 'reception' && (
       <ReceptionWorkspace
         accessToken={session.access_token}
         onDashboard={openDashboard}
@@ -480,6 +482,14 @@ return (
     {view === 'pharmacy' &&
       isPharmacist && (
       <PharmacyWorkspace
+        accessToken={session.access_token}
+      />
+    )}
+
+
+    {view === 'diagnostics' &&
+      isDiagnosticsUser && (
+      <DiagnosticsWorkspace
         accessToken={session.access_token}
       />
     )}

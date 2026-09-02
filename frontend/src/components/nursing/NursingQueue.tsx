@@ -4,6 +4,7 @@ import type { Episode } from '../../api/episodes'
 interface Props {
   waitingEpisodes: Episode[]
   activeEpisodes: Episode[]
+  admittedEpisodes: Episode[]
   patientNames: Record<string, string>
 
   loading: boolean
@@ -34,6 +35,7 @@ function getPatientName(
 export default function NursingQueue({
   waitingEpisodes,
   activeEpisodes,
+  admittedEpisodes,
   patientNames,
 
   loading,
@@ -222,6 +224,99 @@ export default function NursingQueue({
                     {loadingEncounter
                       ? 'Opening...'
                       : 'Continue'}
+                  </button>
+
+                </article>
+              ),
+            )}
+
+          </div>
+        )}
+
+      </section>
+
+
+      {/* ================================================================== */}
+      {/* Patients on Admission        */}
+      {/* ================================================================== */}
+
+      <section className="nursing-queue-section">
+
+        <div className="nursing-queue-header">
+
+          <div>
+
+            <p className="eyebrow">
+              INPATIENTS
+            </p>
+
+            <h3>
+              Patients on admission
+            </h3>
+
+          </div>
+
+          <span className="nursing-queue-count">
+            {admittedEpisodes.length}
+          </span>
+
+        </div>
+
+
+        {admittedEpisodes.length === 0 ? (
+          <div className="admin-empty-state">
+            No patients are currently on admission.
+          </div>
+        ) : (
+          <div className="nursing-queue-list">
+
+            {admittedEpisodes.map(
+              episode => (
+                <article
+                  key={episode.id}
+                  className="nursing-queue-item"
+                >
+
+                  <div className="nursing-queue-patient">
+
+                    <strong>
+                      {getPatientName(
+                        episode,
+                        patientNames,
+                      )}
+                    </strong>
+
+                    <p>
+                      {episode.episode_number}
+                    </p>
+
+                    <p>
+                      {episode.title}
+                    </p>
+
+                  </div>
+
+
+                  <span className="nursing-queue-status">
+                    Admitted
+                  </span>
+
+
+                  <button
+                    type="button"
+                    className="primary-button"
+                    disabled={
+                      loadingEncounter
+                    }
+                    onClick={() =>
+                      onContinueNursing(
+                        episode,
+                      )
+                    }
+                  >
+                    {loadingEncounter
+                      ? 'Opening...'
+                      : 'Open'}
                   </button>
 
                 </article>

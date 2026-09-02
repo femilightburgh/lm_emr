@@ -84,11 +84,14 @@ export default function NursingVitalsForm({
   onSave,
 }: Props) {
   return (
-    <section className="nursing-section nursing-vitals-entry">
+    <details
+      className="nursing-section nursing-vitals-entry"
+    >
 
-      <div className="nursing-section-heading">
+      <summary className="nursing-vitals-entry-summary">
 
         <div>
+
           <p className="eyebrow">
             CLINICAL OBSERVATIONS
           </p>
@@ -99,15 +102,21 @@ export default function NursingVitalsForm({
 
           <p>
             Enter the patient's current
-            measurements. Fields may be
-            completed independently.
+            measurements.
           </p>
+
         </div>
 
-      </div>
+        <span className="nursing-collapsible-chevron">
+          ▾
+        </span>
+
+      </summary>
 
 
-      <div className="nursing-vitals-entry-grid">
+      <div className="nursing-vitals-entry-body">
+
+        <div className="nursing-vitals-entry-grid">
 
         <VitalField
           label="Temperature"
@@ -284,6 +293,8 @@ export default function NursingVitalsForm({
 
       </div>
 
-    </section>
+    </div>
+
+    </details>
   )
 }

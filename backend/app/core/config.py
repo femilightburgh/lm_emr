@@ -51,9 +51,23 @@ class Settings(BaseSettings):
 
     database_url: str
 
-# ----------------------------------------------------------
-# Security
-# ----------------------------------------------------------
+    # ----------------------------------------------------------
+    # Storage
+    # ----------------------------------------------------------
+
+    storage_backend: str = "local"
+
+    storage_path: str = "./storage"
+
+    storage_max_file_size_mb: int = 20
+
+    storage_allowed_content_types: str = (
+        "application/pdf,image/jpeg,image/png"
+    )
+
+    # ----------------------------------------------------------
+    # Security
+    # ----------------------------------------------------------
 
     jwt_secret_key: str = Field(
         validation_alias="JWT_SECRET_KEY"

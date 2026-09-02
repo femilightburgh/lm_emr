@@ -53,3 +53,27 @@ class ClinicalOrderAlreadyReceivedError(Exception):
 
 class ClinicalOrderCannotReceiveError(Exception):
     """Raised when a Clinical Order cannot be received."""
+
+
+class MedicationAdministrationStaffNotFoundError(Exception):
+    """Raised when the authenticated user has no Staff profile."""
+
+
+class MedicationAdministrationStaffHospitalMismatchError(Exception):
+    """Raised when the Staff member belongs to another Hospital."""
+
+
+class MedicationDoseNotFoundError(Exception):
+    """Raised when a medication dose cannot be found."""
+
+
+class MedicationDoseAlreadyAdministeredError(Exception):
+    """Raised when a medication dose already has an administration record."""
+
+
+class MedicationDoseCannotBeAdministeredError(Exception):
+    """Raised when a medication dose is not eligible for administration."""
+
+
+class MedicationAdministrationEpisodeError(Exception):
+    """Raised when medication administration is attempted outside an admitted Episode."""

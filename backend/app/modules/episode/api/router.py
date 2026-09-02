@@ -34,6 +34,10 @@ from app.modules.encounter.repositories.encounter_repository import (
     EncounterRepository,
 )
 
+from app.modules.encounter.services.encounter_service import (
+    EncounterService,
+)
+
 from app.modules.episode.exceptions import (
     DepartmentHospitalMismatchError,
     DepartmentInactiveError,
@@ -46,7 +50,10 @@ from app.modules.episode.exceptions import (
     EpisodeAlreadyRoutedError,
     EpisodeNotAwaitingCheckInError,
     InvalidConsultationDispositionError,
+    InvalidWardReviewDispositionError,
     EpisodeNotFoundError,
+    WardReviewEncounterRequiredError,
+    WardReviewDispositionDetailsRequiredError,
     EpisodeNotInNursingError,
     EpisodeNotOpenError,
     EpisodeNotWaitingForNursingError,
@@ -58,9 +65,13 @@ from app.modules.episode.exceptions import (
 from app.modules.episode.repositories.episode_repository import (
     EpisodeRepository,
 )
+from app.modules.episode.repositories.episode_disposition_repository import (
+    EpisodeDispositionRepository,
+)
 
 from app.modules.episode.schemas import (
     CompleteConsultationRequest,
+    CompleteWardReviewRequest,
     CreateEpisodeRequest,
     DoctorQueueItemResponse,
     EpisodeResponse,
@@ -125,8 +136,18 @@ def get_episode_service(
         repository=repository,
     )
 
+    staff_repository = StaffRepository(
+        session=db,
+    )
+
     encounter_repository = EncounterRepository(
         db,
+    )
+
+    encounter_service = EncounterService(
+        repository=encounter_repository,
+        episode_repository=repository,
+        staff_repository=staff_repository,
     )
 
     event_service = ClinicalEventService(
@@ -135,11 +156,11 @@ def get_episode_service(
         ),
     )
 
-    staff_repository = StaffRepository(
-        session=db,
+    department_repository = DepartmentRepository(
+        db,
     )
 
-    department_repository = DepartmentRepository(
+    disposition_repository = EpisodeDispositionRepository(
         db,
     )
 
@@ -147,9 +168,10 @@ def get_episode_service(
         repository=repository,
         patient_repository=patient_repository,
         number_generator=number_generator,
-        encounter_repository=encounter_repository,
+        encounter_service=encounter_service,
         event_service=event_service,
         staff_repository=staff_repository,
+        disposition_repository=disposition_repository,
         department_repository=department_repository,
     )
 
@@ -310,6 +332,41 @@ def check_in_episode(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Authenticated user does not have a Staff profile.",
         ) from exc
+
+
+
+# ============================================================================
+# Nursing Inpatients
+# ============================================================================
+
+
+@router.get(
+    "/queue/nursing/inpatients",
+    response_model=list[EpisodeResponse],
+    summary="List admitted patients for Nursing",
+)
+def list_nursing_inpatients(
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: EpisodeService = Depends(
+        get_episode_service,
+    ),
+):
+    """
+    Return Episodes currently on admission within the Hospital.
+    """
+
+    episodes = service.list_admitted_episodes(
+        context=context,
+    )
+
+    return [
+        EpisodeResponse.model_validate(
+            episode,
+        )
+        for episode in episodes
+    ]
 
 
 # ============================================================================
@@ -680,6 +737,90 @@ def complete_consultation(
         ) from exc
 
     except InvalidConsultationDispositionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+
+# ============================================================================
+# Complete Ward Review
+# ============================================================================
+
+
+@router.post(
+    "/{episode_id}/complete-ward-review",
+    response_model=EpisodeResponse,
+    summary="Complete an inpatient Ward Review",
+)
+def complete_ward_review(
+    episode_id: UUID,
+    payload: CompleteWardReviewRequest,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: EpisodeService = Depends(
+        get_episode_service,
+    ),
+):
+    """
+    Complete an inpatient Ward Review.
+    """
+
+    try:
+        episode = service.complete_ward_review(
+            context=context,
+            episode_id=episode_id,
+            encounter_id=payload.encounter_id,
+            disposition=payload.disposition,
+            details=payload.details,
+        )
+
+        return EpisodeResponse.model_validate(
+            episode,
+        )
+
+    except EpisodeNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Episode not found.",
+        ) from exc
+
+    except EpisodeAlreadyClosedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Closed episodes cannot complete a Ward Review.",
+        ) from exc
+
+    except EpisodeAlreadyCancelledError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cancelled episodes cannot complete a Ward Review.",
+        ) from exc
+
+    except EncounterNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Encounter not found.",
+        ) from exc
+
+    except EncounterNotBelongingToEpisodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Encounter does not belong to the Episode.",
+        ) from exc
+
+    except EncounterNotOpenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Encounter is not open.",
+        ) from exc
+
+    except (
+        InvalidWardReviewDispositionError,
+        WardReviewEncounterRequiredError,
+        WardReviewDispositionDetailsRequiredError,
+    ) as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),

@@ -93,6 +93,24 @@ class InvalidConsultationDispositionError(EpisodeError):
     """
 
 
+class InvalidWardReviewDispositionError(EpisodeError):
+    """
+    Raised when a Ward Review disposition is invalid.
+    """
+
+
+class WardReviewEncounterRequiredError(EpisodeError):
+    """
+    Raised when an operation requires a Ward Review Encounter.
+    """
+
+
+class WardReviewDispositionDetailsRequiredError(EpisodeError):
+    """
+    Raised when a Ward Review disposition requires additional details.
+    """
+
+
 # ============================================================================
 # Staff
 # ============================================================================

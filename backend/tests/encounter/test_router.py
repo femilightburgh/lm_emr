@@ -22,6 +22,9 @@ from app.modules.identity.user_service import UserService
 from app.modules.episode.repositories.episode_repository import (
     EpisodeRepository,
 )
+from app.modules.episode.repositories.episode_disposition_repository import (
+    EpisodeDispositionRepository,
+)
 from app.modules.episode.services.episode_number_generator import (
     EpisodeNumberGenerator,
 )
@@ -218,11 +221,18 @@ def test_list_doctor_queue_endpoint(
         number_generator=EpisodeNumberGenerator(
             repository=episode_repository,
         ),
-        encounter_repository=EncounterRepository(db),
+        encounter_service=EncounterService(
+            repository=EncounterRepository(db),
+            episode_repository=episode_repository,
+            staff_repository=StaffRepository(
+                session=db,
+            ),
+        ),
         event_service=ClinicalEventService(
             repository=ClinicalEventRepository(db),
         ),
         staff_repository=StaffRepository(db),
+        disposition_repository=EpisodeDispositionRepository(db),
     )
 
     episode = episode_service.create_episode(
@@ -335,11 +345,18 @@ def test_create_encounter_endpoint(
         number_generator=EpisodeNumberGenerator(
             repository=episode_repository,
         ),
-        encounter_repository=EncounterRepository(db),
+        encounter_service=EncounterService(
+            repository=EncounterRepository(db),
+            episode_repository=episode_repository,
+            staff_repository=StaffRepository(
+                session=db,
+            ),
+        ),
         event_service=ClinicalEventService(
             repository=ClinicalEventRepository(db),
         ),
         staff_repository=StaffRepository(db),
+        disposition_repository=EpisodeDispositionRepository(db),
     )
 
     episode = episode_service.create_episode(
@@ -431,11 +448,18 @@ def test_get_encounter_endpoint(
         number_generator=EpisodeNumberGenerator(
             repository=episode_repository,
         ),
-        encounter_repository=EncounterRepository(db),
+        encounter_service=EncounterService(
+            repository=EncounterRepository(db),
+            episode_repository=episode_repository,
+            staff_repository=StaffRepository(
+                session=db,
+            ),
+        ),
         event_service=ClinicalEventService(
             repository=ClinicalEventRepository(db),
         ),
         staff_repository=StaffRepository(db),
+        disposition_repository=EpisodeDispositionRepository(db),
     )
 
     episode = episode_service.create_episode(
@@ -534,11 +558,18 @@ def test_close_encounter_endpoint(
         number_generator=EpisodeNumberGenerator(
             repository=episode_repository,
         ),
-        encounter_repository=EncounterRepository(db),
+        encounter_service=EncounterService(
+            repository=EncounterRepository(db),
+            episode_repository=episode_repository,
+            staff_repository=StaffRepository(
+                session=db,
+            ),
+        ),
         event_service=ClinicalEventService(
             repository=ClinicalEventRepository(db),
         ),
         staff_repository=StaffRepository(db),
+        disposition_repository=EpisodeDispositionRepository(db),
     )
 
     episode = episode_service.create_episode(
@@ -634,11 +665,18 @@ def test_close_encounter_twice_returns_conflict(
         number_generator=EpisodeNumberGenerator(
             repository=episode_repository,
         ),
-        encounter_repository=EncounterRepository(db),
+        encounter_service=EncounterService(
+            repository=EncounterRepository(db),
+            episode_repository=episode_repository,
+            staff_repository=StaffRepository(
+                session=db,
+            ),
+        ),
         event_service=ClinicalEventService(
             repository=ClinicalEventRepository(db),
         ),
         staff_repository=StaffRepository(db),
+        disposition_repository=EpisodeDispositionRepository(db),
     )
 
     episode = episode_service.create_episode(

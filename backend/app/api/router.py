@@ -140,11 +140,17 @@ from app.modules.clinical_orders.api.router import (
 from app.modules.clinical_results.api.router import (
     router as clinical_results_router,
 )
+from app.modules.diagnostics.api.router import (
+    router as diagnostics_router,
+)
 from app.modules.laboratory.api.router import (
     router as laboratory_router,
 )
 from app.modules.pharmacy.api.router import (
     router as pharmacy_router,
+)
+from app.modules.reception.api.router import (
+    router as reception_router,
 )
 
 # ============================================================================
@@ -276,11 +282,20 @@ api_router.include_router(
 )
 
 api_router.include_router(
+    diagnostics_router,
+)
+
+api_router.include_router(
     laboratory_router,
 )
 
 api_router.include_router(
     pharmacy_router,
+)
+
+
+api_router.include_router(
+    reception_router,
 )
 
 # ============================================================================

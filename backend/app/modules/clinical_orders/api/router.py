@@ -6,9 +6,10 @@ Clinical Order API Router
 ==============================================================================
 """
 
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.context import (
@@ -23,6 +24,12 @@ from app.modules.clinical_orders.enums import (
 )
 from app.modules.clinical_orders.exceptions import (
     ClinicalOrderAlreadyCancelledError,
+    MedicationAdministrationEpisodeError,
+    MedicationAdministrationStaffHospitalMismatchError,
+    MedicationAdministrationStaffNotFoundError,
+    MedicationDoseAlreadyAdministeredError,
+    MedicationDoseCannotBeAdministeredError,
+    MedicationDoseNotFoundError,
     ClinicalOrderAlreadyCompletedError,
     ClinicalOrderAlreadyInProgressError,
     ClinicalOrderCannotStartError,
@@ -37,15 +44,29 @@ from app.modules.clinical_orders.exceptions import (
 )
 from app.modules.clinical_orders.repositories import (
     ClinicalOrderRepository,
+    MedicationAdministrationRepository,
+    MedicationTreatmentRepository,
     PrescriptionRepository,
 )
 from app.modules.clinical_orders.schemas import (
     CreateClinicalOrderRequest,
+    CreateMedicationAdministrationRequest,
+    CreateMedicationTreatmentRequest,
     ClinicalOrderResponse,
     LaboratoryQueueItemResponse,
+    DiagnosticQueueItemResponse,
+    MedicationAdministrationResponse,
+    MedicationDoseQueueResponse,
+    MedicationTreatmentResponse,
+    MedicationNursingSummaryResponse,
+    MedicationTreatmentHistoryResponse,
 )
 from app.modules.clinical_orders.services import (
     ClinicalOrderService,
+    InpatientMedicationService,
+    MedicationAdministrationService,
+    MedicationNursingSummaryService,
+    MedicationTreatmentHistoryService,
 )
 from app.modules.encounter.repositories.encounter_repository import (
     EncounterRepository,
@@ -74,6 +95,60 @@ router = APIRouter(
 # ============================================================================
 
 
+def get_inpatient_medication_service(
+    db: Session = Depends(get_db),
+) -> InpatientMedicationService:
+    """
+    Build the inpatient medication service dependency graph.
+    """
+
+    return InpatientMedicationService(
+        db=db,
+        episode_repository=EpisodeRepository(db),
+        treatment_repository=MedicationTreatmentRepository(db),
+    )
+
+
+def get_medication_nursing_summary_service(
+    db: Session = Depends(get_db),
+) -> MedicationNursingSummaryService:
+    """
+    Build the Nursing medication summary service dependency graph.
+    """
+
+    return MedicationNursingSummaryService(
+        treatment_repository=MedicationTreatmentRepository(db),
+        episode_repository=EpisodeRepository(db),
+    )
+
+
+def get_medication_treatment_history_service(
+    db: Session = Depends(get_db),
+) -> MedicationTreatmentHistoryService:
+    """
+    Build the medication treatment history service dependency graph.
+    """
+
+    return MedicationTreatmentHistoryService(
+        treatment_repository=MedicationTreatmentRepository(db),
+    )
+
+
+def get_medication_administration_service(
+    db: Session = Depends(get_db),
+) -> MedicationAdministrationService:
+    """
+    Build the medication administration service dependency graph.
+    """
+
+    return MedicationAdministrationService(
+        repository=MedicationAdministrationRepository(db),
+        treatment_repository=MedicationTreatmentRepository(db),
+        episode_repository=EpisodeRepository(db),
+        staff_repository=StaffRepository(db),
+    )
+
+
 def get_clinical_order_service(
     db: Session = Depends(get_db),
 ) -> ClinicalOrderService:
@@ -90,6 +165,11 @@ def get_clinical_order_service(
         episode_repository=EpisodeRepository(db),
         staff_repository=StaffRepository(db),
         prescription_repository=PrescriptionRepository(db),
+        inpatient_medication_service=InpatientMedicationService(
+            db=db,
+            episode_repository=EpisodeRepository(db),
+            treatment_repository=MedicationTreatmentRepository(db),
+        ),
     )
 
 
@@ -165,6 +245,378 @@ def create_clinical_order(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Staff member does not belong to the authenticated Hospital.",
+        ) from exc
+
+
+# ============================================================================
+# Activate Inpatient Medication Treatment
+# ============================================================================
+
+
+@router.post(
+    "/medication-treatments",
+    response_model=MedicationTreatmentResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create Inpatient Medication Treatment",
+    dependencies=[
+        Depends(
+            require_permission(
+                Permissions.CLINICAL_ORDER_CREATE,
+            ),
+        ),
+    ],
+)
+def create_inpatient_medication_treatment(
+    request: CreateMedicationTreatmentRequest,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: InpatientMedicationService = Depends(
+        get_inpatient_medication_service,
+    ),
+):
+    """
+    Activate an inpatient medication treatment from a prescription.
+    """
+
+    from app.modules.clinical_orders.repositories import (
+        PrescriptionRepository,
+    )
+
+    prescription = PrescriptionRepository(
+        service.db,
+    ).get_by_id(
+        prescription_id=request.prescription_id,
+    )
+
+    if prescription is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Prescription not found.",
+        )
+
+    try:
+        treatment = service.create_treatment(
+            context=context,
+            prescription=prescription,
+            start_at=request.start_at,
+            first_dose_at=request.first_dose_at,
+        )
+
+        return MedicationTreatmentResponse.model_validate(
+            treatment,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+
+# ============================================================================
+# Medication Nursing Summary
+# ============================================================================
+
+
+@router.get(
+    "/medication-nursing-summary/episode/{episode_id}",
+    response_model=MedicationNursingSummaryResponse,
+    summary="Get Nursing Medication Summary",
+    dependencies=[
+        Depends(
+            require_permission(
+                Permissions.MEDICATION_ADMINISTRATION_READ,
+            ),
+        ),
+    ],
+)
+def get_medication_nursing_summary(
+    episode_id: UUID,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: MedicationNursingSummaryService = Depends(
+        get_medication_nursing_summary_service,
+    ),
+):
+    """
+    Return the inpatient Nursing medication round and summaries.
+    """
+
+    try:
+        prescriptions, round_groups = (
+            service.build_episode_summary(
+                context=context,
+                episode_id=episode_id,
+            )
+        )
+
+        return MedicationNursingSummaryResponse.model_validate(
+            {
+                "prescriptions": prescriptions,
+                "round": round_groups,
+            }
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+
+# ============================================================================
+# Medication Treatment History
+# ============================================================================
+
+
+@router.get(
+    "/medication-treatments/{treatment_id}/history",
+    response_model=MedicationTreatmentHistoryResponse,
+    summary="Get Medication Treatment History",
+    dependencies=[
+        Depends(
+            require_permission(
+                Permissions.MEDICATION_ADMINISTRATION_READ,
+            ),
+        ),
+    ],
+)
+def get_medication_treatment_history(
+    treatment_id: UUID,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: MedicationTreatmentHistoryService = Depends(
+        get_medication_treatment_history_service,
+    ),
+):
+    """
+    Return the complete medication history for one inpatient treatment.
+    """
+
+    try:
+        history = service.build_history(
+            context=context,
+            treatment_id=treatment_id,
+        )
+
+        return MedicationTreatmentHistoryResponse.model_validate(
+            history,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+
+# ============================================================================
+# Medication Administration
+# ============================================================================
+
+
+@router.get(
+    "/medication-doses/episode/{episode_id}",
+    response_model=list[MedicationDoseQueueResponse],
+    summary="List Episode Medication Doses",
+    dependencies=[
+        Depends(
+            require_permission(
+                Permissions.MEDICATION_ADMINISTRATION_READ,
+            ),
+        ),
+    ],
+)
+def list_episode_medication_doses(
+    episode_id: UUID,
+    from_time: datetime | None = Query(
+        default=None,
+        description="Start of the medication-dose window.",
+    ),
+    to_time: datetime | None = Query(
+        default=None,
+        description="End of the medication-dose window.",
+    ),
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: MedicationAdministrationService = Depends(
+        get_medication_administration_service,
+    ),
+):
+    """
+    Return scheduled medication doses for an admitted Episode.
+    """
+
+    now = datetime.now(UTC)
+
+    effective_from = (
+        from_time
+        if from_time is not None
+        else now - timedelta(days=1)
+    )
+
+    effective_to = (
+        to_time
+        if to_time is not None
+        else now + timedelta(days=1)
+    )
+
+    if effective_from > effective_to:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="from_time cannot be later than to_time.",
+        )
+
+    try:
+        doses = service.list_episode_doses(
+            context=context,
+            episode_id=episode_id,
+            from_time=effective_from,
+            to_time=effective_to,
+        )
+
+        results = []
+
+        for dose in doses:
+            treatment = dose.treatment
+            prescription = (
+                treatment.prescription
+                if treatment is not None
+                else None
+            )
+
+            if treatment is None or prescription is None:
+                continue
+
+            administration = dose.administration
+
+            results.append(
+                {
+                    "id": dose.id,
+                    "treatment_id": treatment.id,
+                    "scheduled_at": dose.scheduled_at,
+                    "status": dose.status,
+                    "treatment_status": treatment.status,
+                    "medicine_name": prescription.medicine_name,
+                    "strength": prescription.strength,
+                    "dose": prescription.dose,
+                    "dose_unit": prescription.dose_unit,
+                    "route": prescription.route,
+                    "frequency": prescription.frequency,
+                    "duration": prescription.duration,
+                    "duration_unit": prescription.duration_unit,
+                    "directions": prescription.directions,
+                    "administration": (
+                        MedicationAdministrationResponse.model_validate(
+                            administration,
+                        )
+                        if administration is not None
+                        else None
+                    ),
+                }
+            )
+
+        return [
+            MedicationDoseQueueResponse.model_validate(
+                result,
+            )
+            for result in results
+        ]
+
+    except MedicationDoseNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    except MedicationAdministrationEpisodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/medication-doses/{dose_id}/administration",
+    response_model=MedicationAdministrationResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Record Medication Administration",
+    dependencies=[
+        Depends(
+            require_permission(
+                Permissions.MEDICATION_ADMINISTRATION_CREATE,
+            ),
+        ),
+    ],
+)
+def create_medication_administration(
+    dose_id: UUID,
+    request: CreateMedicationAdministrationRequest,
+    db: Session = Depends(get_db),
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: MedicationAdministrationService = Depends(
+        get_medication_administration_service,
+    ),
+):
+    """
+    Record the nursing outcome of a scheduled medication dose.
+    """
+
+    try:
+        administration = service.record_administration(
+            context=context,
+            dose_id=dose_id,
+            status=request.status,
+            administered_at=request.administered_at,
+            dose_given=request.dose_given,
+            reason=request.reason,
+            notes=request.notes,
+        )
+
+        db.commit()
+        db.refresh(administration)
+
+        return MedicationAdministrationResponse.model_validate(
+            administration,
+        )
+
+    except (
+        MedicationAdministrationStaffNotFoundError,
+        MedicationDoseNotFoundError,
+    ) as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+    except (
+        MedicationAdministrationStaffHospitalMismatchError,
+    ) as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+
+    except (
+        MedicationDoseAlreadyAdministeredError,
+        MedicationDoseCannotBeAdministeredError,
+        MedicationAdministrationEpisodeError,
+    ) as exc:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
         ) from exc
 
 
@@ -313,6 +765,68 @@ def list_laboratory_queue(
             context=context,
         )
     ]
+
+
+# ============================================================================
+# Diagnostics Queue
+# ============================================================================
+
+
+@router.get(
+    "/queue/diagnostics",
+    response_model=list[DiagnosticQueueItemResponse],
+    summary="List Diagnostics Queue",
+    dependencies=[
+        Depends(
+            require_permission(
+                Permissions.CLINICAL_ORDER_READ,
+            ),
+        ),
+    ],
+)
+def list_diagnostic_queue(
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: ClinicalOrderService = Depends(
+        get_clinical_order_service,
+    ),
+):
+    """
+    Return diagnostic orders currently requiring diagnostic attention.
+    """
+
+    return [
+        DiagnosticQueueItemResponse(
+            id=order.id,
+            encounter_id=order.encounter_id,
+            patient_id=order.encounter.episode.patient_id,
+            patient_name=(
+                f"{order.encounter.episode.patient.first_name} "
+                f"{order.encounter.episode.patient.last_name}"
+            ),
+            hospital_number=(
+                order.encounter.episode.patient.hospital_number
+            ),
+            episode_number=(
+                order.encounter.episode.episode_number
+            ),
+            ordering_clinician_name=(
+                f"{order.ordering_staff.first_name} "
+                f"{order.ordering_staff.last_name}"
+            ),
+            order_type=order.order_type,
+            status=order.status,
+            priority=order.priority,
+            details=order.details,
+            ordered_at=order.ordered_at,
+            started_at=order.started_at,
+        )
+        for order in service.list_diagnostic_queue(
+            context=context,
+        )
+    ]
+
 
 
 # ============================================================================

@@ -157,6 +157,61 @@ class ClinicalOrderRepository:
         )
 
     # ------------------------------------------------------------------
+    # Diagnostics Queue
+    # ------------------------------------------------------------------
+
+    def list_diagnostic_queue(
+        self,
+        *,
+        hospital_id: UUID,
+    ) -> list[ClinicalOrder]:
+        """
+        Return open diagnostic orders requiring attention.
+
+        Includes:
+
+            REQUESTED
+            RECEIVED
+            IN_PROGRESS
+        """
+
+        from app.modules.clinical_orders.enums import (
+            ClinicalOrderStatus,
+            ClinicalOrderType,
+        )
+
+        statement = (
+            select(ClinicalOrder)
+            .join(
+                Encounter,
+                ClinicalOrder.encounter_id == Encounter.id,
+            )
+            .join(
+                Episode,
+                Encounter.episode_id == Episode.id,
+            )
+            .where(
+                Episode.hospital_id == hospital_id,
+                ClinicalOrder.order_type
+                == ClinicalOrderType.DIAGNOSTIC,
+                ClinicalOrder.status.in_(
+                    (
+                        ClinicalOrderStatus.REQUESTED,
+                        ClinicalOrderStatus.RECEIVED,
+                        ClinicalOrderStatus.IN_PROGRESS,
+                    ),
+                ),
+            )
+            .order_by(
+                ClinicalOrder.ordered_at.asc(),
+            )
+        )
+
+        return list(
+            self.db.scalars(statement),
+        )
+
+    # ------------------------------------------------------------------
     # Pharmacy Queue
     # ------------------------------------------------------------------
 
@@ -252,6 +307,7 @@ class ClinicalOrderRepository:
                     (
                         ClinicalOrderType.LABORATORY,
                         ClinicalOrderType.RADIOLOGY,
+                        ClinicalOrderType.DIAGNOSTIC,
                     ),
                 ),
                 ClinicalOrder.status.in_(

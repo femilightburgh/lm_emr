@@ -34,6 +34,10 @@ function getWorkspaceEyebrow(
     return 'PHARMACY'
   }
 
+  if (view === 'reception') {
+    return 'RECEPTION'
+  }
+
   return isReceptionist
     ? 'RECEPTION'
     : 'STAFF WORKSPACE'
@@ -47,11 +51,8 @@ function getWorkspaceTitle(
     case 'dashboard':
       return 'Good day'
 
-    case 'patients':
-      return 'Patients'
-
-    case 'register':
-      return 'Register patient'
+    case 'reception':
+      return 'Reception'
 
     case 'administrator':
       return 'Administration'

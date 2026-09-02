@@ -565,15 +565,6 @@ class ClinicalDocumentService:
             document.signed_at = signed_at
             document.signed_by = signer.id
 
-            if (
-                document.document_type
-                == ClinicalDocumentType.PROGRESS_NOTE
-                and encounter.title == "Ward Review"
-                and encounter.status == EncounterStatus.OPEN
-            ):
-                encounter.status = EncounterStatus.CLOSED
-                encounter.ended_at = signed_at
-
             self.repository.db.flush()
 
             self.event_service.create_event(

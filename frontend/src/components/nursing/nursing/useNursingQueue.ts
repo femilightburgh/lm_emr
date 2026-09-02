@@ -5,6 +5,7 @@ import {
 } from 'react'
 
 import {
+  listNursingInpatients,
   listNursingQueue,
   type Episode,
 } from '../../../api/episodes'
@@ -30,6 +31,9 @@ export function useNursingQueue({
   const [episodes, setEpisodes] =
     useState<Episode[]>([])
 
+  const [admittedEpisodes, setAdmittedEpisodes] =
+    useState<Episode[]>([])
+
   const [patientNames, setPatientNames] =
     useState<Record<string, string>>({})
 
@@ -44,14 +48,30 @@ export function useNursingQueue({
         onError('')
 
         try {
-          const response =
-            await listNursingQueue(
+          const [
+            response,
+            admittedResponse,
+          ] = await Promise.all([
+            listNursingQueue(
               accessToken,
-            )
+            ),
+            listNursingInpatients(
+              accessToken,
+            ),
+          ])
+
+          setAdmittedEpisodes(
+            admittedResponse,
+          )
+
+          const combinedEpisodes = [
+            ...response,
+            ...admittedResponse,
+          ]
 
           const uniquePatientIds = [
             ...new Set(
-              response.map(
+              combinedEpisodes.map(
                 episode =>
                   episode.patient_id,
               ),
@@ -95,6 +115,7 @@ export function useNursingQueue({
           )
         } catch (err) {
           setEpisodes([])
+          setAdmittedEpisodes([])
           setPatientNames({})
 
           onError(
@@ -120,6 +141,7 @@ export function useNursingQueue({
 
   return {
     episodes,
+    admittedEpisodes,
     patientNames,
     loading,
     loadQueue,

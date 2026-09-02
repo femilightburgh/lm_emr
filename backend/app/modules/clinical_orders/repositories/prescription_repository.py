@@ -33,6 +33,17 @@ class PrescriptionRepository:
         self.db.add(prescription)
         return prescription
 
+    def get_by_id(
+        self,
+        *,
+        prescription_id: UUID,
+    ) -> Prescription | None:
+        statement = select(Prescription).where(
+            Prescription.id == prescription_id,
+        )
+
+        return self.db.scalar(statement)
+
     def get_by_order_id(
         self,
         *,

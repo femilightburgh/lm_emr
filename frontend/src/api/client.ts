@@ -146,21 +146,102 @@ async function parseError(
 }
 
 
+export async function apiRequestBlob(
+  path: string,
+  options: RequestInit = {},
+  accessToken?: string,
+): Promise<Blob> {
+  const headers = new Headers(
+    options.headers ?? {},
+  )
+
+  const currentAccessToken =
+    accessToken ??
+    sessionStorage.getItem(
+      ACCESS_TOKEN_KEY,
+    )
+
+  if (currentAccessToken) {
+    headers.set(
+      'Authorization',
+      `Bearer ${currentAccessToken}`,
+    )
+  }
+
+  let response = await fetch(
+    `${API_BASE_URL}${path}`,
+    {
+      ...options,
+      headers,
+    },
+  )
+
+  if (
+    response.status === 401 &&
+    currentAccessToken &&
+    path !== '/auth/refresh'
+  ) {
+    const newAccessToken =
+      await refreshAccessToken()
+
+    if (newAccessToken) {
+      const retryHeaders =
+        new Headers(
+          options.headers ?? {},
+        )
+
+      retryHeaders.set(
+        'Authorization',
+        `Bearer ${newAccessToken}`,
+      )
+
+      response = await fetch(
+        `${API_BASE_URL}${path}`,
+        {
+          ...options,
+          headers: retryHeaders,
+        },
+      )
+    }
+  }
+
+  if (!response.ok) {
+    const detail =
+      await parseError(response)
+
+    throw new Error(detail)
+  }
+
+  return response.blob()
+}
+
+
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},
   accessToken?: string,
 ): Promise<T> {
-  const headers = new Headers({
-    'Content-Type':
-      'application/json',
-    ...(options.headers ?? {}),
-  })
+  const headers = new Headers(
+    options.headers ?? {},
+  )
 
-  if (accessToken) {
+  if (!(options.body instanceof FormData)) {
+    headers.set(
+      'Content-Type',
+      'application/json',
+    )
+  }
+
+  const currentAccessToken =
+    accessToken ??
+    sessionStorage.getItem(
+      ACCESS_TOKEN_KEY,
+    )
+
+  if (currentAccessToken) {
     headers.set(
       'Authorization',
-      `Bearer ${accessToken}`,
+      `Bearer ${currentAccessToken}`,
     )
   }
 
@@ -179,7 +260,7 @@ export async function apiRequest<T>(
 
   if (
     response.status === 401 &&
-    accessToken &&
+    currentAccessToken &&
     path !== '/auth/refresh'
   ) {
     const newAccessToken =
@@ -187,11 +268,16 @@ export async function apiRequest<T>(
 
     if (newAccessToken) {
       const retryHeaders =
-        new Headers({
-          'Content-Type':
-            'application/json',
-          ...(options.headers ?? {}),
-        })
+        new Headers(
+          options.headers ?? {},
+        )
+
+      if (!(options.body instanceof FormData)) {
+        retryHeaders.set(
+          'Content-Type',
+          'application/json',
+        )
+      }
 
       retryHeaders.set(
         'Authorization',

@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.common.exceptions import DuplicateResourceException
 from app.modules.identity.role_seeder import seed_default_roles
+from app.bootstrap.diagnostics import bootstrap_diagnostic_investigations
 from app.modules.organization.models import Hospital
 from app.modules.organization.repository import HospitalRepository
 from app.modules.organization.schemas import HospitalCreate
@@ -69,6 +70,11 @@ class HospitalService:
 
             seed_default_roles(
                 db=self.repository.db,
+                hospital_id=hospital.id,
+            )
+
+            bootstrap_diagnostic_investigations(
+                session=self.repository.db,
                 hospital_id=hospital.id,
             )
 

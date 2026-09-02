@@ -1,0 +1,278 @@
+
+
+/* ==========================================================================
+   Reception Workspace
+   ========================================================================== */
+
+.reception-workspace-navigation {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 24px;
+  padding: 5px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  background: var(--surface, #ffffff);
+  width: fit-content;
+}
+
+.reception-tab {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted, #64748b);
+  padding: 10px 16px;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.reception-tab:hover {
+  color: var(--text, #17212b);
+}
+
+.reception-tab.active {
+  background: #f1f5f9;
+  color: var(--text, #17212b);
+}
+
+.reception-overview {
+  display: grid;
+  gap: 24px;
+}
+
+.reception-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.reception-stat-card {
+  padding: 22px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 14px;
+  background: var(--surface, #ffffff);
+}
+
+.reception-stat-card span,
+.reception-stat-card small {
+  display: block;
+}
+
+.reception-stat-card span {
+  color: var(--text-muted, #64748b);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.reception-stat-card strong {
+  display: block;
+  margin: 8px 0;
+  font-size: 32px;
+  line-height: 1;
+}
+
+.reception-stat-card small {
+  color: var(--text-muted, #64748b);
+  font-size: 12px;
+}
+
+.reception-overview-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.reception-overview-note,
+.reception-placeholder-panel {
+  padding: 22px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 14px;
+  background: var(--surface, #ffffff);
+}
+
+.reception-overview-note p,
+.reception-placeholder-panel p {
+  color: var(--text-muted, #64748b);
+}
+
+@media (max-width: 800px) {
+  .reception-workspace-navigation {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .reception-tab {
+    white-space: nowrap;
+  }
+
+  .reception-overview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* ==========================================================================
+   Patient Flow
+   ========================================================================== */
+
+.reception-flow-panel {
+  display: grid;
+  gap: 20px;
+  padding: 24px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 14px;
+  background: var(--surface, #ffffff);
+}
+
+.reception-flow-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.reception-flow-header h2 {
+  margin: 4px 0 6px;
+}
+
+.reception-flow-header p {
+  color: var(--text-muted, #64748b);
+}
+
+.reception-flow-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.reception-flow-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.reception-flow-table th,
+.reception-flow-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.reception-flow-table th {
+  color: var(--text-muted, #64748b);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.reception-flow-table td {
+  font-size: 14px;
+}
+
+.reception-flow-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.reception-flow-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: var(--text, #17212b);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.reception-flow-empty {
+  padding: 28px;
+  border: 1px dashed var(--border, #e2e8f0);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.reception-flow-empty p {
+  margin: 0;
+  color: var(--text-muted, #64748b);
+}
+
+@media (max-width: 800px) {
+  .reception-flow-header {
+    flex-direction: column;
+  }
+}
+
+
+/* ==========================================================================
+   Today's Patient Activity
+   ========================================================================== */
+
+.reception-activity-panel {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 14px;
+  background: var(--surface, #ffffff);
+}
+
+.reception-activity-header h3 {
+  margin: 4px 0 0;
+  font-size: 17px;
+}
+
+.reception-activity-list {
+  display: grid;
+}
+
+.reception-activity-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+
+.reception-activity-row:last-child {
+  border-bottom: 0;
+}
+
+.reception-activity-row span {
+  color: var(--text-muted, #64748b);
+  font-size: 14px;
+}
+
+.reception-activity-row strong {
+  min-width: 36px;
+  text-align: right;
+  font-size: 18px;
+}
+
+
+/* --------------------------------------------------------------------------
+   Patient Flow — Current Care Location
+   -------------------------------------------------------------------------- */
+
+.reception-flow-location {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.reception-flow-professional {
+  color: #34414d;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.reception-flow-department {
+  color: #7a8791;
+  font-size: 10px;
+  line-height: 1.35;
+}
+

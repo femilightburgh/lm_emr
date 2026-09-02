@@ -200,6 +200,7 @@ class EncounterService:
         *,
         context: RequestContext,
         encounter_id: UUID,
+        commit: bool = True,
     ) -> Encounter:
         """
         Close an open Encounter.
@@ -211,6 +212,14 @@ class EncounterService:
 
         Closing an Encounter records the end timestamp and preserves
         the Encounter as historical clinical activity.
+
+        Parameters
+        ----------
+        commit:
+            When True, persist the transaction immediately.
+
+            When False, flush the Encounter but leave transaction
+            ownership to the calling service.
         """
 
         encounter = self.repository.get_by_id(
@@ -227,7 +236,10 @@ class EncounterService:
         encounter.status = EncounterStatus.CLOSED
         encounter.ended_at = datetime.now(UTC)
 
-        self.repository.save()
+        if commit:
+            self.repository.save()
+        else:
+            self.repository.db.flush()
 
         self.repository.refresh(
             encounter,

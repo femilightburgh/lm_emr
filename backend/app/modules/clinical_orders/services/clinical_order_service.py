@@ -45,6 +45,9 @@ from app.modules.clinical_orders.repositories import (
     ClinicalOrderRepository,
     PrescriptionRepository,
 )
+from app.modules.clinical_orders.services.medication_treatment_service import (
+    InpatientMedicationService,
+)
 from app.modules.encounter.exceptions import (
     EncounterAlreadyClosedError,
     EncounterNotFoundError,
@@ -82,6 +85,7 @@ class ClinicalOrderService:
         episode_repository: EpisodeRepository,
         staff_repository: StaffRepository,
         prescription_repository: PrescriptionRepository,
+        inpatient_medication_service: InpatientMedicationService | None = None,
     ) -> None:
         self.repository = repository
         self.event_service = event_service
@@ -89,6 +93,9 @@ class ClinicalOrderService:
         self.episode_repository = episode_repository
         self.staff_repository = staff_repository
         self.prescription_repository = prescription_repository
+        self.inpatient_medication_service = (
+            inpatient_medication_service
+        )
 
     # ------------------------------------------------------------------
     # Internal Helpers
@@ -164,6 +171,8 @@ class ClinicalOrderService:
         order_type: ClinicalOrderType,
         priority: str,
         details: dict,
+        start_at: datetime | None = None,
+        first_dose_at: datetime | None = None,
     ) -> ClinicalOrder:
         """
         Create a Clinical Order and its corresponding Clinical Event
@@ -224,6 +233,46 @@ class ClinicalOrderService:
         )
 
         try:
+            if order_type == ClinicalOrderType.DIAGNOSTIC:
+                from app.modules.diagnostics.repositories import (
+                    DiagnosticRepository,
+                )
+
+                investigation_id = details.get(
+                    "investigation_id",
+                )
+
+                if not investigation_id:
+                    raise ValueError(
+                        "Diagnostic orders require an investigation_id."
+                    )
+
+                diagnostic_repository = DiagnosticRepository(
+                    self.repository.db,
+                )
+
+                investigation = diagnostic_repository.get_investigation(
+                    hospital_id=context.hospital_id,
+                    investigation_id=investigation_id,
+                )
+
+                if investigation is None:
+                    raise ValueError(
+                        "Diagnostic investigation not found."
+                    )
+
+                details = {
+                    **details,
+                    "investigation_id": str(
+                        investigation.id,
+                    ),
+                    "investigation_code": investigation.code,
+                    "investigation_name": investigation.name,
+                    "diagnostic_category": investigation.category.value,
+                }
+
+                order.details = details
+
             self.repository.create(
                 order=order,
             )
@@ -231,77 +280,96 @@ class ClinicalOrderService:
             self.repository.db.flush()
 
             if order_type == ClinicalOrderType.MEDICATION:
-                self.prescription_repository.create(
-                    prescription=Prescription(
-                        clinical_order_id=order.id,
-                        medicine_name=str(
+                prescription = Prescription(
+                    clinical_order_id=order.id,
+                    medicine_name=str(
+                        details.get(
+                            "medicine_name",
                             details.get(
-                                "medicine_name",
-                                details.get(
-                                    "medication_id",
-                                    "",
-                                ),
-                            )
-                        ).strip(),
-                        strength=(
-                            str(details["strength"]).strip()
-                            if details.get("strength") is not None
-                            else None
-                        ),
-                        dose=str(
-                            details.get(
-                                "dose",
+                                "medication_id",
                                 "",
-                            )
-                        ).strip(),
-                        dose_unit=(
-                            str(details["dose_unit"]).strip()
-                            if details.get("dose_unit") is not None
-                            else None
-                        ),
-                        route=str(
-                            details.get(
-                                "route",
-                                "",
-                            )
-                        ).strip(),
-                        frequency=str(
-                            details.get(
-                                "frequency",
-                                "",
-                            )
-                        ).strip(),
-                        duration=(
-                            str(details["duration"]).strip()
-                            if details.get("duration") is not None
-                            else None
-                        ),
-                        duration_unit=(
-                            str(details["duration_unit"]).strip()
-                            if details.get("duration_unit") is not None
-                            else None
-                        ),
-                        quantity=(
-                            str(details["quantity"]).strip()
-                            if details.get("quantity") is not None
-                            else None
-                        ),
-                        directions=(
-                            str(details["directions"]).strip()
-                            if details.get("directions") is not None
-                            else None
-                        ),
-                        indication=(
-                            str(details["indication"]).strip()
-                            if details.get("indication") is not None
-                            else None
-                        ),
-                    )
+                            ),
+                        )
+                    ).strip(),
+                    strength=(
+                        str(details["strength"]).strip()
+                        if details.get("strength") is not None
+                        else None
+                    ),
+                    dose=str(
+                        details.get(
+                            "dose",
+                            "",
+                        )
+                    ).strip(),
+                    dose_unit=(
+                        str(details["dose_unit"]).strip()
+                        if details.get("dose_unit") is not None
+                        else None
+                    ),
+                    route=str(
+                        details.get(
+                            "route",
+                            "",
+                        )
+                    ).strip(),
+                    frequency=str(
+                        details.get(
+                            "frequency",
+                            "",
+                        )
+                    ).strip(),
+                    duration=(
+                        str(details["duration"]).strip()
+                        if details.get("duration") is not None
+                        else None
+                    ),
+                    duration_unit=(
+                        str(details["duration_unit"]).strip()
+                        if details.get("duration_unit") is not None
+                        else None
+                    ),
+                    quantity=(
+                        str(details["quantity"]).strip()
+                        if details.get("quantity") is not None
+                        else None
+                    ),
+                    directions=(
+                        str(details["directions"]).strip()
+                        if details.get("directions") is not None
+                        else None
+                    ),
+                    indication=(
+                        str(details["indication"]).strip()
+                        if details.get("indication") is not None
+                        else None
+                    ),
                 )
+
+                self.prescription_repository.create(
+                    prescription=prescription,
+                )
+
+                self.repository.db.flush()
+
+                if episode.status == EpisodeStatus.ADMITTED:
+                    if self.inpatient_medication_service is None:
+                        raise RuntimeError(
+                            "Inpatient medication service is required "
+                            "for admitted medication orders.",
+                        )
+
+                    self.inpatient_medication_service.create_treatment(
+                        context=context,
+                        prescription=prescription,
+                        start_at=start_at,
+                        first_dose_at=first_dose_at,
+                    )
 
             event_type = {
                 ClinicalOrderType.LABORATORY: EventType.INVESTIGATION_ORDERED,
                 ClinicalOrderType.RADIOLOGY: EventType.INVESTIGATION_ORDERED,
+                ClinicalOrderType.DIAGNOSTIC: EventType.INVESTIGATION_ORDERED,
                 ClinicalOrderType.MEDICATION: EventType.MEDICATION_PRESCRIBED,
             }[order_type]
 
@@ -369,6 +437,23 @@ class ClinicalOrderService:
             hospital_id=context.hospital_id,
         )
 
+
+    # ------------------------------------------------------------------
+    # Diagnostics Queue
+    # ------------------------------------------------------------------
+
+    def list_diagnostic_queue(
+        self,
+        *,
+        context: RequestContext,
+    ) -> list[ClinicalOrder]:
+        """
+        Return diagnostic orders requiring diagnostic attention.
+        """
+
+        return self.repository.list_diagnostic_queue(
+            hospital_id=context.hospital_id,
+        )
 
     # ------------------------------------------------------------------
     # Pharmacy Queue

@@ -27,6 +27,7 @@ from app.modules.clinical_orders.exceptions import (
 )
 from app.modules.clinical_orders.repositories import (
     ClinicalOrderRepository,
+    MedicationTreatmentRepository,
     PrescriptionRepository,
 )
 from app.modules.clinical_orders.schemas import (
@@ -36,6 +37,7 @@ from app.modules.clinical_orders.schemas import (
 )
 from app.modules.clinical_orders.services import (
     ClinicalOrderService,
+    InpatientMedicationService,
 )
 from app.modules.pharmacy.repositories import (
     DispensingRepository,
@@ -82,6 +84,11 @@ def get_clinical_order_service(
         episode_repository=EpisodeRepository(db),
         staff_repository=StaffRepository(db),
         prescription_repository=PrescriptionRepository(db),
+        inpatient_medication_service=InpatientMedicationService(
+            db=db,
+            episode_repository=EpisodeRepository(db),
+            treatment_repository=MedicationTreatmentRepository(db),
+        ),
     )
 
 
@@ -399,6 +406,8 @@ def create_prescription(
             order_type=ClinicalOrderType.MEDICATION,
             priority=request.priority,
             details=details,
+            start_at=request.start_at,
+            first_dose_at=request.first_dose_at,
         )
 
         prescription = order.prescription

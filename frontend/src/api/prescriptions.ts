@@ -20,6 +20,9 @@ export interface CreatePrescriptionRequest {
   quantity?: string | null
   directions?: string | null
   indication?: string | null
+
+  start_at?: string | null
+  first_dose_at?: string | null
 }
 
 

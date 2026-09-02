@@ -86,6 +86,9 @@ from app.modules.episode.models import EpisodeStatus
 from app.modules.episode.repositories.episode_repository import (
     EpisodeRepository,
 )
+from app.modules.episode.repositories.episode_disposition_repository import (
+    EpisodeDispositionRepository,
+)
 from app.modules.episode.services.episode_number_generator import (
     EpisodeNumberGenerator,
 )
@@ -217,11 +220,18 @@ def create_test_encounter(
         number_generator=EpisodeNumberGenerator(
             repository=episode_repository,
         ),
-        encounter_repository=EncounterRepository(db),
+        encounter_service=EncounterService(
+            repository=EncounterRepository(db),
+            episode_repository=episode_repository,
+            staff_repository=StaffRepository(
+                session=db,
+            ),
+        ),
         event_service=ClinicalEventService(
             repository=ClinicalEventRepository(db),
         ),
         staff_repository=StaffRepository(db),
+        disposition_repository=EpisodeDispositionRepository(db),
     )
 
     episode = episode_service.create_episode(
@@ -722,13 +732,13 @@ def test_sign_document(
 
 
 
-def test_sign_progress_note_closes_ward_review(
+def test_sign_progress_note_keeps_ward_review_open(
     db,
     hospital,
 ):
     """
-    Signing a Progress Note on a Ward Review completes and closes
-    that Ward Review encounter atomically.
+    Signing a Progress Note on a Ward Review signs the document
+    without closing the Ward Review encounter.
     """
 
     context, staff, encounter, _, service = create_document(
@@ -773,8 +783,8 @@ def test_sign_progress_note_closes_ward_review(
     db.refresh(encounter)
 
     assert signed.status == ClinicalDocumentStatus.SIGNED
-    assert encounter.status == EncounterStatus.CLOSED
-    assert encounter.ended_at == signed_at
+    assert encounter.status == EncounterStatus.OPEN
+    assert encounter.ended_at is None
 
 
 def test_sign_initial_clerking_does_not_close_doctor_consultation(

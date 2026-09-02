@@ -17,6 +17,9 @@ python -m scripts.seed
 import app.models
 
 from app.bootstrap.permissions import bootstrap_permissions
+from app.bootstrap.diagnostics import (
+    bootstrap_diagnostic_investigations,
+)
 from app.db.session import SessionLocal
 from app.modules.identity.repository import IdentityRepository
 from app.modules.identity.user_service import UserService
@@ -108,6 +111,21 @@ def seed_database() -> None:
                 f"  • Hospital already exists: "
                 f"{DEMO_HOSPITAL.code}"
             )
+
+        # --------------------------------------------------------------
+        # Diagnostics catalogue
+        # --------------------------------------------------------------
+
+        print("✓ Seeding diagnostics catalogue...")
+
+        bootstrap_diagnostic_investigations(
+            db,
+            hospital_id=hospital.id,
+        )
+
+        print(
+            "  • Diagnostics catalogue synchronized."
+        )
 
         # --------------------------------------------------------------
         # Demo receptionist

@@ -45,6 +45,9 @@ from app.modules.events.services.event_service import ClinicalEventService
 from app.modules.episode.repositories.episode_repository import (
     EpisodeRepository,
 )
+from app.modules.episode.repositories.episode_disposition_repository import (
+    EpisodeDispositionRepository,
+)
 from app.modules.episode.services.episode_number_generator import (
     EpisodeNumberGenerator,
 )
@@ -209,11 +212,18 @@ def create_test_encounter(
         number_generator=EpisodeNumberGenerator(
             repository=episode_repository,
         ),
-        encounter_repository=EncounterRepository(db),
+        encounter_service=EncounterService(
+            repository=EncounterRepository(db),
+            episode_repository=episode_repository,
+            staff_repository=StaffRepository(
+                session=db,
+            ),
+        ),
         event_service=ClinicalEventService(
             repository=ClinicalEventRepository(db),
         ),
         staff_repository=StaffRepository(db),
+        disposition_repository=EpisodeDispositionRepository(db),
     )
 
     episode = episode_service.create_episode(

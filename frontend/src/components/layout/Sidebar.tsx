@@ -14,15 +14,16 @@ interface SidebarProps {
   isDoctor: boolean
   isLaboratoryScientist: boolean
   isPharmacist: boolean
+  isDiagnosticsUser: boolean
 
   onDashboard: () => void
-  onPatients: () => void
-  onRegistration: () => void
+  onReception: () => void
   onAdministrator: () => void
   onNursing: () => void
   onDoctor: () => void
   onLaboratory: () => void
   onPharmacy: () => void
+  onDiagnostics: () => void
   onSignOut: () => void
 }
 
@@ -37,15 +38,16 @@ export default function Sidebar({
   isDoctor,
   isLaboratoryScientist,
   isPharmacist,
+  isDiagnosticsUser,
 
   onDashboard,
-  onPatients,
-  onRegistration,
+  onReception,
   onAdministrator,
   onNursing,
   onDoctor,
   onLaboratory,
   onPharmacy,
+  onDiagnostics,
   onSignOut,
 }: SidebarProps) {
   return (
@@ -84,62 +86,17 @@ export default function Sidebar({
         {/* Reception */}
 
         {isReceptionist && (
-          <>
-            <button
-              type="button"
-              className={
-                view === 'patients'
-                  ? 'nav-item active'
-                  : 'nav-item'
-              }
-              onClick={onPatients}
-            >
-              <span>Patients</span>
-            </button>
-
-
-            <button
-              type="button"
-              className={
-                view === 'register'
-                  ? 'nav-item active'
-                  : 'nav-item'
-              }
-              onClick={onRegistration}
-            >
-              <span>Register patient</span>
-            </button>
-
-
-            <button
-              type="button"
-              className="nav-item"
-              disabled
-            >
-              <span>Returning patient</span>
-              <small>Coming soon</small>
-            </button>
-
-
-            <button
-              type="button"
-              className="nav-item"
-              disabled
-            >
-              <span>Queue</span>
-              <small>Coming soon</small>
-            </button>
-
-
-            <button
-              type="button"
-              className="nav-item"
-              disabled
-            >
-              <span>Payments</span>
-              <small>Coming soon</small>
-            </button>
-          </>
+          <button
+            type="button"
+            className={
+              view === 'reception'
+                ? 'nav-item active'
+                : 'nav-item'
+            }
+            onClick={onReception}
+          >
+            <span>Reception</span>
+          </button>
         )}
 
 
@@ -214,6 +171,23 @@ export default function Sidebar({
           </button>
         )}
 
+
+        {/* Diagnostics */}
+
+        {isDiagnosticsUser && (
+          <button
+            type="button"
+            className={
+              view === 'diagnostics'
+                ? 'nav-item active'
+                : 'nav-item'
+            }
+            onClick={onDiagnostics}
+          >
+            <span>Diagnostics</span>
+            <small>Clinical</small>
+          </button>
+        )}
 
         {/* Administration */}
 

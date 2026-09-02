@@ -2276,3 +2276,317 @@
     grid-column: 1 / -1;
   }
 }
+
+
+/* ========================================================================== */
+/* Diagnostic Result Review                                                   */
+/* ========================================================================== */
+
+.diagnostic-result-report {
+  margin-top: 18px;
+  padding: 24px;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #dbe3ea);
+  border-radius: 14px;
+  color: var(--text, #17212b);
+}
+
+.diagnostic-result-report .clinical-result-report-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 18px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border, #e5eaf0);
+}
+
+.diagnostic-result-report
+  .clinical-result-report-header
+  > div {
+  display: grid;
+  gap: 6px;
+}
+
+.diagnostic-result-report
+  .clinical-result-report-header
+  strong {
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.diagnostic-result-report
+  .clinical-result-report-header
+  span {
+  display: block;
+  color: var(--text-muted, #64748b);
+  font-size: 13px;
+}
+
+.diagnostic-result-report
+  .clinical-result-status.final {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.diagnostic-result-report
+  .clinical-result-report-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.diagnostic-result-report
+  .clinical-result-report-meta
+  > div {
+  padding: 14px 16px;
+  background: var(--surface-muted, #f8fafc);
+  border: 1px solid var(--border, #e5eaf0);
+  border-radius: 10px;
+}
+
+.diagnostic-result-report
+  .clinical-result-report-meta
+  span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text-muted, #64748b);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.diagnostic-result-report
+  .clinical-result-report-meta
+  strong {
+  color: var(--text, #17212b);
+  font-size: 14px;
+}
+
+.diagnostic-result-report
+  .clinical-result-interpretation {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border, #e8edf2);
+}
+
+.diagnostic-result-report
+  .clinical-result-interpretation:last-of-type {
+  border-bottom: 0;
+}
+
+.diagnostic-result-report
+  .clinical-result-interpretation
+  > span {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-muted, #64748b);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.diagnostic-result-report
+  .clinical-result-interpretation
+  > p {
+  margin: 0;
+  color: var(--text, #273444);
+  font-size: 15px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.diagnostic-measurement-grid {
+  margin-top: 20px;
+}
+
+.diagnostic-measurement-grid
+  > div {
+  min-width: 0;
+}
+
+.diagnostic-measurement-grid
+  strong {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 700px) {
+  .diagnostic-result-report
+    .clinical-result-report-header,
+  .diagnostic-result-report
+    .clinical-result-report-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .diagnostic-result-report
+    .clinical-result-report-header {
+    display: grid;
+  }
+}
+
+
+/* ========================================================================== */
+/* Diagnostic Report Attachments                                               */
+/* ========================================================================== */
+
+.diagnostic-doctor-attachments {
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+
+.diagnostic-doctor-section-label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted, #64748b);
+}
+
+.diagnostic-doctor-attachments-help {
+  margin: 0 0 14px;
+  color: var(--text-muted, #64748b);
+  font-size: 13px;
+}
+
+.diagnostic-doctor-attachment-list {
+  display: grid;
+  gap: 16px;
+}
+
+.diagnostic-doctor-attachment {
+  display: grid;
+  gap: 8px;
+}
+
+.diagnostic-doctor-image-link {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.diagnostic-doctor-image {
+  display: block;
+  max-width: min(100%, 760px);
+  max-height: 620px;
+  object-fit: contain;
+  border: 1px solid var(--border, #dbe3ea);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.diagnostic-doctor-attachment
+  > span {
+  color: var(--text-muted, #64748b);
+  font-size: 13px;
+}
+
+.diagnostic-doctor-file {
+  display: grid;
+  gap: 6px;
+  padding: 15px 17px;
+  border: 1px solid var(--border, #dbe3ea);
+  border-radius: 10px;
+  background: var(--surface-muted, #f8fafc);
+}
+
+.diagnostic-doctor-file strong {
+  color: var(--text, #17212b);
+}
+
+.diagnostic-doctor-file span {
+  color: var(--text-muted, #64748b);
+  font-size: 13px;
+}
+
+.diagnostic-doctor-file a {
+  width: fit-content;
+  font-weight: 600;
+}
+
+
+/* ========================================================================== */
+/* Collapsible Diagnostic Reports                                              */
+/* ========================================================================== */
+
+.doctor-diagnostic-report-details {
+  width: 100%;
+}
+
+.doctor-diagnostic-report-summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.doctor-diagnostic-report-summary::-webkit-details-marker {
+  display: none;
+}
+
+.doctor-diagnostic-report-summary::after {
+  content: '+';
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border, #dbe3ea);
+  border-radius: 50%;
+  color: var(--text-muted, #64748b);
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.doctor-diagnostic-report-details[open]
+  .doctor-diagnostic-report-summary::after {
+  content: '−';
+}
+
+.doctor-diagnostic-report-summary:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.25);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.doctor-diagnostic-report-details
+  .doctor-diagnostic-report-summary
+  > div {
+  min-width: 0;
+}
+
+.doctor-diagnostic-report-details
+  .doctor-diagnostic-report-summary
+  > div
+  > strong {
+  display: block;
+}
+
+.doctor-diagnostic-report-details
+  .doctor-diagnostic-report-summary
+  > div
+  > span {
+  display: block;
+}
+
+.doctor-diagnostic-report-details
+  > .clinical-result-report-meta,
+.doctor-diagnostic-report-details
+  > .clinical-result-interpretation,
+.doctor-diagnostic-report-details
+  > .diagnostic-doctor-attachments {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.doctor-diagnostic-report-details
+  > .clinical-result-report-meta {
+  margin-top: 22px;
+}

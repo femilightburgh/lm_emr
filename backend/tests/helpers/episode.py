@@ -15,8 +15,14 @@ from sqlalchemy.orm import Session
 from app.modules.encounter.repositories.encounter_repository import (
     EncounterRepository,
 )
+from app.modules.encounter.services.encounter_service import (
+    EncounterService,
+)
 from app.modules.episode.repositories.episode_repository import (
     EpisodeRepository,
+)
+from app.modules.episode.repositories.episode_disposition_repository import (
+    EpisodeDispositionRepository,
 )
 from app.modules.episode.services.episode_number_generator import (
     EpisodeNumberGenerator,
@@ -57,8 +63,14 @@ def build_episode_service(
         number_generator=EpisodeNumberGenerator(
             repository=repository,
         ),
-        encounter_repository=EncounterRepository(
-            db,
+        encounter_service=EncounterService(
+            repository=EncounterRepository(
+                db,
+            ),
+            episode_repository=repository,
+            staff_repository=StaffRepository(
+                session=db,
+            ),
         ),
         event_service=ClinicalEventService(
             repository=ClinicalEventRepository(
@@ -67,5 +79,8 @@ def build_episode_service(
         ),
         staff_repository=StaffRepository(
             session=db,
+        ),
+        disposition_repository=EpisodeDispositionRepository(
+            db,
         ),
     )

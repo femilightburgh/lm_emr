@@ -29,6 +29,8 @@ from uuid import uuid4
 
 import pytest
 
+from sqlalchemy import select
+
 from app.core.context import RequestContext
 
 from app.modules.clinical_documents.enums import (
@@ -46,6 +48,9 @@ from app.modules.episode.exceptions import (
     EncounterNotBelongingToEpisodeError,
     EncounterNotOpenError,
     EpisodeAlreadyAdmittedError,
+    InvalidWardReviewDispositionError,
+    WardReviewDispositionDetailsRequiredError,
+    WardReviewEncounterRequiredError,
     EpisodeAlreadyCancelledError,
     EpisodeAlreadyClosedError,
     EpisodeNotAwaitingCheckInError,
@@ -55,6 +60,8 @@ from app.modules.episode.exceptions import (
 )
 
 from app.modules.episode.models import (
+    EpisodeDisposition,
+    EpisodeDispositionType,
     EpisodeFlowStatus,
     EpisodeStatus,
 )
@@ -109,6 +116,20 @@ from app.modules.staff.repository import StaffRepository
 from app.modules.staff.schemas import StaffCreate
 
 from app.modules.staff.service import StaffService
+
+from app.modules.organization.department_repository import (
+    DepartmentRepository,
+)
+from app.modules.organization.department_service import (
+    DepartmentService,
+)
+from app.modules.organization.enums import (
+    DepartmentCategory,
+    DepartmentStatus,
+)
+from app.modules.organization.schemas import (
+    DepartmentCreate,
+)
 
 from app.modules.organization.repository import HospitalRepository
 
@@ -331,6 +352,547 @@ def create_episode_with_encounter(
         service,
     )
 
+
+
+
+
+# =============================================================================
+# Ward Review Test Helpers
+# =============================================================================
+
+
+def create_admitted_ward_review(
+    db,
+    hospital,
+    *,
+    hospital_number,
+    staff_number,
+):
+    """
+    Create an admitted Episode with an OPEN Ward Review Encounter.
+    """
+
+    _, staff, context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+        staff_number=staff_number,
+    )
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number=hospital_number,
+    )
+
+    service = build_episode_service(db)
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Admission",
+    )
+
+    episode.status = EpisodeStatus.ADMITTED
+    episode.managing_doctor_id = staff.id
+
+    encounter = create_open_encounter(
+        db=db,
+        hospital=hospital,
+        episode=episode,
+        staff=staff,
+    )
+
+    encounter.title = "Ward Review"
+
+    db.commit()
+    db.refresh(episode)
+    db.refresh(encounter)
+
+    return (
+        context,
+        staff,
+        episode,
+        encounter,
+        service,
+    )
+
+
+# =============================================================================
+# Ward Review Completion
+# =============================================================================
+
+
+def test_complete_ward_review_continue_admission(
+    db,
+    hospital,
+):
+    """
+    Continuing admission closes the Ward Review while keeping the
+    Episode ADMITTED.
+    """
+
+    (
+        context,
+        staff,
+        episode,
+        encounter,
+        service,
+    ) = create_admitted_ward_review(
+        db,
+        hospital,
+        hospital_number="PAT-WARD-DISP-001",
+        staff_number="STF-WARD-DISP-001",
+    )
+
+    completed = service.complete_ward_review(
+        context=context,
+        episode_id=episode.id,
+        encounter_id=encounter.id,
+        disposition=EpisodeDispositionType.CONTINUE_ADMISSION,
+    )
+
+    db.refresh(completed)
+    db.refresh(encounter)
+
+    disposition = db.scalar(
+        select(EpisodeDisposition).where(
+            EpisodeDisposition.episode_id == episode.id,
+        )
+    )
+
+    assert completed.status == EpisodeStatus.ADMITTED
+    assert completed.closed_at is None
+    assert encounter.status == EncounterStatus.CLOSED
+    assert encounter.ended_at is not None
+    assert disposition is not None
+    assert (
+        disposition.disposition
+        == EpisodeDispositionType.CONTINUE_ADMISSION
+    )
+    assert disposition.decided_by == staff.id
+
+
+def test_complete_ward_review_discharge_closes_episode(
+    db,
+    hospital,
+):
+    """
+    Discharge closes both the Ward Review Encounter and the Episode.
+    """
+
+    (
+        context,
+        staff,
+        episode,
+        encounter,
+        service,
+    ) = create_admitted_ward_review(
+        db,
+        hospital,
+        hospital_number="PAT-WARD-DISP-002",
+        staff_number="STF-WARD-DISP-002",
+    )
+
+    completed = service.complete_ward_review(
+        context=context,
+        episode_id=episode.id,
+        encounter_id=encounter.id,
+        disposition=EpisodeDispositionType.DISCHARGE,
+    )
+
+    db.refresh(completed)
+    db.refresh(encounter)
+
+    disposition = db.scalar(
+        select(EpisodeDisposition).where(
+            EpisodeDisposition.episode_id == episode.id,
+        )
+    )
+
+    assert completed.status == EpisodeStatus.CLOSED
+    assert completed.closed_at is not None
+    assert encounter.status == EncounterStatus.CLOSED
+    assert encounter.ended_at is not None
+    assert disposition is not None
+    assert disposition.disposition == EpisodeDispositionType.DISCHARGE
+    assert disposition.decided_by == staff.id
+
+
+@pytest.mark.parametrize(
+    "disposition",
+    [
+        EpisodeDispositionType.TRANSFER,
+        EpisodeDispositionType.REFERRAL,
+        EpisodeDispositionType.OTHER,
+    ],
+)
+def test_complete_ward_review_requires_details(
+    db,
+    hospital,
+    disposition,
+):
+    """
+    Transfer, referral, and other dispositions require details.
+    """
+
+    (
+        context,
+        staff,
+        episode,
+        encounter,
+        service,
+    ) = create_admitted_ward_review(
+        db,
+        hospital,
+        hospital_number=(
+            f"PAT-WD-{disposition.value[:1]}-002"
+        ),
+        staff_number=(
+            f"STF-WD-{disposition.value[:1]}-002"
+        ),
+    )
+
+    with pytest.raises(
+        WardReviewDispositionDetailsRequiredError,
+    ):
+        service.complete_ward_review(
+            context=context,
+            episode_id=episode.id,
+            encounter_id=encounter.id,
+            disposition=disposition,
+        )
+
+    db.refresh(episode)
+    db.refresh(encounter)
+
+    disposition_record = db.scalar(
+        select(EpisodeDisposition).where(
+            EpisodeDisposition.episode_id == episode.id,
+        )
+    )
+
+    assert episode.status == EpisodeStatus.ADMITTED
+    assert episode.closed_at is None
+    assert encounter.status == EncounterStatus.OPEN
+    assert encounter.ended_at is None
+    assert disposition_record is None
+
+
+@pytest.mark.parametrize(
+    "disposition",
+    [
+        EpisodeDispositionType.TRANSFER,
+        EpisodeDispositionType.REFERRAL,
+        EpisodeDispositionType.OTHER,
+    ],
+)
+def test_complete_ward_review_persists_details(
+    db,
+    hospital,
+    disposition,
+):
+    """
+    Transfer, referral, and other dispositions preserve their details.
+    """
+
+    (
+        context,
+        staff,
+        episode,
+        encounter,
+        service,
+    ) = create_admitted_ward_review(
+        db,
+        hospital,
+        hospital_number=(
+            f"PAT-WD-{disposition.value[:1]}-001"
+        ),
+        staff_number=(
+            f"STF-WD-{disposition.value[:1]}-001"
+        ),
+    )
+
+    details = "Clinical disposition details."
+
+    completed = service.complete_ward_review(
+        context=context,
+        episode_id=episode.id,
+        encounter_id=encounter.id,
+        disposition=disposition,
+        details=details,
+    )
+
+    db.refresh(completed)
+    db.refresh(encounter)
+
+    disposition_record = db.scalar(
+        select(EpisodeDisposition).where(
+            EpisodeDisposition.episode_id == episode.id,
+        )
+    )
+
+    assert completed.status == EpisodeStatus.ADMITTED
+    assert encounter.status == EncounterStatus.CLOSED
+    assert disposition_record is not None
+    assert disposition_record.details == details
+    assert disposition_record.decided_by == staff.id
+
+
+def test_complete_ward_review_rejects_non_ward_review_encounter(
+    db,
+    hospital,
+):
+    """
+    Only a Ward Review Encounter can complete the Ward Review workflow.
+    """
+
+    (
+        context,
+        staff,
+        episode,
+        encounter,
+        service,
+    ) = create_admitted_ward_review(
+        db,
+        hospital,
+        hospital_number="PAT-WARD-DISP-003",
+        staff_number="STF-WARD-DISP-003",
+    )
+
+    encounter.title = "Doctor Consultation"
+    db.commit()
+    db.refresh(encounter)
+
+    with pytest.raises(
+        WardReviewEncounterRequiredError,
+    ):
+        service.complete_ward_review(
+            context=context,
+            episode_id=episode.id,
+            encounter_id=encounter.id,
+            disposition=EpisodeDispositionType.DISCHARGE,
+        )
+
+    db.refresh(episode)
+    db.refresh(encounter)
+
+    disposition_record = db.scalar(
+        select(EpisodeDisposition).where(
+            EpisodeDisposition.episode_id == episode.id,
+        )
+    )
+
+    assert episode.status == EpisodeStatus.ADMITTED
+    assert encounter.status == EncounterStatus.OPEN
+    assert disposition_record is None
+
+
+def test_complete_ward_review_rejects_wrong_episode_encounter(
+    db,
+    hospital,
+):
+    """
+    A Ward Review Encounter from another Episode cannot be completed.
+    """
+
+    (
+        context,
+        staff,
+        episode,
+        encounter,
+        service,
+    ) = create_admitted_ward_review(
+        db,
+        hospital,
+        hospital_number="PAT-WARD-DISP-004",
+        staff_number="STF-WARD-DISP-004",
+    )
+
+    other_patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number="PAT-WARD-DISP-005",
+    )
+
+    other_episode = service.create_episode(
+        context=context,
+        patient_id=other_patient.id,
+        title="Medical Admission",
+    )
+
+    other_episode.status = EpisodeStatus.ADMITTED
+    other_episode.managing_doctor_id = staff.id
+
+    db.commit()
+    db.refresh(other_episode)
+
+    with pytest.raises(
+        EncounterNotBelongingToEpisodeError,
+    ):
+        service.complete_ward_review(
+            context=context,
+            episode_id=other_episode.id,
+            encounter_id=encounter.id,
+            disposition=EpisodeDispositionType.DISCHARGE,
+        )
+
+    db.refresh(episode)
+    db.refresh(encounter)
+    db.refresh(other_episode)
+
+    assert episode.status == EpisodeStatus.ADMITTED
+    assert other_episode.status == EpisodeStatus.ADMITTED
+    assert encounter.status == EncounterStatus.OPEN
+
+
+# =============================================================================
+# Episode Routing Transaction Atomicity
+# =============================================================================
+
+
+def test_route_episode_rolls_back_nursing_encounter_closure_on_failure(
+    db,
+    hospital,
+):
+    """
+    Routing must atomically commit the Episode transition and
+    Nursing Encounter closure.
+
+    If routing fails after the Nursing Encounter has been closed
+    in the transaction, both changes must be rolled back.
+    """
+
+    _, staff, context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+    )
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number="PAT-ROUTE-ATOMIC-001",
+    )
+
+    service = build_episode_service(db)
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    episode.flow_status = EpisodeFlowStatus.WAITING_FOR_NURSING
+    db.commit()
+    db.refresh(episode)
+
+    service.start_nursing(
+        context=context,
+        episode_id=episode.id,
+    )
+
+    db.refresh(episode)
+
+    encounter = next(
+        encounter
+        for encounter in episode.encounters
+        if encounter.title == "Nursing Intake"
+    )
+
+    assert encounter.status == EncounterStatus.OPEN
+
+    document_service = ClinicalDocumentService(
+        repository=ClinicalDocumentRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+    )
+
+    document = document_service.create_draft(
+        context=context,
+        encounter_id=encounter.id,
+        document_type=ClinicalDocumentType.NURSING_INTAKE,
+        authored_by=staff.id,
+        content={
+            "blood_pressure": "120/80",
+            "pulse_rate": 72,
+            "temperature": 36.5,
+        },
+    )
+
+    document_service.sign_document(
+        context=context,
+        document_id=document.id,
+        signed_at=datetime(
+            2026,
+            8,
+            31,
+            12,
+            0,
+            tzinfo=UTC,
+        ),
+    )
+
+    department_service = DepartmentService(
+        repository=DepartmentRepository(db),
+        hospital_repository=HospitalRepository(db),
+    )
+
+    department = department_service.create_department(
+        DepartmentCreate(
+            hospital_id=hospital.id,
+            name="Emergency Department",
+            code="ROUTE-ATOMIC-ED",
+            category=DepartmentCategory.CLINICAL,
+            status=DepartmentStatus.ACTIVE,
+        ),
+    )
+
+    original_save = service.repository.save
+
+    def failing_save():
+        raise RuntimeError("Forced routing transaction failure.")
+
+    service.repository.save = failing_save
+
+    try:
+        with pytest.raises(
+            RuntimeError,
+            match="Forced routing transaction failure",
+        ):
+            service.route_episode(
+                context=context,
+                episode_id=episode.id,
+                department_id=department.id,
+            )
+    finally:
+        service.repository.save = original_save
+
+    db.expire_all()
+
+    refreshed_episode = db.get(
+        type(episode),
+        episode.id,
+    )
+
+    assert refreshed_episode is not None
+
+    assert (
+        refreshed_episode.flow_status
+        == EpisodeFlowStatus.NURSING_IN_PROGRESS
+    )
+
+    assert refreshed_episode.current_department_id is None
+    assert refreshed_episode.routed_at is None
+    assert refreshed_episode.routed_by is None
+
+    refreshed_encounter = db.get(
+        Encounter,
+        encounter.id,
+    )
+
+    assert refreshed_encounter is not None
+    assert refreshed_encounter.status == EncounterStatus.OPEN
+    assert refreshed_encounter.ended_at is None
 
 
 # =============================================================================

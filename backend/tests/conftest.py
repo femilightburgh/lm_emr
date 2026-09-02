@@ -157,6 +157,58 @@ def cleanup_hospital(db: Session, hospital_id) -> None:
     )
 
     # ------------------------------------------------------------------
+    # Diagnostics
+    # ------------------------------------------------------------------
+
+    db.execute(
+        text(
+            '''
+            DELETE FROM diagnostic_report_attachments
+            WHERE report_id IN (
+                SELECT dr.id
+                FROM diagnostic_reports dr
+                JOIN clinical_orders co
+                    ON dr.order_id = co.id
+                JOIN encounters e
+                    ON co.encounter_id = e.id
+                JOIN episodes ep
+                    ON e.episode_id = ep.id
+                WHERE ep.hospital_id = :hospital_id
+            )
+            '''
+        ),
+        {"hospital_id": hospital_id},
+    )
+
+    db.execute(
+        text(
+            '''
+            DELETE FROM diagnostic_reports
+            WHERE order_id IN (
+                SELECT co.id
+                FROM clinical_orders co
+                JOIN encounters e
+                    ON co.encounter_id = e.id
+                JOIN episodes ep
+                    ON e.episode_id = ep.id
+                WHERE ep.hospital_id = :hospital_id
+            )
+            '''
+        ),
+        {"hospital_id": hospital_id},
+    )
+
+    db.execute(
+        text(
+            '''
+            DELETE FROM diagnostic_investigations
+            WHERE hospital_id = :hospital_id
+            '''
+        ),
+        {"hospital_id": hospital_id},
+    )
+
+    # ------------------------------------------------------------------
     # Clinical Results
     # ------------------------------------------------------------------
 
@@ -248,6 +300,26 @@ def cleanup_hospital(db: Session, hospital_id) -> None:
         text(
             """
             DELETE FROM clinical_events
+            WHERE encounter_id IN (
+                SELECT e.id
+                FROM encounters e
+                JOIN episodes ep
+                    ON e.episode_id = ep.id
+                WHERE ep.hospital_id = :hospital_id
+            )
+            """
+        ),
+        {"hospital_id": hospital_id},
+    )
+
+    # ------------------------------------------------------------------
+    # Episode Dispositions
+    # ------------------------------------------------------------------
+
+    db.execute(
+        text(
+            """
+            DELETE FROM episode_dispositions
             WHERE encounter_id IN (
                 SELECT e.id
                 FROM encounters e
@@ -370,6 +442,38 @@ def cleanup_hospital(db: Session, hospital_id) -> None:
         text(
             """
             DELETE FROM roles
+            WHERE hospital_id = :hospital_id
+            """
+        ),
+        {"hospital_id": hospital_id},
+    )
+
+    # ------------------------------------------------------------------
+    # Laboratory Test Analytes
+    # ------------------------------------------------------------------
+
+    db.execute(
+        text(
+            """
+            DELETE FROM laboratory_test_analytes
+            WHERE laboratory_test_id IN (
+                SELECT id
+                FROM laboratory_tests
+                WHERE hospital_id = :hospital_id
+            )
+            """
+        ),
+        {"hospital_id": hospital_id},
+    )
+
+    # ------------------------------------------------------------------
+    # Laboratory Tests
+    # ------------------------------------------------------------------
+
+    db.execute(
+        text(
+            """
+            DELETE FROM laboratory_tests
             WHERE hospital_id = :hospital_id
             """
         ),

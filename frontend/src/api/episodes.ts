@@ -184,6 +184,17 @@ export async function listNursingQueue(
 }
 
 
+export async function listNursingInpatients(
+  accessToken: string,
+): Promise<Episode[]> {
+  return apiRequest<Episode[]>(
+    '/episodes/queue/nursing/inpatients',
+    {},
+    accessToken,
+  )
+}
+
+
 // ============================================================================
 // Start Nursing
 // ============================================================================
@@ -261,6 +272,34 @@ export async function completeConsultation(
 ): Promise<Episode> {
   return apiRequest<Episode>(
     `/episodes/${episodeId}/complete-consultation`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    accessToken,
+  )
+}
+
+
+export type WardReviewDisposition =
+  | 'CONTINUE_ADMISSION'
+  | 'DISCHARGE'
+  | 'TRANSFER'
+  | 'REFERRAL'
+  | 'OTHER'
+
+
+export async function completeWardReview(
+  accessToken: string,
+  episodeId: string,
+  payload: {
+    encounter_id: string
+    disposition: WardReviewDisposition
+    details: string | null
+  },
+): Promise<Episode> {
+  return apiRequest<Episode>(
+    `/episodes/${episodeId}/complete-ward-review`,
     {
       method: 'POST',
       body: JSON.stringify(payload),

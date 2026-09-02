@@ -51,8 +51,8 @@ from app.modules.encounter.models import (
     Encounter,
     EncounterStatus,
 )
-from app.modules.encounter.repositories.encounter_repository import (
-    EncounterRepository,
+from app.modules.encounter.services.encounter_service import (
+    EncounterService,
 )
 
 from app.modules.episode.exceptions import (
@@ -69,7 +69,10 @@ from app.modules.episode.exceptions import (
     EpisodeAlreadyRoutedError,
     EpisodeNotAwaitingCheckInError,
     InvalidConsultationDispositionError,
+    InvalidWardReviewDispositionError,
     EpisodeNotFoundError,
+    WardReviewEncounterRequiredError,
+    WardReviewDispositionDetailsRequiredError,
     EpisodeNotInNursingError,
     EpisodeNotOpenError,
     EpisodeNotWaitingForNursingError,
@@ -82,12 +85,17 @@ from app.modules.episode.exceptions import (
 
 from app.modules.episode.models import (
     Episode,
+    EpisodeDisposition,
+    EpisodeDispositionType,
     EpisodeFlowStatus,
     EpisodeStatus,
 )
 
 from app.modules.episode.repositories.episode_repository import (
     EpisodeRepository,
+)
+from app.modules.episode.repositories.episode_disposition_repository import (
+    EpisodeDispositionRepository,
 )
 
 from app.modules.episode.services.episode_number_generator import (
@@ -123,17 +131,19 @@ class EpisodeService:
         repository: EpisodeRepository,
         patient_repository: PatientRepository,
         number_generator: EpisodeNumberGenerator,
-        encounter_repository: EncounterRepository,
+        encounter_service: EncounterService,
         event_service: ClinicalEventService,
         staff_repository: StaffRepository,
+        disposition_repository: EpisodeDispositionRepository,
         department_repository: DepartmentRepository | None = None,
     ) -> None:
         self.repository = repository
         self.patient_repository = patient_repository
         self.number_generator = number_generator
-        self.encounter_repository = encounter_repository
+        self.encounter_service = encounter_service
         self.event_service = event_service
         self.staff_repository = staff_repository
+        self.disposition_repository = disposition_repository
 
         if department_repository is None:
             department_repository = DepartmentRepository(
@@ -478,6 +488,25 @@ class EpisodeService:
         )
 
 
+
+    # =========================================================================
+    # Nursing Inpatients
+    # =========================================================================
+
+    def list_admitted_episodes(
+        self,
+        *,
+        context: RequestContext,
+    ) -> list[Episode]:
+        """
+        Return Episodes currently on admission within the Hospital.
+        """
+
+        return self.repository.list_admitted_episodes(
+            hospital_id=context.hospital_id,
+        )
+
+
     # =========================================================================
     # Doctor Ward Queue
     # =========================================================================
@@ -545,27 +574,18 @@ class EpisodeService:
             context=context,
         )
 
-        started_at = datetime.now(UTC)
-
-        encounter = Encounter(
-            episode_id=episode.id,
-            staff_id=staff.id,
-            title="Nursing Intake",
-            status=EncounterStatus.OPEN,
-            started_at=started_at,
-            ended_at=None,
-        )
-
         try:
             episode.flow_status = (
                 EpisodeFlowStatus.NURSING_IN_PROGRESS
             )
 
-            self.encounter_repository.db.add(
-                encounter,
+            self.encounter_service.create_encounter(
+                context=context,
+                episode_id=episode.id,
+                staff_id=staff.id,
+                title="Nursing Intake",
+                commit=False,
             )
-
-            self.repository.db.flush()
 
             self.repository.db.commit()
 
@@ -665,11 +685,9 @@ class EpisodeService:
         # Complete Nursing Encounter
         # ------------------------------------------------------------------
 
-        encounters = (
-            self.encounter_repository.list_by_episode(
-                hospital_id=context.hospital_id,
-                episode_id=episode.id,
-            )
+        encounters = self.encounter_service.list_episode_encounters(
+            context=context,
+            episode_id=episode.id,
         )
 
         nursing_encounter = next(
@@ -689,25 +707,22 @@ class EpisodeService:
                 "Open Nursing Intake encounter not found.",
             )
 
-        completed_at = datetime.now(UTC)
-
-        nursing_encounter.status = (
-            EncounterStatus.CLOSED
-        )
-        nursing_encounter.ended_at = (
-            completed_at
-        )
-
-        # ------------------------------------------------------------------
-        # Route
-        # ------------------------------------------------------------------
-
-        episode.current_department_id = department.id
-        episode.routed_at = datetime.now(UTC)
-        episode.routed_by = staff.id
-        episode.flow_status = EpisodeFlowStatus.ROUTED
-
         try:
+            self.encounter_service.close_encounter(
+                context=context,
+                encounter_id=nursing_encounter.id,
+                commit=False,
+            )
+
+            # --------------------------------------------------------------
+            # Route
+            # --------------------------------------------------------------
+
+            episode.current_department_id = department.id
+            episode.routed_at = datetime.now(UTC)
+            episode.routed_by = staff.id
+            episode.flow_status = EpisodeFlowStatus.ROUTED
+
             self.repository.save()
 
             self.repository.refresh(
@@ -756,8 +771,8 @@ class EpisodeService:
                 "Unsupported consultation disposition.",
             )
 
-        encounter = self.encounter_repository.get_by_id(
-            hospital_id=context.hospital_id,
+        encounter = self.encounter_service.get_encounter(
+            context=context,
             encounter_id=encounter_id,
         )
 
@@ -822,6 +837,126 @@ class EpisodeService:
 
 
     # =========================================================================
+    # Complete Ward Review
+    # =========================================================================
+
+    def complete_ward_review(
+        self,
+        *,
+        context: RequestContext,
+        episode_id: UUID,
+        encounter_id: UUID,
+        disposition: EpisodeDispositionType,
+        details: str | None = None,
+    ) -> Episode:
+        """
+        Complete an inpatient Ward Review.
+
+        The Ward Review Encounter is closed for every valid disposition.
+
+        A DISCHARGE disposition also closes the Episode.
+
+        TRANSFER, REFERRAL, and OTHER require details and do not
+        change the Episode lifecycle.
+        """
+
+        episode = self._get_episode(
+            context=context,
+            episode_id=episode_id,
+        )
+
+        if episode.status == EpisodeStatus.CLOSED:
+            raise EpisodeAlreadyClosedError()
+
+        if episode.status == EpisodeStatus.CANCELLED:
+            raise EpisodeAlreadyCancelledError()
+
+        if episode.status != EpisodeStatus.ADMITTED:
+            raise InvalidWardReviewDispositionError(
+                "Ward Review disposition requires an admitted Episode.",
+            )
+
+        encounter = self.encounter_service.get_encounter(
+            context=context,
+            encounter_id=encounter_id,
+        )
+
+        if encounter is None:
+            raise EncounterNotFoundError()
+
+        if encounter.episode_id != episode.id:
+            raise EncounterNotBelongingToEpisodeError()
+
+        if encounter.title != "Ward Review":
+            raise WardReviewEncounterRequiredError(
+                "Only a Ward Review encounter can be completed "
+                "through this workflow.",
+            )
+
+        if encounter.status != EncounterStatus.OPEN:
+            raise EncounterNotOpenError()
+
+        normalized_details = (
+            details.strip()
+            if details is not None
+            else None
+        )
+
+        if disposition in {
+            EpisodeDispositionType.TRANSFER,
+            EpisodeDispositionType.REFERRAL,
+            EpisodeDispositionType.OTHER,
+        } and not normalized_details:
+            raise WardReviewDispositionDetailsRequiredError(
+                "Details are required for this Ward Review disposition.",
+            )
+
+        staff = self._get_authenticated_staff(
+            context=context,
+        )
+
+        completed_at = datetime.now(UTC)
+
+        record = EpisodeDisposition(
+            hospital_id=context.hospital_id,
+            episode_id=episode.id,
+            encounter_id=encounter.id,
+            disposition=disposition,
+            details=normalized_details,
+            decided_by=staff.id,
+            decided_at=completed_at,
+        )
+
+        try:
+            self.disposition_repository.create(
+                disposition=record,
+            )
+
+            self.encounter_service.close_encounter(
+                context=context,
+                encounter_id=encounter.id,
+                commit=False,
+            )
+
+            if disposition == EpisodeDispositionType.DISCHARGE:
+                episode.status = EpisodeStatus.CLOSED
+                episode.closed_at = completed_at
+
+            self.repository.db.flush()
+            self.repository.db.commit()
+
+        except Exception:
+            self.repository.db.rollback()
+            raise
+
+        self.repository.refresh(
+            episode,
+        )
+
+        return episode
+
+
+    # =========================================================================
     # Admit Episode
     # =========================================================================
 
@@ -868,8 +1003,8 @@ class EpisodeService:
         if episode.status != EpisodeStatus.OPEN:
             raise EpisodeNotOpenError()
 
-        encounter = self.encounter_repository.get_by_id(
-            hospital_id=context.hospital_id,
+        encounter = self.encounter_service.get_encounter(
+            context=context,
             encounter_id=encounter_id,
         )
 

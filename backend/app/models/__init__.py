@@ -95,9 +95,23 @@ from app.modules.laboratory.models import (
     LaboratoryTest,
     LaboratoryTestAnalyte,
 )
+
+from app.modules.clinical_orders.models import (
+    MedicationTreatment,
+    MedicationTreatmentStatus,
+    MedicationDose,
+    MedicationDoseStatus,
+    MedicationAdministration,
+    MedicationAdministrationStatus,
+)
 from app.modules.clinical_results.models import (
     ClinicalResult,
     ClinicalResultValue,
+)
+from app.modules.diagnostics.models import (
+    DiagnosticInvestigation,
+    DiagnosticReport,
+    DiagnosticReportAttachment,
 )
 from app.modules.diagnoses.models import ClinicalDiagnosis
 from app.modules.terminology.models import (
@@ -147,9 +161,22 @@ __all__ = [
     "LaboratoryTest",
     "LaboratoryTestAnalyte",
 
+    # Inpatient Medication
+    "MedicationTreatment",
+    "MedicationTreatmentStatus",
+    "MedicationDose",
+    "MedicationDoseStatus",
+    "MedicationAdministration",
+    "MedicationAdministrationStatus",
+
     # Clinical Results
     "ClinicalResult",
     "ClinicalResultValue",
+
+    # Diagnostics
+    "DiagnosticInvestigation",
+    "DiagnosticReport",
+    "DiagnosticReportAttachment",
 
     # Clinical Diagnoses
     "ClinicalDiagnosis",

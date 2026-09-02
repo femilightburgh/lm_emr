@@ -57,3 +57,37 @@ class CompleteConsultationRequest(BaseModel):
         ...,
         description="Clinical disposition selected by the doctor.",
     )
+
+class WardReviewDisposition(str, Enum):
+    """
+    Clinical disposition selected during a Ward Review.
+    """
+
+    CONTINUE_ADMISSION = "CONTINUE_ADMISSION"
+    DISCHARGE = "DISCHARGE"
+    TRANSFER = "TRANSFER"
+    REFERRAL = "REFERRAL"
+    OTHER = "OTHER"
+
+
+class CompleteWardReviewRequest(BaseModel):
+    """
+    Complete an inpatient Ward Review.
+    """
+
+    encounter_id: UUID = Field(
+        ...,
+        description="OPEN Ward Review encounter being completed.",
+    )
+
+    disposition: WardReviewDisposition = Field(
+        ...,
+        description="Clinical disposition selected by the doctor.",
+    )
+
+    details: str | None = Field(
+        default=None,
+        max_length=5000,
+        description="Additional details required for some dispositions.",
+    )
+

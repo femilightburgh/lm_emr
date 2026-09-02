@@ -8,3 +8,6 @@
 @import './styles/laboratory.css';
 @import './styles/pharmacy.css';
 @import './styles/doctor.css';
+@import './styles/diagnostics.css';
+
+@import './styles/reception.css';

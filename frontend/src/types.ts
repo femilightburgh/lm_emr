@@ -41,13 +41,13 @@ export type Profession =
 
   export type WorkspaceView =
   | 'dashboard'
-  | 'patients'
-  | 'register'
+  | 'reception'
   | 'administrator'
   | 'nursing'
   | 'doctor'
   | 'laboratory'
   | 'pharmacy'
+  | 'diagnostics'
 
 
 export interface LoginRequest {

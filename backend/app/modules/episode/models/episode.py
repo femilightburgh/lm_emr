@@ -48,6 +48,9 @@ from app.db.base_entity import BaseEntity
 
 if TYPE_CHECKING:
     from app.modules.encounter.models import Encounter
+    from app.modules.episode.models.episode_disposition import (
+        EpisodeDisposition,
+    )
     from app.modules.organization.models import Hospital
     from app.modules.patients.models import Patient
     from app.modules.staff.models import Staff
@@ -273,4 +276,9 @@ class Episode(BaseEntity):
 
     encounters: Mapped[list["Encounter"]] = relationship(
         back_populates="episode",
+    )
+
+    dispositions: Mapped[list["EpisodeDisposition"]] = relationship(
+        back_populates="episode",
+        order_by="EpisodeDisposition.decided_at",
     )

@@ -114,3 +114,27 @@ class LaboratoryQueueItemResponse(BaseModel):
     ordered_at: datetime
 
     started_at: datetime | None
+
+
+class DiagnosticQueueItemResponse(BaseModel):
+    """
+    Clinical Order worklist item for Diagnostics staff.
+    """
+
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
+
+    id: UUID
+    encounter_id: UUID
+    patient_id: UUID
+    patient_name: str
+    hospital_number: str
+    episode_number: str
+    ordering_clinician_name: str
+    order_type: ClinicalOrderType
+    status: ClinicalOrderStatus
+    priority: str
+    details: dict[str, Any]
+    ordered_at: datetime
+    started_at: datetime | None

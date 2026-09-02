@@ -16,7 +16,7 @@ Hospital tenancy is enforced by repository query predicates.
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from app.modules.episode.models import (
@@ -24,8 +24,16 @@ from app.modules.episode.models import (
     EpisodeFlowStatus,
     EpisodeStatus,
 )
-
+from app.modules.encounter.models import (
+    Encounter,
+    EncounterStatus,
+)
+from app.modules.organization.models import Department
 from app.modules.patients.models import Patient
+from app.modules.staff.models import (
+    Staff,
+    StaffEmployment,
+)
 
 
 class EpisodeRepository:
@@ -38,6 +46,53 @@ class EpisodeRepository:
         db: Session,
     ) -> None:
         self.db = db
+
+    # =========================================================================
+    # Reception Overview
+    # =========================================================================
+
+    def count_admitted_by_hospital(
+        self,
+        *,
+        hospital_id: UUID,
+    ) -> int:
+        """
+        Count Episodes currently on admission within a Hospital.
+        """
+        return int(
+            self.db.scalar(
+                select(
+                    func.count(Episode.id),
+                ).where(
+                    Episode.hospital_id == hospital_id,
+                    Episode.status == EpisodeStatus.ADMITTED,
+                )
+            )
+            or 0
+        )
+
+    def count_checked_in_between(
+        self,
+        *,
+        hospital_id: UUID,
+        start_at,
+        end_at,
+    ) -> int:
+        """
+        Count Episodes checked in within a supplied time interval.
+        """
+        return int(
+            self.db.scalar(
+                select(
+                    func.count(Episode.id),
+                ).where(
+                    Episode.hospital_id == hospital_id,
+                    Episode.checked_in_at >= start_at,
+                    Episode.checked_in_at < end_at,
+                )
+            )
+            or 0
+        )
 
     # =========================================================================
     # Create
@@ -205,6 +260,41 @@ class EpisodeRepository:
             self.db.scalars(statement),
         )
 
+
+    # =========================================================================
+    # Nursing Inpatients
+    # =========================================================================
+
+    def list_admitted_episodes(
+        self,
+        *,
+        hospital_id: UUID,
+    ) -> list[Episode]:
+        """
+        Return Episodes currently on admission within a Hospital.
+        """
+
+        statement = (
+            select(Episode)
+            .join(
+                Patient,
+                Patient.id == Episode.patient_id,
+            )
+            .where(
+                Episode.hospital_id == hospital_id,
+                Episode.status == EpisodeStatus.ADMITTED,
+            )
+            .order_by(
+                Episode.routed_at.asc().nulls_last(),
+                Episode.created_at.asc(),
+            )
+        )
+
+        return list(
+            self.db.scalars(statement),
+        )
+
+
     # =========================================================================
     # Doctor Ward Queue
     # =========================================================================
@@ -238,6 +328,152 @@ class EpisodeRepository:
         return list(
             self.db.scalars(statement),
         )
+
+    # =========================================================================
+    # Reception Patient Flow
+    # =========================================================================
+
+    def count_flow_status_checked_in_between(
+        self,
+        *,
+        hospital_id: UUID,
+        flow_status: EpisodeFlowStatus,
+        start_at,
+        end_at,
+    ) -> int:
+        """
+        Count active Episodes in a flow state that were
+        checked in within a supplied time interval.
+        """
+        return int(
+            self.db.scalar(
+                select(
+                    func.count(Episode.id),
+                ).where(
+                    Episode.hospital_id == hospital_id,
+                    Episode.status == EpisodeStatus.OPEN,
+                    Episode.flow_status == flow_status,
+                    Episode.checked_in_at >= start_at,
+                    Episode.checked_in_at < end_at,
+                )
+            )
+            or 0
+        )
+
+    def count_flow_status_by_hospital(
+        self,
+        *,
+        hospital_id: UUID,
+        flow_status: EpisodeFlowStatus,
+    ) -> int:
+        """
+        Count active Episodes in a specific operational flow state.
+        """
+        return int(
+            self.db.scalar(
+                select(
+                    func.count(Episode.id),
+                ).where(
+                    Episode.hospital_id == hospital_id,
+                    Episode.status == EpisodeStatus.OPEN,
+                    Episode.flow_status == flow_status,
+                )
+            )
+            or 0
+        )
+
+    def list_patient_flow(
+        self,
+        *,
+        hospital_id: UUID,
+    ) -> list[
+        tuple[
+            Episode,
+            Patient,
+            Encounter | None,
+            Staff | None,
+            StaffEmployment | None,
+            Department | None,
+        ]
+    ]:
+        """
+        Return active Episodes with current patient-flow context.
+
+        The active OPEN Encounter, when present, identifies the
+        professional currently handling the patient.
+        """
+
+        latest_open_encounter = (
+            select(
+                Encounter.id.label(
+                    "encounter_id",
+                ),
+            )
+            .where(
+                Encounter.episode_id == Episode.id,
+                Encounter.status == EncounterStatus.OPEN,
+            )
+            .order_by(
+                Encounter.started_at.desc(),
+            )
+            .limit(1)
+            .correlate(Episode)
+            .scalar_subquery()
+        )
+
+        statement = (
+            select(
+                Episode,
+                Patient,
+                Encounter,
+                Staff,
+                StaffEmployment,
+                Department,
+            )
+            .join(
+                Patient,
+                Patient.id == Episode.patient_id,
+            )
+            .outerjoin(
+                Encounter,
+                Encounter.id == latest_open_encounter,
+            )
+            .outerjoin(
+                Staff,
+                Staff.id == Encounter.staff_id,
+            )
+            .outerjoin(
+                StaffEmployment,
+                and_(
+                    StaffEmployment.staff_id == Staff.id,
+                    StaffEmployment.employment_status == "ACTIVE",
+                    StaffEmployment.date_left.is_(None),
+                ),
+            )
+            .outerjoin(
+                Department,
+                Department.id == Episode.current_department_id,
+            )
+            .where(
+                Episode.hospital_id == hospital_id,
+                Patient.hospital_id == hospital_id,
+                Episode.status.in_(
+                    (
+                        EpisodeStatus.OPEN,
+                        EpisodeStatus.ADMITTED,
+                    ),
+                ),
+            )
+            .order_by(
+                Episode.checked_in_at.desc().nullslast(),
+                Episode.opened_at.desc(),
+            )
+        )
+
+        return list(
+            self.db.execute(statement).all(),
+        )
+
 
     # =========================================================================
     # Patient Episodes

@@ -5,6 +5,8 @@ export type ClinicalOrderType =
   | 'LABORATORY'
   | 'RADIOLOGY'
   | 'MEDICATION'
+  | 'DIAGNOSTIC'
+  | 'DIAGNOSTIC'
 
 
 export type ClinicalOrderStatus =

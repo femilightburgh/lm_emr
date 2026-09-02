@@ -188,6 +188,18 @@ PERMISSIONS: list[PermissionDefinition] = [
     ),
 
     PermissionDefinition(
+        code=Permissions.MEDICATION_ADMINISTRATION_READ,
+        name="Read Medication Administration",
+        description="Allows viewing scheduled inpatient medication doses and administration records.",
+    ),
+
+    PermissionDefinition(
+        code=Permissions.MEDICATION_ADMINISTRATION_CREATE,
+        name="Record Medication Administration",
+        description="Allows recording the nursing outcome of a scheduled inpatient medication dose.",
+    ),
+
+    PermissionDefinition(
         code=Permissions.LABORATORY_CATALOGUE_READ,
         name="Read Laboratory Catalogue",
         description="Allows viewing laboratory tests and analyte definitions.",

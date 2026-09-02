@@ -12,6 +12,9 @@ from uuid import uuid4
 import pytest
 
 from app.core.context import RequestContext
+from app.bootstrap.laboratory import (
+    bootstrap_laboratory_tests,
+)
 from app.modules.clinical_orders.enums import ClinicalOrderStatus
 from app.modules.clinical_orders.repositories import (
     ClinicalOrderRepository,
@@ -53,6 +56,9 @@ from app.modules.encounter.services.encounter_service import (
 from app.modules.episode.models import EpisodeStatus
 from app.modules.episode.repositories.episode_repository import (
     EpisodeRepository,
+)
+from app.modules.episode.repositories.episode_disposition_repository import (
+    EpisodeDispositionRepository,
 )
 from app.modules.episode.services.episode_number_generator import (
     EpisodeNumberGenerator,
@@ -111,6 +117,11 @@ def create_test_encounter(
         permissions=frozenset(),
     )
 
+    bootstrap_laboratory_tests(
+        db,
+        hospital_id=hospital.id,
+    )
+
     patient = PatientService(
         repository=PatientRepository(db),
     ).create_patient(
@@ -155,11 +166,18 @@ def create_test_encounter(
         number_generator=EpisodeNumberGenerator(
             repository=episode_repository,
         ),
-        encounter_repository=EncounterRepository(db),
+        encounter_service=EncounterService(
+            repository=EncounterRepository(db),
+            episode_repository=episode_repository,
+            staff_repository=StaffRepository(
+                session=db,
+            ),
+        ),
         event_service=ClinicalEventService(
             repository=ClinicalEventRepository(db),
         ),
         staff_repository=StaffRepository(db),
+        disposition_repository=EpisodeDispositionRepository(db),
     ).create_episode(
         context=context,
         patient_id=patient.id,
@@ -496,7 +514,10 @@ def test_record_structured_laboratory_values(
 
     laboratory_test = (
         db.query(LaboratoryTest)
-        .filter(LaboratoryTest.code == "CBC")
+        .filter(
+            LaboratoryTest.hospital_id == hospital.id,
+            LaboratoryTest.code == "CBC",
+        )
         .one()
     )
 
@@ -566,7 +587,10 @@ def test_record_result_rejects_unknown_laboratory_analyte(
 
     laboratory_test = (
         db.query(LaboratoryTest)
-        .filter(LaboratoryTest.code == "EUCR")
+        .filter(
+            LaboratoryTest.hospital_id == hospital.id,
+            LaboratoryTest.code == "EUCR",
+        )
         .one()
     )
 
@@ -618,7 +642,10 @@ def test_record_result_rejects_invalid_laboratory_value_type(
 
     laboratory_test = (
         db.query(LaboratoryTest)
-        .filter(LaboratoryTest.code == "CBC")
+        .filter(
+            LaboratoryTest.hospital_id == hospital.id,
+            LaboratoryTest.code == "CBC",
+        )
         .one()
     )
 
@@ -668,7 +695,10 @@ def test_record_result_rejects_duplicate_analyte(
 
     laboratory_test = (
         db.query(LaboratoryTest)
-        .filter(LaboratoryTest.code == "CBC")
+        .filter(
+            LaboratoryTest.hospital_id == hospital.id,
+            LaboratoryTest.code == "CBC",
+        )
         .one()
     )
 
@@ -722,7 +752,10 @@ def test_record_result_rejects_invalid_coded_value(
 
     laboratory_test = (
         db.query(LaboratoryTest)
-        .filter(LaboratoryTest.code == "MALARIA")
+        .filter(
+            LaboratoryTest.hospital_id == hospital.id,
+            LaboratoryTest.code == "MALARIA",
+        )
         .one()
     )
 
@@ -772,7 +805,10 @@ def test_record_result_accepts_valid_coded_value(
 
     laboratory_test = (
         db.query(LaboratoryTest)
-        .filter(LaboratoryTest.code == "MALARIA")
+        .filter(
+            LaboratoryTest.hospital_id == hospital.id,
+            LaboratoryTest.code == "MALARIA",
+        )
         .one()
     )
 
@@ -944,7 +980,10 @@ def test_numeric_result_below_reference_range_is_flagged_low(
 
     test = (
         db.query(LaboratoryTest)
-        .filter(LaboratoryTest.code == "CBC")
+        .filter(
+            LaboratoryTest.hospital_id == hospital.id,
+            LaboratoryTest.code == "CBC",
+        )
         .one()
     )
 
@@ -999,7 +1038,10 @@ def test_numeric_result_above_reference_range_is_flagged_high(
 
     test = (
         db.query(LaboratoryTest)
-        .filter(LaboratoryTest.code == "CBC")
+        .filter(
+            LaboratoryTest.hospital_id == hospital.id,
+            LaboratoryTest.code == "CBC",
+        )
         .one()
     )
 
@@ -1054,7 +1096,10 @@ def test_numeric_result_within_reference_range_has_no_abnormal_flag(
 
     test = (
         db.query(LaboratoryTest)
-        .filter(LaboratoryTest.code == "CBC")
+        .filter(
+            LaboratoryTest.hospital_id == hospital.id,
+            LaboratoryTest.code == "CBC",
+        )
         .one()
     )
 

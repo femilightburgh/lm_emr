@@ -12,6 +12,10 @@ import type {
 } from '../../api/laboratory'
 
 import type {
+  DiagnosticInvestigation,
+} from '../../api/diagnostics'
+
+import type {
   ClinicalResult,
 } from '../../api/clinicalResults'
 
@@ -23,6 +27,7 @@ interface Props {
   saving: boolean
   cancellingOrderId: string | null
   encounterClosed: boolean
+  inpatientMedication: boolean
 
   orderType: ClinicalOrderType
   orderPriority: string
@@ -30,9 +35,11 @@ interface Props {
   laboratoryTests: LaboratoryTest[]
   selectedLaboratoryTestId: string
 
+  diagnosticInvestigations: DiagnosticInvestigation[]
+  selectedDiagnosticInvestigationId: string
+
   orderTestCode: string
   orderTestName: string
-  orderStudyCode: string
   orderMedicationId: string
   orderDose: string
 
@@ -47,6 +54,17 @@ interface Props {
   prescriptionDirections: string
   prescriptionIndication: string
 
+  inpatientTreatmentStart: string
+  inpatientFirstDose: string
+
+  onInpatientTreatmentStartChange: (
+    value: string,
+  ) => void
+
+  onInpatientFirstDoseChange: (
+    value: string,
+  ) => void
+
   onOrderTypeChange: (
     value: ClinicalOrderType,
   ) => void
@@ -60,7 +78,12 @@ interface Props {
   ) => void
 
 
-  onOrderTestCodeChange?: (
+
+
+  onDiagnosticInvestigationChange: (
+    value: string,
+  ) => void
+onOrderTestCodeChange?: (
     value: string,
   ) => void
 
@@ -68,9 +91,6 @@ interface Props {
     value: string,
   ) => void
 
-  onOrderStudyCodeChange: (
-    value: string,
-  ) => void
 
   onOrderMedicationIdChange: (
     value: string,
@@ -151,6 +171,30 @@ function getOrderLabel(
     return 'Laboratory investigation'
   }
 
+  if (order.order_type === 'DIAGNOSTIC') {
+    const investigationName =
+      order.details.investigation_name
+
+    const investigationCode =
+      order.details.investigation_code
+
+    if (
+      typeof investigationName === 'string' &&
+      investigationName.trim()
+    ) {
+      return investigationName
+    }
+
+    if (
+      typeof investigationCode === 'string' &&
+      investigationCode.trim()
+    ) {
+      return investigationCode
+    }
+
+    return 'Diagnostic investigation'
+  }
+
   if (order.order_type === 'RADIOLOGY') {
     const studyCode =
       order.details.study_code
@@ -181,6 +225,16 @@ function getOrderDetail(
       code.trim()
       ? code
       : 'Laboratory'
+  }
+
+  if (order.order_type === 'DIAGNOSTIC') {
+    const category =
+      order.details.diagnostic_category
+
+    return typeof category === 'string' &&
+      category.trim()
+      ? category
+      : 'Diagnostic'
   }
 
   if (order.order_type === 'RADIOLOGY') {
@@ -221,6 +275,10 @@ function getOrderTypeLabel(
     return 'Laboratory'
   }
 
+  if (type === 'DIAGNOSTIC') {
+    return 'Diagnostic'
+  }
+
   if (type === 'RADIOLOGY') {
     return 'Radiology'
   }
@@ -236,6 +294,7 @@ export default function ClinicalOrdersPanel({
   saving,
   cancellingOrderId,
   encounterClosed,
+  inpatientMedication,
 
   orderType,
   orderPriority,
@@ -243,9 +302,11 @@ export default function ClinicalOrdersPanel({
   laboratoryTests,
   selectedLaboratoryTestId,
 
+
+  diagnosticInvestigations,
+  selectedDiagnosticInvestigationId,
   orderTestCode,
   orderTestName,
-  orderStudyCode,
   orderDose,
 
   prescriptionMedicine,
@@ -259,10 +320,16 @@ export default function ClinicalOrdersPanel({
   prescriptionDirections,
   prescriptionIndication,
 
+  inpatientTreatmentStart,
+  inpatientFirstDose,
+
+  onInpatientTreatmentStartChange,
+  onInpatientFirstDoseChange,
+
   onOrderTypeChange,
   onOrderPriorityChange,
   onLaboratoryTestChange,
-  onOrderStudyCodeChange,
+  onDiagnosticInvestigationChange,
   onOrderDoseChange,
 
   onPrescriptionMedicineChange,
@@ -291,8 +358,8 @@ export default function ClinicalOrdersPanel({
             orderTestCode.trim() &&
             orderTestName.trim()
           )
-        : orderType === 'RADIOLOGY'
-          ? orderStudyCode.trim()
+        : orderType === 'DIAGNOSTIC'
+          ? selectedDiagnosticInvestigationId
           : (
               prescriptionMedicine.trim() &&
               orderDose.trim() &&
@@ -368,8 +435,8 @@ export default function ClinicalOrdersPanel({
                 Laboratory
               </option>
 
-              <option value="RADIOLOGY">
-                Radiology
+              <option value="DIAGNOSTIC">
+                Diagnostic
               </option>
 
               <option value="MEDICATION">
@@ -463,24 +530,70 @@ export default function ClinicalOrdersPanel({
           </div>
         )}
 
-        {orderType === 'RADIOLOGY' && (
+        {orderType === 'DIAGNOSTIC' && (
           <div className="doctor-order-specific-fields">
             <label>
               <span>
-                Study code
+                Diagnostic investigation
               </span>
 
-              <input
+              <select
                 disabled={encounterClosed}
-                value={orderStudyCode}
+                value={
+                  selectedDiagnosticInvestigationId
+                }
                 onChange={event =>
-                  onOrderStudyCodeChange(
+                  onDiagnosticInvestigationChange(
                     event.target.value,
                   )
                 }
-                placeholder="e.g. CXR"
-              />
+              >
+                <option value="">
+                  Select diagnostic investigation
+                </option>
+
+                {diagnosticInvestigations.map(
+                  investigation => (
+                    <option
+                      key={investigation.id}
+                      value={investigation.id}
+                    >
+                      {investigation.code}
+                      {' — '}
+                      {investigation.name}
+                    </option>
+                  ),
+                )}
+              </select>
             </label>
+
+            {selectedDiagnosticInvestigationId && (
+              <div className="doctor-selected-order-preview">
+                <span>
+                  Selected investigation
+                </span>
+
+                <strong>
+                  {
+                    diagnosticInvestigations.find(
+                      investigation =>
+                        investigation.id ===
+                        selectedDiagnosticInvestigationId,
+                    )?.name ?? 'Diagnostic investigation'
+                  }
+                </strong>
+
+                <small>
+                  {
+                    diagnosticInvestigations.find(
+                      investigation =>
+                        investigation.id ===
+                        selectedDiagnosticInvestigationId,
+                    )?.category ?? ''
+                  }
+                </small>
+              </div>
+            )}
           </div>
         )}
 
@@ -672,6 +785,43 @@ export default function ClinicalOrdersPanel({
               </label>
             </div>
 
+              {inpatientMedication && (
+                <div className="doctor-order-row">
+                  <label>
+                    <span>
+                      Treatment start
+                    </span>
+
+                    <input
+                      type="datetime-local"
+                      disabled={encounterClosed}
+                      value={inpatientTreatmentStart}
+                      onChange={event =>
+                        onInpatientTreatmentStartChange(
+                          event.target.value,
+                        )
+                      }
+                    />
+                  </label>
+
+                  <label>
+                    <span>
+                      First dose
+                    </span>
+
+                    <input
+                      type="datetime-local"
+                      disabled={encounterClosed}
+                      value={inpatientFirstDose}
+                      onChange={event =>
+                        onInpatientFirstDoseChange(
+                          event.target.value,
+                        )
+                      }
+                    />
+                  </label>
+                </div>
+              )}
             <div className="doctor-order-row">
               <label>
                 <span>

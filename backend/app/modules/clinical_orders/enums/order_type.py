@@ -16,4 +16,5 @@ class ClinicalOrderType(str, Enum):
 
     LABORATORY = "LABORATORY"
     RADIOLOGY = "RADIOLOGY"
+    DIAGNOSTIC = "DIAGNOSTIC"
     MEDICATION = "MEDICATION"

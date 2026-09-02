@@ -986,3 +986,748 @@
     width: 100%;
   }
 }
+
+
+/* ==========================================================================
+   Compact clinical disclosure
+   ========================================================================== */
+
+.nursing-collapsible {
+  margin-top: 12px;
+  border-top: 1px solid #e4e9ed;
+  border-bottom: 1px solid #e4e9ed;
+}
+
+.nursing-collapsible summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 2px;
+  cursor: pointer;
+  list-style: none;
+  color: #526575;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.nursing-collapsible summary::-webkit-details-marker {
+  display: none;
+}
+
+.nursing-collapsible summary::after {
+  content: '▾';
+  margin-left: auto;
+  color: #748391;
+  transition: transform 120ms ease;
+}
+
+.nursing-collapsible:not([open]) summary::after {
+  transform: rotate(-90deg);
+}
+
+.nursing-collapsible-content {
+  padding: 4px 0 16px;
+}
+
+
+/* ==========================================================================
+   Nursing workspace visual polish
+   ========================================================================== */
+
+.nursing-compact-section
+  .nursing-collapsible
+  summary {
+  gap: 24px;
+}
+
+.nursing-compact-section
+  .nursing-collapsible
+  summary > div:first-child {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: 14px;
+  row-gap: 2px;
+  min-width: 0;
+}
+
+.nursing-compact-section
+  .nursing-collapsible-label {
+  flex: 0 0 auto;
+}
+
+.nursing-compact-section
+  .nursing-collapsible-summary {
+  margin-top: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.nursing-compact-section
+  .nursing-collapsible-chevron {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+
+/* --------------------------------------------------------------------------
+   Latest vital signs
+   -------------------------------------------------------------------------- */
+
+.nursing-latest-vitals {
+  display: grid;
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid #e4e9ed;
+  border-bottom: 1px solid #e4e9ed;
+}
+
+.nursing-latest-vital {
+  min-width: 0;
+  padding: 12px 14px;
+  border-right: 1px solid #e4e9ed;
+}
+
+.nursing-latest-vital:nth-child(3n) {
+  border-right: 0;
+}
+
+.nursing-latest-vital:nth-child(n + 4) {
+  border-top: 1px solid #e4e9ed;
+}
+
+.nursing-latest-vital span {
+  display: block;
+  margin-bottom: 4px;
+  color: #77858e;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+}
+
+.nursing-latest-vital strong {
+  display: inline-block;
+  color: #1d2935;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.nursing-latest-vital small {
+  margin-left: 4px;
+  color: #7a8790;
+  font-size: 10px;
+}
+
+.nursing-vital-recorded {
+  margin-top: 8px;
+  color: #7a8790;
+  font-size: 12px;
+}
+
+
+/* --------------------------------------------------------------------------
+   Active prescriptions
+   -------------------------------------------------------------------------- */
+
+.nursing-medication-item {
+  margin-top: 8px;
+  border: 1px solid #dfe5e9;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.nursing-medication-item
+  > button {
+  min-height: 72px;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+}
+
+.nursing-medication-item
+  > button
+  strong {
+  color: #1d2935;
+  font-size: 14px;
+}
+
+.nursing-medication-item
+  > button
+  p {
+  margin: 3px 0 0;
+  color: #667680;
+  font-size: 12px;
+}
+
+.nursing-medication-item
+  > button
+  p:last-child {
+  color: #7a8790;
+}
+
+
+/* --------------------------------------------------------------------------
+   Previous-observation rows
+   -------------------------------------------------------------------------- */
+
+.nursing-vitals-history-row {
+  padding: 10px 2px;
+}
+
+.nursing-vitals-history-values {
+  line-height: 1.6;
+}
+
+
+/* --------------------------------------------------------------------------
+   Responsive
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .nursing-latest-vitals {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .nursing-latest-vital:nth-child(3n) {
+    border-right: 1px solid #e4e9ed;
+  }
+
+  .nursing-latest-vital:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .nursing-latest-vital:nth-child(n + 3) {
+    border-top: 1px solid #e4e9ed;
+  }
+}
+
+@media (max-width: 600px) {
+  .nursing-latest-vitals {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .nursing-compact-section
+    .nursing-collapsible
+    summary > div:first-child {
+    display: block;
+  }
+
+  .nursing-compact-section
+    .nursing-collapsible-summary {
+    margin-top: 4px;
+  }
+}
+
+
+/* ==========================================================================
+   Final nursing workspace polish
+   ========================================================================== */
+
+/* Use one disclosure indicator only. */
+.nursing-collapsible summary::after {
+  content: none;
+}
+
+.nursing-collapsible summary {
+  list-style: none;
+}
+
+.nursing-collapsible summary::-webkit-details-marker {
+  display: none;
+}
+
+
+/* Keep compact information readable without making it tall. */
+.nursing-compact-section
+  .nursing-collapsible
+  summary {
+  min-height: 56px;
+  padding: 12px 2px;
+}
+
+.nursing-compact-section
+  .nursing-collapsible
+  summary > div:first-child {
+  display: block;
+}
+
+.nursing-compact-section
+  .nursing-collapsible-label {
+  line-height: 1.2;
+}
+
+.nursing-compact-section
+  .nursing-collapsible-summary {
+  margin-top: 4px;
+  line-height: 1.35;
+}
+
+
+/* Desktop vital-sign grid: three columns. */
+.nursing-latest-vitals {
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+}
+
+.nursing-latest-vital {
+  min-height: 58px;
+}
+
+
+/* Correct the borders for the three-column layout. */
+.nursing-latest-vital:nth-child(3n) {
+  border-right: 0;
+}
+
+.nursing-latest-vital:nth-child(n + 4) {
+  border-top: 1px solid #e4e9ed;
+}
+
+
+/* Previous observation disclosure should stay compact. */
+.nursing-vitals-history {
+  margin-top: 10px;
+}
+
+.nursing-vitals-history
+  summary {
+  min-height: 50px;
+}
+
+
+/* Make the vitals entry form feel like an active workflow rather
+   than another large information card. */
+.nursing-vitals-form {
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
+.nursing-vitals-form
+  .section-heading {
+  margin-bottom: 14px;
+}
+
+
+/* Reduce unnecessary vertical space in active medication rows. */
+.nursing-medication-item {
+  margin-top: 6px;
+}
+
+.nursing-medication-item
+  > button {
+  min-height: 64px;
+  padding: 10px 14px;
+}
+
+
+/* Desktop spacing. */
+@media (min-width: 1001px) {
+  .nursing-latest-vitals {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+  }
+}
+
+
+/* Tablet / narrow desktop. */
+@media (max-width: 1000px) {
+  .nursing-latest-vitals {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+  }
+}
+
+
+/* Mobile. */
+@media (max-width: 650px) {
+  .nursing-latest-vitals {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+}
+
+
+/* ==========================================================================
+   Final nursing workspace density pass
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Patient header
+   -------------------------------------------------------------------------- */
+
+.nursing-patient-header {
+  padding-top: 28px;
+  padding-bottom: 28px;
+}
+
+.nursing-patient-identity {
+  min-width: 0;
+}
+
+.nursing-patient-name {
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.nursing-patient-meta {
+  gap: 12px;
+}
+
+.nursing-patient-episode {
+  padding-left: 22px;
+}
+
+.nursing-patient-episode p {
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+
+.nursing-patient-episode .secondary-button {
+  margin-top: 10px !important;
+}
+
+
+/* --------------------------------------------------------------------------
+   Patient-summary disclosures
+   -------------------------------------------------------------------------- */
+
+.nursing-compact-section
+  .nursing-collapsible
+  summary {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.nursing-compact-section
+  .nursing-collapsible
+  summary > div:first-child {
+  display: block !important;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.nursing-compact-section
+  .nursing-collapsible-label {
+  display: block !important;
+  line-height: 1.2;
+}
+
+.nursing-compact-section
+  .nursing-collapsible-summary {
+  display: block !important;
+  margin-top: 3px !important;
+  color: #71808b;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: normal;
+}
+
+.nursing-compact-section
+  .nursing-collapsible-chevron {
+  margin-left: auto;
+  font-size: 11px;
+}
+
+
+/* --------------------------------------------------------------------------
+   Medication disclosure rows
+   -------------------------------------------------------------------------- */
+
+.nursing-medication-list
+  .nursing-collapsible
+  summary {
+  min-height: 48px;
+}
+
+.nursing-medication-list
+  .nursing-collapsible-content {
+  padding-top: 6px;
+}
+
+
+/* --------------------------------------------------------------------------
+   Latest vitals
+   -------------------------------------------------------------------------- */
+
+.nursing-latest-vitals {
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+}
+
+.nursing-latest-vital {
+  min-height: 52px;
+  padding: 10px 14px;
+}
+
+.nursing-latest-vital span {
+  margin-bottom: 3px;
+}
+
+.nursing-latest-vital strong {
+  font-size: 15px;
+}
+
+.nursing-vitals-time {
+  align-self: center;
+}
+
+
+/* --------------------------------------------------------------------------
+   Previous observations
+   -------------------------------------------------------------------------- */
+
+.nursing-vitals-history {
+  margin-top: 8px;
+}
+
+.nursing-vitals-history
+  summary {
+  min-height: 48px;
+}
+
+
+/* --------------------------------------------------------------------------
+   Vitals entry form
+   -------------------------------------------------------------------------- */
+
+.nursing-vitals-entry {
+  padding: 20px 24px;
+}
+
+.nursing-vitals-entry
+  .nursing-section-heading {
+  margin-bottom: 12px;
+}
+
+.nursing-vitals-entry-grid {
+  gap: 14px;
+}
+
+.nursing-vitals-entry-actions {
+  padding-top: 12px;
+}
+
+.nursing-vitals-entry-actions
+  .primary-button {
+  min-height: 42px;
+}
+
+
+/* --------------------------------------------------------------------------
+   Desktop
+   -------------------------------------------------------------------------- */
+
+@media (min-width: 1001px) {
+  .nursing-patient-header {
+    min-height: 0;
+  }
+}
+
+
+/* --------------------------------------------------------------------------
+   Mobile
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 700px) {
+  .nursing-patient-header {
+    padding-top: 20px;
+    padding-bottom: 20px;
+  }
+
+  .nursing-patient-episode {
+    padding-left: 0;
+    padding-top: 16px;
+    border-left: 0;
+  }
+
+  .nursing-latest-vitals {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .nursing-vitals-entry {
+    padding: 18px;
+  }
+}
+
+
+/* ==========================================================================
+   Collapsed vital-sign entry
+   ========================================================================== */
+
+.nursing-vitals-entry {
+  padding: 0;
+  overflow: hidden;
+}
+
+.nursing-vitals-entry-summary {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 24px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.nursing-vitals-entry-summary::-webkit-details-marker {
+  display: none;
+}
+
+.nursing-vitals-entry-summary > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.nursing-vitals-entry-summary
+  .eyebrow {
+  margin-bottom: 2px;
+}
+
+.nursing-vitals-entry-summary h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.nursing-vitals-entry-summary p:last-child {
+  margin-top: 3px;
+  color: #71808b;
+  font-size: 12px;
+}
+
+.nursing-vitals-entry-summary
+  .nursing-collapsible-chevron {
+  flex: 0 0 auto;
+}
+
+.nursing-vitals-entry-body {
+  padding: 0 24px 20px;
+  border-top: 1px solid #e4e9ed;
+}
+
+.nursing-vitals-entry[open]
+  .nursing-vitals-entry-summary {
+  padding-bottom: 12px;
+}
+
+.nursing-vitals-entry[open]
+  .nursing-vitals-entry-summary
+  .nursing-collapsible-chevron {
+  transform: rotate(180deg);
+}
+
+
+/* Keep the entry form's existing grid compact. */
+.nursing-vitals-entry
+  .nursing-vitals-entry-grid {
+  padding-top: 16px;
+}
+
+
+
+/* ==========================================================================
+   Nursing workspace breathing room
+   ========================================================================== */
+
+/* Patient-context disclosures */
+.nursing-compact-section {
+  margin-top: 16px;
+}
+
+.nursing-compact-section
+  .nursing-collapsible
+  summary {
+  min-height: 62px;
+  padding: 14px 2px;
+}
+
+
+/* Give the transition from patient context to clinical work more space. */
+.nursing-compact-section
+  + .workspace-section {
+  margin-top: 28px;
+}
+
+
+/* Major workspace sections should not visually run together. */
+.workspace-section
+  + .workspace-section {
+  margin-top: 28px;
+}
+
+
+/* Medication internal spacing. */
+.nursing-medication-list {
+  padding-top: 4px;
+}
+
+.nursing-medication-list
+  .nursing-collapsible {
+  margin-top: 16px;
+}
+
+.nursing-medication-list
+  .nursing-collapsible
+  + .nursing-collapsible {
+  margin-top: 14px;
+}
+
+
+/* Active prescriptions need a little separation from the round controls. */
+.nursing-medication-list
+  > section {
+  margin-top: 24px;
+}
+
+.nursing-medication-item {
+  margin-top: 10px;
+}
+
+
+/* Vital-sign section breathing room. */
+.nursing-latest-vitals {
+  margin-top: 6px;
+}
+
+.nursing-vital-recorded {
+  margin-top: 10px;
+}
+
+.nursing-vitals-history {
+  margin-top: 14px;
+}
+
+
+/* Don't let the record-vitals disclosure sit directly against history. */
+.nursing-vitals-entry {
+  margin-top: 28px;
+}
+
+
+/* Slightly more comfortable disclosure text. */
+.nursing-collapsible-summary {
+  line-height: 1.45;
+}
+
+
+@media (max-width: 700px) {
+  .nursing-compact-section {
+    margin-top: 12px;
+  }
+
+  .nursing-compact-section
+    + .workspace-section,
+  .workspace-section
+    + .workspace-section {
+    margin-top: 22px;
+  }
+
+  .nursing-vitals-entry {
+    margin-top: 22px;
+  }
+}

@@ -47,3 +47,10 @@ htmlcov/
 # Logs
 # ==========================
 *.log
+
+# ==========================
+# Project Runtime / Backups
+# ==========================
+.backup/
+backend/storage/
+*.bak

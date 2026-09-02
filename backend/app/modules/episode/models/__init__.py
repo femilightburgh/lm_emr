@@ -16,9 +16,16 @@ from app.modules.episode.models.episode import (
     EpisodeStatus,
 )
 
+from app.modules.episode.models.episode_disposition import (
+    EpisodeDisposition,
+    EpisodeDispositionType,
+)
+
 
 __all__ = [
     "Episode",
+    "EpisodeDisposition",
+    "EpisodeDispositionType",
     "EpisodeFlowStatus",
     "EpisodeStatus",
 ]
