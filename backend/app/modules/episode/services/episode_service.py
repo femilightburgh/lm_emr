@@ -43,6 +43,9 @@ from app.modules.clinical_documents.enums import (
 from app.modules.clinical_documents.repositories import (
     ClinicalDocumentRepository,
 )
+from app.modules.clinical_orders.repositories import (
+    ClinicalOrderRepository,
+)
 
 from app.modules.encounter.exceptions import (
     EncounterNotFoundError,
@@ -156,6 +159,10 @@ class EpisodeService:
             ClinicalDocumentRepository(
                 repository.db,
             )
+        )
+
+        self.clinical_order_repository = ClinicalOrderRepository(
+            repository.db,
         )
 
     # =========================================================================
@@ -812,11 +819,24 @@ class EpisodeService:
                 "before completing the Doctor Consultation.",
             )
 
+        outstanding_investigations = (
+            self.clinical_order_repository
+            .list_outstanding_investigation_orders_for_episode(
+                hospital_id=context.hospital_id,
+                episode_id=episode.id,
+            )
+        )
+
         completed_at = datetime.now(UTC)
 
         try:
             encounter.status = EncounterStatus.CLOSED
             encounter.ended_at = completed_at
+
+            if outstanding_investigations:
+                episode.flow_status = (
+                    EpisodeFlowStatus.AWAITING_INVESTIGATIONS
+                )
 
             self.repository.db.flush()
             self.repository.db.commit()

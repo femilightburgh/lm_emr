@@ -44,6 +44,19 @@ from app.modules.clinical_documents.services.clinical_document_service import (
     ClinicalDocumentService,
 )
 
+from app.modules.clinical_orders.enums import (
+    ClinicalOrderType,
+)
+from app.modules.clinical_orders.repositories import (
+    ClinicalOrderRepository,
+)
+from app.modules.clinical_orders.services.clinical_order_service import (
+    ClinicalOrderService,
+)
+from app.modules.encounter.repositories.encounter_repository import EncounterRepository
+from app.modules.episode.repositories.episode_repository import EpisodeRepository
+from app.modules.clinical_orders.repositories.prescription_repository import PrescriptionRepository
+
 from app.modules.episode.exceptions import (
     EncounterNotBelongingToEpisodeError,
     EncounterNotOpenError,
@@ -1533,6 +1546,128 @@ def test_complete_consultation_keeps_episode_open(
     assert encounter.status == EncounterStatus.CLOSED
     assert encounter.ended_at is not None
     assert encounter.ended_at > signed_at
+
+
+def test_complete_consultation_moves_episode_to_awaiting_investigations(
+    db,
+    hospital,
+):
+    """
+    Completing a consultation with an outstanding investigation
+    moves the Episode to AWAITING_INVESTIGATIONS.
+    """
+
+    _, staff, context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+        staff_number="STF-DOC-INV-001",
+    )
+
+    service = build_episode_service(
+        db,
+    )
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number="PAT-DOC-INV-001",
+    )
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    encounter = create_open_encounter(
+        db=db,
+        hospital=hospital,
+        episode=episode,
+        staff=staff,
+    )
+
+    encounter.title = "Doctor Consultation"
+    db.commit()
+    db.refresh(encounter)
+
+    document_service = ClinicalDocumentService(
+        repository=ClinicalDocumentRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+    )
+
+    document = document_service.create_draft(
+        context=context,
+        encounter_id=encounter.id,
+        document_type=ClinicalDocumentType.INITIAL_CLERKING,
+        authored_by=staff.id,
+        content={
+            "presenting_complaints": [
+                "Fever",
+            ],
+            "history_of_presenting_complaints": (
+                "Two days of fever."
+            ),
+        },
+    )
+
+    signed = document_service.sign_document(
+        context=context,
+        document_id=document.id,
+        signed_at=datetime(
+            2026,
+            8,
+            26,
+            15,
+            0,
+            tzinfo=UTC,
+        ),
+    )
+
+    assert signed.status == ClinicalDocumentStatus.SIGNED
+
+    order_service = ClinicalOrderService(
+        repository=ClinicalOrderRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+        encounter_repository=EncounterRepository(db),
+        episode_repository=EpisodeRepository(db),
+        staff_repository=StaffRepository(db),
+        prescription_repository=PrescriptionRepository(db),
+    )
+
+    order = order_service.create_order(
+        context=context,
+        encounter_id=encounter.id,
+        order_type=ClinicalOrderType.LABORATORY,
+        priority="ROUTINE",
+        details={
+            "test_code": "CBC",
+            "test_name": "Full Blood Count",
+        },
+    )
+
+    assert order.status.value == "REQUESTED"
+
+    completed = service.complete_consultation(
+        context=context,
+        episode_id=episode.id,
+        encounter_id=encounter.id,
+        disposition=ConsultationDisposition.COMPLETE,
+    )
+
+    db.refresh(encounter)
+    db.refresh(completed)
+
+    assert completed.status == EpisodeStatus.OPEN
+    assert (
+        completed.flow_status
+        == EpisodeFlowStatus.AWAITING_INVESTIGATIONS
+    )
+    assert encounter.status == EncounterStatus.CLOSED
+    assert encounter.ended_at is not None
 
 
 def test_admit_episode_creates_admission_event(
