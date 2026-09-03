@@ -282,6 +282,22 @@ class ClinicalDiagnosisService:
 
         return diagnosis
 
+    def list_episode_diagnoses(
+        self,
+        *,
+        context: RequestContext,
+        episode_id: UUID,
+    ) -> list[ClinicalDiagnosis]:
+        episode = self._get_episode(
+            context=context,
+            episode_id=episode_id,
+        )
+
+        return self.repository.list_by_episode(
+            hospital_id=context.hospital_id,
+            episode_id=episode.id,
+        )
+
     def list_encounter_diagnoses(
         self,
         *,

@@ -77,6 +77,31 @@ class ClinicalDiagnosisRepository:
             self.db.scalars(statement),
         )
 
+    def list_by_episode(
+        self,
+        *,
+        hospital_id: UUID,
+        episode_id: UUID,
+    ) -> list[ClinicalDiagnosis]:
+        statement = (
+            select(ClinicalDiagnosis)
+            .join(
+                Episode,
+                ClinicalDiagnosis.episode_id == Episode.id,
+            )
+            .where(
+                ClinicalDiagnosis.episode_id == episode_id,
+                Episode.hospital_id == hospital_id,
+            )
+            .order_by(
+                ClinicalDiagnosis.diagnosed_at.asc(),
+            )
+        )
+
+        return list(
+            self.db.scalars(statement),
+        )
+
     def save(self) -> None:
         self.db.commit()
 

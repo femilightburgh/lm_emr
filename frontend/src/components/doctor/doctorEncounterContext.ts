@@ -5,7 +5,7 @@ import {
 } from '../../api/encounters'
 
 import {
-  listEncounterDiagnoses,
+  listEpisodeDiagnoses,
   type ClinicalDiagnosis,
 } from '../../api/diagnoses'
 
@@ -57,20 +57,21 @@ export async function loadDoctorEncounterContext(
   accessToken: string,
   encounterId: string,
 ): Promise<DoctorEncounterContext> {
+  const encounter =
+    await getEncounter(
+      accessToken,
+      encounterId,
+    )
+
   const [
-    encounter,
     diagnoses,
     timeline,
     orders,
     vitals,
   ] = await Promise.all([
-    getEncounter(
+    listEpisodeDiagnoses(
       accessToken,
-      encounterId,
-    ),
-    listEncounterDiagnoses(
-      accessToken,
-      encounterId,
+      encounter.episode_id,
     ),
     getEncounterTimeline(
       accessToken,

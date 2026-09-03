@@ -164,6 +164,39 @@ def get_clinical_diagnosis(
 
 
 @router.get(
+    "/episodes/{episode_id}",
+    response_model=list[ClinicalDiagnosisResponse],
+    summary="List Episode Clinical Diagnoses",
+    dependencies=[
+        Depends(require_permission(Permissions.DIAGNOSIS_READ)),
+    ],
+)
+def list_episode_clinical_diagnoses(
+    episode_id: UUID,
+    context: RequestContext = Depends(get_request_context),
+    service: ClinicalDiagnosisService = Depends(
+        get_clinical_diagnosis_service,
+    ),
+):
+    try:
+        diagnoses = service.list_episode_diagnoses(
+            context=context,
+            episode_id=episode_id,
+        )
+
+        return [
+            ClinicalDiagnosisResponse.model_validate(diagnosis)
+            for diagnosis in diagnoses
+        ]
+
+    except ClinicalDiagnosisEpisodeNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Episode not found.",
+        ) from exc
+
+
+@router.get(
     "/encounters/{encounter_id}",
     response_model=list[ClinicalDiagnosisResponse],
     summary="List Encounter Clinical Diagnoses",

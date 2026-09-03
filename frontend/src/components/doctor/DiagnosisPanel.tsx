@@ -262,7 +262,7 @@ export default function DiagnosisPanel({
             </p>
 
             <h3>
-              Clinical Assessment
+              Assessment History
             </h3>
           </div>
         </div>
@@ -276,7 +276,7 @@ export default function DiagnosisPanel({
         {!loading &&
           diagnoses.length === 0 && (
             <p className="doctor-assessment-empty">
-              No clinical diagnoses recorded for this encounter.
+              No clinical diagnoses recorded for this episode.
             </p>
           )}
 

@@ -65,6 +65,17 @@ export async function listEncounterDiagnoses(
   )
 }
 
+export async function listEpisodeDiagnoses(
+  accessToken: string,
+  episodeId: string,
+): Promise<ClinicalDiagnosis[]> {
+  return apiRequest<ClinicalDiagnosis[]>(
+    `/diagnoses/episodes/${episodeId}`,
+    {},
+    accessToken,
+  )
+}
+
 export async function getClinicalDiagnosis(
   accessToken: string,
   diagnosisId: string,
