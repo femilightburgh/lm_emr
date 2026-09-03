@@ -337,6 +337,13 @@ export default function DiagnosisPanel({
                                 `${diagnosis.code_system} · `}
                               {diagnosis.code}
                             </span>
+
+                            <small>
+                              Recorded{' '}
+                              {new Date(
+                                diagnosis.diagnosed_at,
+                              ).toLocaleString()}
+                            </small>
                           </div>
 
                           <div className="doctor-diagnosis-badges">
