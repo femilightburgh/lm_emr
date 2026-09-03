@@ -119,7 +119,6 @@ interface Props {
   clerkingExamMusculoskeletal: string
   clerkingExamGenitourinary: string
   clerkingExamOther: string
-  clerkingInvestigations: string
 
   noteSubjective: string
   noteObjective: string
@@ -149,7 +148,6 @@ interface Props {
   setClerkingExamMusculoskeletal: StringChangeHandler
   setClerkingExamGenitourinary: StringChangeHandler
   setClerkingExamOther: StringChangeHandler
-  setClerkingInvestigations: StringChangeHandler
 
   setNoteSubjective: StringChangeHandler
   setNoteObjective: StringChangeHandler
@@ -351,7 +349,6 @@ export default function DoctorEncounterWorkspace({
   clerkingExamMusculoskeletal,
   clerkingExamGenitourinary,
   clerkingExamOther,
-  clerkingInvestigations,
   noteSubjective,
   noteObjective,
   noteWorkingDiagnosis,
@@ -379,7 +376,6 @@ export default function DoctorEncounterWorkspace({
   setClerkingExamMusculoskeletal,
   setClerkingExamGenitourinary,
   setClerkingExamOther,
-  setClerkingInvestigations,
   setNoteSubjective,
   setNoteObjective,
   setNoteWorkingDiagnosis,
@@ -497,9 +493,563 @@ export default function DoctorEncounterWorkspace({
     !wardReviewDetailsRequired ||
     wardReviewDetails.trim().length > 0
 
+
+  const renderDiagnosis = () => (
+<DiagnosisPanel
+  diagnoses={diagnoses}
+  loading={loadingDiagnoses}
+  saving={savingDiagnosis}
+  encounterClosed={
+    selectedEncounter.status === 'CLOSED'
+  }
+
+  query={diagnosisQuery}
+  results={diagnosisResults}
+  selected={selectedDiagnosis}
+
+  diagnosisType={diagnosisType}
+  certainty={certainty}
+
+  onQueryChange={value =>
+    void searchDiagnoses(value)
+  }
+
+  onSelect={
+    setSelectedDiagnosis
+  }
+
+  onDiagnosisTypeChange={
+    setDiagnosisType
+  }
+
+  onCertaintyChange={
+    setCertainty
+  }
+
+  onSave={() =>
+    void saveDiagnosis()
+  }
+/>
+  )
+
+
+  const renderDocumentation = () => (
+<div className="doctor-documentation-section">
+  <div className="doctor-section-heading">
+    <p className="eyebrow">
+      DOCUMENTATION
+    </p>
+
+    <h2>
+      Clinical Documentation
+    </h2>
+
+    <p>
+      Record and review the current clinical documentation.
+    </p>
+  </div>
+
+{documentation.doctorNoteDocumentType() === 'INITIAL_CLERKING' ? (
+  <InitialClerkingPanel
+    document={progressNote}
+    loading={loadingProgressNote}
+    saving={savingProgressNote}
+    signing={signingProgressNote}
+
+    complaint={clerkingComplaint}
+    complaintDuration={
+      clerkingComplaintDuration
+    }
+    history={clerkingHistory}
+    reviewOfSystems={
+      clerkingReviewOfSystems
+    }
+    pastMedicalHistory={
+      clerkingPastMedicalHistory
+    }
+    pastSurgicalHistory={
+      clerkingPastSurgicalHistory
+    }
+    drugHistory={clerkingDrugHistory}
+    allergies={clerkingAllergies}
+    familyHistory={clerkingFamilyHistory}
+    socialHistory={clerkingSocialHistory}
+    personalHistory={clerkingPersonalHistory}
+
+    ideas={clerkingIdeas}
+    concerns={clerkingConcerns}
+    expectations={
+      clerkingExpectations
+    }
+
+    examGeneral={clerkingExamGeneral}
+    examCardiovascular={
+      clerkingExamCardiovascular
+    }
+    examRespiratory={
+      clerkingExamRespiratory
+    }
+    examAbdomen={clerkingExamAbdomen}
+    examNeurological={
+      clerkingExamNeurological
+    }
+    examMusculoskeletal={
+      clerkingExamMusculoskeletal
+    }
+    examGenitourinary={
+      clerkingExamGenitourinary
+    }
+    examOther={clerkingExamOther}
+
+    onComplaintChange={
+      setClerkingComplaint
+    }
+    onComplaintDurationChange={
+      setClerkingComplaintDuration
+    }
+    onHistoryChange={
+      setClerkingHistory
+    }
+    onReviewOfSystemsChange={
+      setClerkingReviewOfSystems
+    }
+    onPastMedicalHistoryChange={
+      setClerkingPastMedicalHistory
+    }
+    onPastSurgicalHistoryChange={
+      setClerkingPastSurgicalHistory
+    }
+    onDrugHistoryChange={
+      setClerkingDrugHistory
+    }
+    onAllergiesChange={
+      setClerkingAllergies
+    }
+    onFamilyHistoryChange={
+      setClerkingFamilyHistory
+    }
+    onSocialHistoryChange={
+      setClerkingSocialHistory
+    }
+    onPersonalHistoryChange={
+      setClerkingPersonalHistory
+    }
+
+    onIdeasChange={
+      setClerkingIdeas
+    }
+    onConcernsChange={
+      setClerkingConcerns
+    }
+    onExpectationsChange={
+      setClerkingExpectations
+    }
+
+    onExamGeneralChange={
+      setClerkingExamGeneral
+    }
+    onExamCardiovascularChange={
+      setClerkingExamCardiovascular
+    }
+    onExamRespiratoryChange={
+      setClerkingExamRespiratory
+    }
+    onExamAbdomenChange={
+      setClerkingExamAbdomen
+    }
+    onExamNeurologicalChange={
+      setClerkingExamNeurological
+    }
+    onExamMusculoskeletalChange={
+      setClerkingExamMusculoskeletal
+    }
+    onExamGenitourinaryChange={
+      setClerkingExamGenitourinary
+    }
+    onExamOtherChange={
+      setClerkingExamOther
+    }
+
+    onSave={() =>
+      void saveProgressNote()
+    }
+    onSign={() =>
+      void signProgressNote()
+    }
+
+    admitting={admittingEpisode}
+    canAdmit={
+      Boolean(
+        progressNote &&
+        progressNote.document_type ===
+          'INITIAL_CLERKING' &&
+        progressNote.status === 'SIGNED' &&
+        selectedEpisode?.status === 'OPEN',
+      )
+    }
+    onAdmit={() =>
+      void admitSelectedEpisode()
+    }
+  />
+) : (
+  <ProgressNotePanel
+    noteTitle="Progress Note"
+
+    progressNote={progressNote}
+    encounterClosed={
+      selectedEncounter.status === 'CLOSED'
+    }
+    loading={loadingProgressNote}
+    saving={savingProgressNote}
+    signing={signingProgressNote}
+
+    subjective={noteSubjective}
+    objective={noteObjective}
+    workingDiagnosis={
+      noteWorkingDiagnosis
+    }
+    differentials={
+      noteDifferentials
+    }
+    plan={notePlan}
+
+    onSubjectiveChange={
+      setNoteSubjective
+    }
+    onObjectiveChange={
+      setNoteObjective
+    }
+    onWorkingDiagnosisChange={
+      setNoteWorkingDiagnosis
+    }
+    onDifferentialsChange={
+      setNoteDifferentials
+    }
+    onPlanChange={
+      setNotePlan
+    }
+
+    onInsertLatestVitals={
+      insertLatestVitals
+    }
+    hasVitals={
+      vitals.length > 0
+    }
+
+    onSave={() =>
+      void saveProgressNote()
+    }
+    onSign={() =>
+      void signProgressNote()
+    }
+  />
+)}
+
+<SignedClinicalDocumentSummary
+  document={progressNote}
+/>
+
+</div>
+  )
+
+
+  const renderInvestigationResults = () => (
+<DoctorInvestigationResults
+  showResults={
+    selectedEncounter.title ===
+      'Doctor Review' ||
+    selectedEncounter.title ===
+      'Ward Review'
+  }
+  loadingClinicalResults={
+    loadingClinicalResults
+  }
+  clinicalResults={clinicalResults}
+  diagnosticReports={
+    diagnosticReports
+  }
+  diagnosticAttachments={
+    diagnosticAttachments
+  }
+  orders={orders}
+/>
+  )
+
+
+  const renderOrders = () => (
+<ClinicalOrdersPanel
+  orders={orders}
+  clinicalResults={clinicalResults}
+  loading={loadingOrders}
+  saving={savingOrder}
+  cancellingOrderId={
+    cancellingOrderId
+  }
+  encounterClosed={
+    selectedEncounter.status === 'CLOSED'
+  }
+  inpatientMedication={
+    selectedEpisode?.status === 'ADMITTED'
+  }
+
+  inpatientTreatmentStart={
+    inpatientTreatmentStart
+  }
+
+  inpatientFirstDose={
+    inpatientFirstDose
+  }
+
+  onInpatientTreatmentStartChange={
+    setInpatientTreatmentStart
+  }
+
+  onInpatientFirstDoseChange={
+    setInpatientFirstDose
+  }
+
+
+
+  orderType={orderType}
+
+  orderPriority={orderPriority}
+
+  laboratoryTests={
+    laboratoryTests
+  }
+  selectedLaboratoryTestId={
+    selectedLaboratoryTestId
+  }
+  diagnosticInvestigations={
+    diagnosticInvestigations
+  }
+  selectedDiagnosticInvestigationId={
+    selectedDiagnosticInvestigationId
+  }
+  orderTestCode={
+    orderTestCode
+  }
+  orderTestName={
+    orderTestName
+  }
+  orderMedicationId={
+    orderMedicationId
+  }
+  orderDose={
+    orderDose
+  }
+
+  prescriptionMedicine={
+    prescriptionMedicine
+  }
+  prescriptionStrength={
+    prescriptionStrength
+  }
+  prescriptionDoseUnit={
+    prescriptionDoseUnit
+  }
+  prescriptionRoute={
+    prescriptionRoute
+  }
+  prescriptionFrequency={
+    prescriptionFrequency
+  }
+  prescriptionDuration={
+    prescriptionDuration
+  }
+  prescriptionDurationUnit={
+    prescriptionDurationUnit
+  }
+  prescriptionQuantity={
+    prescriptionQuantity
+  }
+  prescriptionDirections={
+    prescriptionDirections
+  }
+  prescriptionIndication={
+    prescriptionIndication
+  }
+
+  onOrderTypeChange={
+    setOrderType
+  }
+  onOrderPriorityChange={
+    setOrderPriority
+  }
+  onLaboratoryTestChange={
+    handleLaboratoryTestChange
+  }
+  onDiagnosticInvestigationChange={
+    handleDiagnosticInvestigationChange
+  }
+  onOrderTestCodeChange={
+    setOrderTestCode
+  }
+  onOrderTestNameChange={
+    setOrderTestName
+  }
+  onOrderMedicationIdChange={
+    setOrderMedicationId
+  }
+  onOrderDoseChange={
+    setOrderDose
+  }
+
+  onPrescriptionMedicineChange={
+    setPrescriptionMedicine
+  }
+  onPrescriptionStrengthChange={
+    setPrescriptionStrength
+  }
+  onPrescriptionDoseUnitChange={
+    setPrescriptionDoseUnit
+  }
+  onPrescriptionRouteChange={
+    setPrescriptionRoute
+  }
+  onPrescriptionFrequencyChange={
+    setPrescriptionFrequency
+  }
+  onPrescriptionDurationChange={
+    setPrescriptionDuration
+  }
+  onPrescriptionDurationUnitChange={
+    setPrescriptionDurationUnit
+  }
+  onPrescriptionQuantityChange={
+    setPrescriptionQuantity
+  }
+  onPrescriptionDirectionsChange={
+    setPrescriptionDirections
+  }
+  onPrescriptionIndicationChange={
+    setPrescriptionIndication
+  }
+
+  onSave={() =>
+    void saveOrder()
+  }
+
+  onCancel={orderId =>
+    void cancelOrder(orderId)
+  }
+/>
+  )
+
+
+  const renderTimeline = () => (
+<section className="workspace-panel doctor-timeline-panel">
+  <details>
+    <summary className="doctor-context-summary">
+      <div>
+        <p className="eyebrow">
+          CARE CONTEXT
+        </p>
+
+        <h2>
+          Timeline
+        </h2>
+
+        <p>
+          Clinical events recorded for this encounter.
+        </p>
+      </div>
+
+      <div className="doctor-context-summary-meta">
+        <span>
+          {timeline.length}
+          {' '}
+          event
+          {timeline.length === 1
+            ? ''
+            : 's'}
+        </span>
+      </div>
+    </summary>
+
+    <div className="doctor-context-body">
+      {loadingTimeline && (
+        <p>
+          Loading clinical timeline...
+        </p>
+      )}
+
+      {!loadingTimeline &&
+        timeline.length === 0 && (
+          <p>
+            No clinical events recorded yet.
+          </p>
+        )}
+
+      {!loadingTimeline &&
+        timeline.length > 0 && (
+          <div className="doctor-timeline-list">
+            {timeline.map(event => (
+              <div
+                key={event.id}
+                className="doctor-timeline-item"
+              >
+                <strong>
+                  {formatEventLabel(
+                    event.event_type,
+                  )}
+                </strong>
+
+                <span>
+                  {new Date(
+                    event.occurred_at,
+                  ).toLocaleString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+    </div>
+  </details>
+</section>
+  )
+
   return (
     <>
-<section className="doctor-patient-banner">
+<section
+  className={`doctor-encounter-mode ${
+    isWardReview
+      ? 'doctor-encounter-mode--ward'
+      : 'doctor-encounter-mode--clinic'
+  }`}
+>
+  <div>
+    <p className="eyebrow">
+      {isWardReview
+        ? 'WARD REVIEW'
+        : 'DOCTOR CONSULTATION'}
+    </p>
+
+    <h1>
+      {isWardReview
+        ? 'Daily inpatient review'
+        : 'Outpatient consultation'}
+    </h1>
+
+    <p>
+      {isWardReview
+        ? 'Assess the patient’s current condition and ongoing care.'
+        : 'Assess the presenting problem, establish the diagnosis, and plan care.'}
+    </p>
+  </div>
+
+  <span className="doctor-encounter-mode-badge">
+    {selectedEncounter.status === 'OPEN'
+      ? 'Active'
+      : 'Closed'}
+  </span>
+</section>
+
+<section className={`doctor-patient-banner ${
+  isWardReview
+    ? 'doctor-patient-banner--ward'
+    : 'doctor-patient-banner--clinic'
+}`}>
   {loadingPatientContext ? (
     <div className="doctor-patient-banner-loading">
       Loading patient information...
@@ -709,544 +1259,42 @@ export default function DoctorEncounterWorkspace({
 
 </div>
 
-<DiagnosisPanel
-  diagnoses={diagnoses}
-  loading={loadingDiagnoses}
-  saving={savingDiagnosis}
-  encounterClosed={
-    selectedEncounter.status === 'CLOSED'
-  }
+{isWardReview ? (
+  <>
+    {renderDiagnosis()}
 
-  query={diagnosisQuery}
-  results={diagnosisResults}
-  selected={selectedDiagnosis}
+    <NursingHandoffPanel
+      encounter={nursingEncounter}
+      document={nursingDocument}
+      loading={loadingNursingHandoff}
+    />
 
-  diagnosisType={diagnosisType}
-  certainty={certainty}
+    {selectedEpisode && (
+      <DoctorMedicationTreatmentReview
+        accessToken={accessToken}
+        episodeId={selectedEpisode.id}
+      />
+    )}
 
-  onQueryChange={value =>
-    void searchDiagnoses(value)
-  }
+    {renderInvestigationResults()}
 
-  onSelect={
-    setSelectedDiagnosis
-  }
+    {renderTimeline()}
 
-  onDiagnosisTypeChange={
-    setDiagnosisType
-  }
+    {renderDocumentation()}
 
-  onCertaintyChange={
-    setCertainty
-  }
-
-  onSave={() =>
-    void saveDiagnosis()
-  }
-/>
-
-{isWardReview && (
-  <NursingHandoffPanel
-    encounter={nursingEncounter}
-    document={nursingDocument}
-    loading={loadingNursingHandoff}
-  />
-)}
-
-{isWardReview && selectedEpisode && (
-  <DoctorMedicationTreatmentReview
-    accessToken={accessToken}
-    episodeId={selectedEpisode.id}
-  />
-)}
-
-<DoctorInvestigationResults
-  showResults={
-    selectedEncounter.title ===
-      'Doctor Review' ||
-    selectedEncounter.title ===
-      'Ward Review'
-  }
-  loadingClinicalResults={
-    loadingClinicalResults
-  }
-  clinicalResults={clinicalResults}
-  diagnosticReports={
-    diagnosticReports
-  }
-  diagnosticAttachments={
-    diagnosticAttachments
-  }
-  orders={orders}
-/>
-<section className="workspace-panel doctor-timeline-panel">
-  <details>
-    <summary className="doctor-context-summary">
-      <div>
-        <p className="eyebrow">
-          CARE CONTEXT
-        </p>
-
-        <h2>
-          Timeline
-        </h2>
-
-        <p>
-          Clinical events recorded for this encounter.
-        </p>
-      </div>
-
-      <div className="doctor-context-summary-meta">
-        <span>
-          {timeline.length}
-          {' '}
-          event
-          {timeline.length === 1
-            ? ''
-            : 's'}
-        </span>
-      </div>
-    </summary>
-
-    <div className="doctor-context-body">
-      {loadingTimeline && (
-        <p>
-          Loading clinical timeline...
-        </p>
-      )}
-
-      {!loadingTimeline &&
-        timeline.length === 0 && (
-          <p>
-            No clinical events recorded yet.
-          </p>
-        )}
-
-      {!loadingTimeline &&
-        timeline.length > 0 && (
-          <div className="doctor-timeline-list">
-            {timeline.map(event => (
-              <div
-                key={event.id}
-                className="doctor-timeline-item"
-              >
-                <strong>
-                  {formatEventLabel(
-                    event.event_type,
-                  )}
-                </strong>
-
-                <span>
-                  {new Date(
-                    event.occurred_at,
-                  ).toLocaleString()}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-    </div>
-  </details>
-</section>
-
-<div className="doctor-documentation-section">
-  <div className="doctor-section-heading">
-    <p className="eyebrow">
-      DOCUMENTATION
-    </p>
-
-    <h2>
-      Clinical Documentation
-    </h2>
-
-    <p>
-      Record and review the current clinical documentation.
-    </p>
-  </div>
-
-{documentation.doctorNoteDocumentType() === 'INITIAL_CLERKING' ? (
-  <InitialClerkingPanel
-    document={progressNote}
-    loading={loadingProgressNote}
-    saving={savingProgressNote}
-    signing={signingProgressNote}
-
-    complaint={clerkingComplaint}
-    complaintDuration={
-      clerkingComplaintDuration
-    }
-    history={clerkingHistory}
-    reviewOfSystems={
-      clerkingReviewOfSystems
-    }
-    pastMedicalHistory={
-      clerkingPastMedicalHistory
-    }
-    pastSurgicalHistory={
-      clerkingPastSurgicalHistory
-    }
-    drugHistory={clerkingDrugHistory}
-    allergies={clerkingAllergies}
-    familyHistory={clerkingFamilyHistory}
-    socialHistory={clerkingSocialHistory}
-    personalHistory={clerkingPersonalHistory}
-
-    ideas={clerkingIdeas}
-    concerns={clerkingConcerns}
-    expectations={
-      clerkingExpectations
-    }
-
-    examGeneral={clerkingExamGeneral}
-    examCardiovascular={
-      clerkingExamCardiovascular
-    }
-    examRespiratory={
-      clerkingExamRespiratory
-    }
-    examAbdomen={clerkingExamAbdomen}
-    examNeurological={
-      clerkingExamNeurological
-    }
-    examMusculoskeletal={
-      clerkingExamMusculoskeletal
-    }
-    examGenitourinary={
-      clerkingExamGenitourinary
-    }
-    examOther={clerkingExamOther}
-
-    workingDiagnosis={
-      noteWorkingDiagnosis
-    }
-    differentials={
-      noteDifferentials
-    }
-    investigations={
-      clerkingInvestigations
-    }
-    plan={notePlan}
-
-    onComplaintChange={
-      setClerkingComplaint
-    }
-    onComplaintDurationChange={
-      setClerkingComplaintDuration
-    }
-    onHistoryChange={
-      setClerkingHistory
-    }
-    onReviewOfSystemsChange={
-      setClerkingReviewOfSystems
-    }
-    onPastMedicalHistoryChange={
-      setClerkingPastMedicalHistory
-    }
-    onPastSurgicalHistoryChange={
-      setClerkingPastSurgicalHistory
-    }
-    onDrugHistoryChange={
-      setClerkingDrugHistory
-    }
-    onAllergiesChange={
-      setClerkingAllergies
-    }
-    onFamilyHistoryChange={
-      setClerkingFamilyHistory
-    }
-    onSocialHistoryChange={
-      setClerkingSocialHistory
-    }
-    onPersonalHistoryChange={
-      setClerkingPersonalHistory
-    }
-
-    onIdeasChange={
-      setClerkingIdeas
-    }
-    onConcernsChange={
-      setClerkingConcerns
-    }
-    onExpectationsChange={
-      setClerkingExpectations
-    }
-
-    onExamGeneralChange={
-      setClerkingExamGeneral
-    }
-    onExamCardiovascularChange={
-      setClerkingExamCardiovascular
-    }
-    onExamRespiratoryChange={
-      setClerkingExamRespiratory
-    }
-    onExamAbdomenChange={
-      setClerkingExamAbdomen
-    }
-    onExamNeurologicalChange={
-      setClerkingExamNeurological
-    }
-    onExamMusculoskeletalChange={
-      setClerkingExamMusculoskeletal
-    }
-    onExamGenitourinaryChange={
-      setClerkingExamGenitourinary
-    }
-    onExamOtherChange={
-      setClerkingExamOther
-    }
-
-    onWorkingDiagnosisChange={
-      setNoteWorkingDiagnosis
-    }
-    onDifferentialsChange={
-      setNoteDifferentials
-    }
-    onInvestigationsChange={
-      setClerkingInvestigations
-    }
-    onPlanChange={
-      setNotePlan
-    }
-
-    onSave={() =>
-      void saveProgressNote()
-    }
-    onSign={() =>
-      void signProgressNote()
-    }
-
-    admitting={admittingEpisode}
-    canAdmit={
-      Boolean(
-        progressNote &&
-        progressNote.document_type ===
-          'INITIAL_CLERKING' &&
-        progressNote.status === 'SIGNED' &&
-        selectedEpisode?.status === 'OPEN',
-      )
-    }
-    onAdmit={() =>
-      void admitSelectedEpisode()
-    }
-  />
+    {renderOrders()}
+  </>
 ) : (
-  <ProgressNotePanel
-    noteTitle="Progress Note"
+  <>
+    {renderDocumentation()}
 
-    progressNote={progressNote}
-    encounterClosed={
-      selectedEncounter.status === 'CLOSED'
-    }
-    loading={loadingProgressNote}
-    saving={savingProgressNote}
-    signing={signingProgressNote}
+    {renderDiagnosis()}
 
-    subjective={noteSubjective}
-    objective={noteObjective}
-    workingDiagnosis={
-      noteWorkingDiagnosis
-    }
-    differentials={
-      noteDifferentials
-    }
-    plan={notePlan}
+    {renderOrders()}
 
-    onSubjectiveChange={
-      setNoteSubjective
-    }
-    onObjectiveChange={
-      setNoteObjective
-    }
-    onWorkingDiagnosisChange={
-      setNoteWorkingDiagnosis
-    }
-    onDifferentialsChange={
-      setNoteDifferentials
-    }
-    onPlanChange={
-      setNotePlan
-    }
-
-    onInsertLatestVitals={
-      insertLatestVitals
-    }
-    hasVitals={
-      vitals.length > 0
-    }
-
-    onSave={() =>
-      void saveProgressNote()
-    }
-    onSign={() =>
-      void signProgressNote()
-    }
-  />
+    {renderInvestigationResults()}
+  </>
 )}
-
-<SignedClinicalDocumentSummary
-  document={progressNote}
-/>
-
-</div>
-
-<ClinicalOrdersPanel
-  orders={orders}
-  clinicalResults={clinicalResults}
-  loading={loadingOrders}
-  saving={savingOrder}
-  cancellingOrderId={
-    cancellingOrderId
-  }
-  encounterClosed={
-    selectedEncounter.status === 'CLOSED'
-  }
-  inpatientMedication={
-    selectedEpisode?.status === 'ADMITTED'
-  }
-
-  inpatientTreatmentStart={
-    inpatientTreatmentStart
-  }
-
-  inpatientFirstDose={
-    inpatientFirstDose
-  }
-
-  onInpatientTreatmentStartChange={
-    setInpatientTreatmentStart
-  }
-
-  onInpatientFirstDoseChange={
-    setInpatientFirstDose
-  }
-
-
-
-  orderType={orderType}
-
-  orderPriority={orderPriority}
-
-  laboratoryTests={
-    laboratoryTests
-  }
-  selectedLaboratoryTestId={
-    selectedLaboratoryTestId
-  }
-  diagnosticInvestigations={
-    diagnosticInvestigations
-  }
-  selectedDiagnosticInvestigationId={
-    selectedDiagnosticInvestigationId
-  }
-  orderTestCode={
-    orderTestCode
-  }
-  orderTestName={
-    orderTestName
-  }
-  orderMedicationId={
-    orderMedicationId
-  }
-  orderDose={
-    orderDose
-  }
-
-  prescriptionMedicine={
-    prescriptionMedicine
-  }
-  prescriptionStrength={
-    prescriptionStrength
-  }
-  prescriptionDoseUnit={
-    prescriptionDoseUnit
-  }
-  prescriptionRoute={
-    prescriptionRoute
-  }
-  prescriptionFrequency={
-    prescriptionFrequency
-  }
-  prescriptionDuration={
-    prescriptionDuration
-  }
-  prescriptionDurationUnit={
-    prescriptionDurationUnit
-  }
-  prescriptionQuantity={
-    prescriptionQuantity
-  }
-  prescriptionDirections={
-    prescriptionDirections
-  }
-  prescriptionIndication={
-    prescriptionIndication
-  }
-
-  onOrderTypeChange={
-    setOrderType
-  }
-  onOrderPriorityChange={
-    setOrderPriority
-  }
-  onLaboratoryTestChange={
-    handleLaboratoryTestChange
-  }
-  onDiagnosticInvestigationChange={
-    handleDiagnosticInvestigationChange
-  }
-  onOrderTestCodeChange={
-    setOrderTestCode
-  }
-  onOrderTestNameChange={
-    setOrderTestName
-  }
-  onOrderMedicationIdChange={
-    setOrderMedicationId
-  }
-  onOrderDoseChange={
-    setOrderDose
-  }
-
-  onPrescriptionMedicineChange={
-    setPrescriptionMedicine
-  }
-  onPrescriptionStrengthChange={
-    setPrescriptionStrength
-  }
-  onPrescriptionDoseUnitChange={
-    setPrescriptionDoseUnit
-  }
-  onPrescriptionRouteChange={
-    setPrescriptionRoute
-  }
-  onPrescriptionFrequencyChange={
-    setPrescriptionFrequency
-  }
-  onPrescriptionDurationChange={
-    setPrescriptionDuration
-  }
-  onPrescriptionDurationUnitChange={
-    setPrescriptionDurationUnit
-  }
-  onPrescriptionQuantityChange={
-    setPrescriptionQuantity
-  }
-  onPrescriptionDirectionsChange={
-    setPrescriptionDirections
-  }
-  onPrescriptionIndicationChange={
-    setPrescriptionIndication
-  }
-
-  onSave={() =>
-    void saveOrder()
-  }
-
-  onCancel={orderId =>
-    void cancelOrder(orderId)
-  }
-/>
 
 {selectedEncounter.title ===
   'Ward Review' &&

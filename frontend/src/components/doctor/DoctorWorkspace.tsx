@@ -465,9 +465,6 @@ export default function DoctorWorkspace({
   const clerkingExamOther =
     initialClerking.examOther
 
-  const clerkingInvestigations =
-    initialClerking.investigations
-
   const setClerkingComplaint =
     (value: string) =>
       documentation.updateInitialClerking(
@@ -619,13 +616,6 @@ export default function DoctorWorkspace({
     (value: string) =>
       documentation.updateInitialClerking(
         'examOther',
-        value,
-      )
-
-  const setClerkingInvestigations =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'investigations',
         value,
       )
 
@@ -1251,7 +1241,6 @@ Vitals: ${formatted}`
           clerkingExamMusculoskeletal={clerkingExamMusculoskeletal}
           clerkingExamGenitourinary={clerkingExamGenitourinary}
           clerkingExamOther={clerkingExamOther}
-          clerkingInvestigations={clerkingInvestigations}
           noteSubjective={noteSubjective}
           noteObjective={noteObjective}
           noteWorkingDiagnosis={noteWorkingDiagnosis}
@@ -1279,7 +1268,6 @@ Vitals: ${formatted}`
           setClerkingExamMusculoskeletal={setClerkingExamMusculoskeletal}
           setClerkingExamGenitourinary={setClerkingExamGenitourinary}
           setClerkingExamOther={setClerkingExamOther}
-          setClerkingInvestigations={setClerkingInvestigations}
           setNoteSubjective={setNoteSubjective}
           setNoteObjective={setNoteObjective}
           setNoteWorkingDiagnosis={setNoteWorkingDiagnosis}

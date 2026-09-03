@@ -65,16 +65,16 @@ export default function DiagnosisPanel({
       <div className="panel-header">
         <div>
           <p className="eyebrow">
-            CLINICAL ASSESSMENT
+            INITIAL ASSESSMENT
           </p>
 
           <h2>
-            Assessment
+            Initial Assessment
           </h2>
 
           <p>
-            Search the clinical terminology and record
-            the doctor’s assessment.
+            Record the working, provisional, and differential
+            diagnoses that guide the investigation plan.
           </p>
         </div>
 
@@ -91,7 +91,7 @@ export default function DiagnosisPanel({
         <div className="doctor-diagnosis-search">
           <label>
             <span>
-              Diagnosis
+              Clinical diagnosis
             </span>
 
             <input
@@ -255,7 +255,7 @@ export default function DiagnosisPanel({
             </p>
 
             <h3>
-              Diagnoses
+              Assessment History
             </h3>
           </div>
         </div>
@@ -269,7 +269,7 @@ export default function DiagnosisPanel({
         {!loading &&
           diagnoses.length === 0 && (
             <p className="doctor-assessment-empty">
-              No diagnoses recorded for this encounter.
+              No clinical diagnoses recorded for this encounter.
             </p>
           )}
 

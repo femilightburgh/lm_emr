@@ -32,11 +32,6 @@ interface Props {
   examGenitourinary: string
   examOther: string
 
-  workingDiagnosis: string
-  differentials: string
-  investigations: string
-  plan: string
-
   onComplaintChange: (value: string) => void
   onComplaintDurationChange: (value: string) => void
   onHistoryChange: (value: string) => void
@@ -61,11 +56,6 @@ interface Props {
   onExamMusculoskeletalChange: (value: string) => void
   onExamGenitourinaryChange: (value: string) => void
   onExamOtherChange: (value: string) => void
-
-  onWorkingDiagnosisChange: (value: string) => void
-  onDifferentialsChange: (value: string) => void
-  onInvestigationsChange: (value: string) => void
-  onPlanChange: (value: string) => void
 
   onSave: () => void
   onSign: () => void
@@ -107,11 +97,6 @@ export default function InitialClerkingPanel({
   examGenitourinary,
   examOther,
 
-  workingDiagnosis,
-  differentials,
-  investigations,
-  plan,
-
   onComplaintChange,
   onComplaintDurationChange,
   onHistoryChange,
@@ -136,11 +121,6 @@ export default function InitialClerkingPanel({
   onExamMusculoskeletalChange,
   onExamGenitourinaryChange,
   onExamOtherChange,
-
-  onWorkingDiagnosisChange,
-  onDifferentialsChange,
-  onInvestigationsChange,
-  onPlanChange,
 
   onSave,
   onSign,
@@ -527,75 +507,6 @@ export default function InitialClerkingPanel({
               disabled={signed}
               onChange={event =>
                 onExamOtherChange(
-                  event.target.value,
-                )
-              }
-            />
-          </label>
-
-            </div>
-          </details>
-
-          <details className="doctor-clerking-section" open>
-            <summary>
-              <span>
-                Assessment &amp; Plan
-              </span>
-            </summary>
-
-            <div className="doctor-clerking-section-body">
-
-          <label>
-            Working Diagnosis
-            <input
-              value={workingDiagnosis}
-              disabled={signed}
-              onChange={event =>
-                onWorkingDiagnosisChange(
-                  event.target.value,
-                )
-              }
-            />
-          </label>
-
-          <label>
-            Differentials
-            <textarea
-              rows={4}
-              value={differentials}
-              disabled={signed}
-              onChange={event =>
-                onDifferentialsChange(
-                  event.target.value,
-                )
-              }
-              placeholder="One differential diagnosis per line"
-            />
-          </label>
-
-          <label>
-            Investigations
-            <textarea
-              rows={4}
-              value={investigations}
-              disabled={signed}
-              onChange={event =>
-                onInvestigationsChange(
-                  event.target.value,
-                )
-              }
-              placeholder="One investigation per line"
-            />
-          </label>
-
-          <label>
-            Plan
-            <textarea
-              rows={5}
-              value={plan}
-              disabled={signed}
-              onChange={event =>
-                onPlanChange(
                   event.target.value,
                 )
               }

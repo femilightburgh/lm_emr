@@ -156,6 +156,74 @@
 
 
 
+
+/* ==========================================================================
+   Doctor Encounter Mode
+   ========================================================================== */
+
+.doctor-encounter-mode {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 4px 16px;
+  border-bottom: 1px solid #e7ecef;
+}
+
+.doctor-encounter-mode h1 {
+  margin: 0;
+  color: #17212b;
+  font-size: 21px;
+  letter-spacing: -0.025em;
+}
+
+.doctor-encounter-mode p:not(.eyebrow) {
+  margin: 5px 0 0;
+  max-width: 620px;
+  color: #71808c;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.doctor-encounter-mode--clinic {
+  border-left: 3px solid #526b7d;
+  padding-left: 14px;
+}
+
+.doctor-encounter-mode--ward {
+  border-left: 3px solid #40515d;
+  padding-left: 14px;
+}
+
+.doctor-encounter-mode-badge {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  border: 1px solid #dce4e9;
+  border-radius: 999px;
+  background: #f7f9fa;
+  color: #52616d;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.doctor-patient-banner--clinic {
+  background: #fbfcfd;
+}
+
+.doctor-patient-banner--ward {
+  background: #f7f9fa;
+}
+
+@media (max-width: 760px) {
+  .doctor-encounter-mode {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
 /* ==========================================================================
    Doctor Patient Banner
    ========================================================================== */

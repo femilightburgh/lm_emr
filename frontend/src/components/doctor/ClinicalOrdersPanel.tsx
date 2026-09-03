@@ -721,7 +721,7 @@ export default function ClinicalOrdersPanel({
                   Frequency
                 </span>
 
-                <input
+                <select
                   disabled={encounterClosed}
                   value={prescriptionFrequency}
                   onChange={event =>
@@ -729,8 +729,44 @@ export default function ClinicalOrdersPanel({
                       event.target.value,
                     )
                   }
-                  placeholder="e.g. TDS"
-                />
+                >
+                  <option value="">
+                    Select frequency
+                  </option>
+                  <option value="STAT">
+                    STAT — immediately
+                  </option>
+                  <option value="ONCE">
+                    Once
+                  </option>
+                  <option value="Q2H">
+                    Every 2 hours
+                  </option>
+                  <option value="Q4H">
+                    Every 4 hours
+                  </option>
+                  <option value="Q6H">
+                    Every 6 hours
+                  </option>
+                  <option value="Q8H">
+                    Every 8 hours
+                  </option>
+                  <option value="Q12H">
+                    Every 12 hours
+                  </option>
+                  <option value="Q24H">
+                    Every 24 hours
+                  </option>
+                  <option value="BID">
+                    Twice daily
+                  </option>
+                  <option value="TDS">
+                    Three times daily
+                  </option>
+                  <option value="QID">
+                    Four times daily
+                  </option>
+                </select>
               </label>
             </div>
 
@@ -769,17 +805,14 @@ export default function ClinicalOrdersPanel({
                   <option value="">
                     Select unit
                   </option>
+                  <option value="minutes">
+                    Minutes
+                  </option>
+                  <option value="hours">
+                    Hours
+                  </option>
                   <option value="days">
                     Days
-                  </option>
-                  <option value="weeks">
-                    Weeks
-                  </option>
-                  <option value="months">
-                    Months
-                  </option>
-                  <option value="doses">
-                    Doses
                   </option>
                 </select>
               </label>
