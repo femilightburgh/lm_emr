@@ -257,7 +257,7 @@ interface Props {
   ) => Promise<void>
 
   completingConsultation: boolean
-  handleOrderInvestigations: AsyncAction
+  handleCompleteConsultation: AsyncAction
 
   loadingClinicalResults: boolean
   diagnosticReports: DiagnosticReport[]
@@ -468,7 +468,7 @@ export default function DoctorEncounterWorkspace({
   saveOrder,
   cancelOrder,
   completingConsultation,
-  handleOrderInvestigations,
+  handleCompleteConsultation,
   loadingClinicalResults,
   diagnosticReports,
   diagnosticAttachments,
@@ -1457,22 +1457,15 @@ export default function DoctorEncounterWorkspace({
           progressNote?.document_type !==
             'INITIAL_CLERKING' ||
           progressNote.status !==
-            'SIGNED' ||
-          !orders.some(
-            order =>
-              order.order_type ===
-                'LABORATORY' ||
-              order.order_type ===
-                'RADIOLOGY',
-          )
+            'SIGNED'
         }
         onClick={() =>
-          void handleOrderInvestigations()
+          void handleCompleteConsultation()
         }
       >
         {completingConsultation
           ? 'Completing...'
-          : 'Order Investigations & Complete Consultation'}
+          : 'Complete Consultation'}
       </button>
     </section>
   )}

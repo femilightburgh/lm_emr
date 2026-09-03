@@ -40,7 +40,7 @@ from enum import Enum
 
 
 class ConsultationDisposition(str, Enum):
-    ORDER_INVESTIGATIONS = "ORDER_INVESTIGATIONS"
+    COMPLETE = "COMPLETE"
 
 
 class CompleteConsultationRequest(BaseModel):

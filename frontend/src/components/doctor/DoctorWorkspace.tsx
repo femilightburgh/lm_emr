@@ -885,25 +885,11 @@ Vitals: ${formatted}`
     clearSuccess: () => setSuccess(null),
   })
 
-  async function handleOrderInvestigations() {
+  async function handleCompleteConsultation() {
     if (
       !selectedEpisode ||
       !selectedEncounter
     ) {
-      return
-    }
-
-    const investigationOrders =
-      orders.filter(
-        order =>
-          order.order_type === 'LABORATORY' ||
-          order.order_type === 'DIAGNOSTIC',
-      )
-
-    if (investigationOrders.length === 0) {
-      setError(
-        'Add at least one laboratory or radiology order before completing the consultation.',
-      )
       return
     }
 
@@ -920,7 +906,7 @@ Vitals: ${formatted}`
             encounter_id:
               selectedEncounter.id,
             disposition:
-              'ORDER_INVESTIGATIONS',
+              'COMPLETE',
           },
         )
 
@@ -935,7 +921,7 @@ Vitals: ${formatted}`
       await refreshDoctorQueues()
 
       setSuccess(
-        'Consultation completed. Patient is awaiting investigations.',
+        'Consultation completed.',
       )
     } catch (err) {
       setError(
@@ -1358,7 +1344,7 @@ Vitals: ${formatted}`
           saveOrder={saveOrder}
           cancelOrder={cancelOrder}
           completingConsultation={completingConsultation}
-          handleOrderInvestigations={handleOrderInvestigations}
+          handleCompleteConsultation={handleCompleteConsultation}
           closingEncounter={closingEncounter}
           completeWardReview={completeWardReview}
           loadingClinicalResults={loadingClinicalResults}

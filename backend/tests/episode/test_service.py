@@ -1438,13 +1438,13 @@ def test_admit_episode_closes_consultation_encounter(
     assert encounter.ended_at is not None
 
 
-def test_complete_consultation_orders_investigations(
+def test_complete_consultation_keeps_episode_open(
     db,
     hospital,
 ):
     """
-    Completing an outpatient Doctor Consultation for investigations
-    closes the consultation while keeping the Episode OPEN.
+    Completing an outpatient Doctor Consultation closes the
+    consultation while keeping the Episode OPEN.
     """
 
     _, staff, context = create_authenticated_staff(
@@ -1523,16 +1523,13 @@ def test_complete_consultation_orders_investigations(
         context=context,
         episode_id=episode.id,
         encounter_id=encounter.id,
-        disposition=ConsultationDisposition.ORDER_INVESTIGATIONS,
+        disposition=ConsultationDisposition.COMPLETE,
     )
 
     db.refresh(encounter)
 
     assert completed.status == EpisodeStatus.OPEN
-    assert (
-        completed.flow_status
-        == EpisodeFlowStatus.AWAITING_INVESTIGATIONS
-    )
+    assert completed.flow_status == episode.flow_status
     assert encounter.status == EncounterStatus.CLOSED
     assert encounter.ended_at is not None
     assert encounter.ended_at > signed_at

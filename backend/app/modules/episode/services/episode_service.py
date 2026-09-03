@@ -752,7 +752,7 @@ class EpisodeService:
 
         Supported disposition:
 
-            ORDER_INVESTIGATIONS
+            COMPLETE
 
         Completing the consultation closes the Doctor Consultation
         encounter while keeping the Episode OPEN.
@@ -766,7 +766,7 @@ class EpisodeService:
         if episode.status != EpisodeStatus.OPEN:
             raise EpisodeNotOpenError()
 
-        if disposition != "ORDER_INVESTIGATIONS":
+        if disposition != "COMPLETE":
             raise InvalidConsultationDispositionError(
                 "Unsupported consultation disposition.",
             )
@@ -817,10 +817,6 @@ class EpisodeService:
         try:
             encounter.status = EncounterStatus.CLOSED
             encounter.ended_at = completed_at
-
-            episode.flow_status = (
-                EpisodeFlowStatus.AWAITING_INVESTIGATIONS
-            )
 
             self.repository.db.flush()
             self.repository.db.commit()

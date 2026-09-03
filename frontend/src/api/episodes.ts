@@ -259,7 +259,7 @@ export async function admitEpisode(
 
 
 export type ConsultationDisposition =
-  | 'ORDER_INVESTIGATIONS'
+  | 'COMPLETE'
 
 
 export async function completeConsultation(
