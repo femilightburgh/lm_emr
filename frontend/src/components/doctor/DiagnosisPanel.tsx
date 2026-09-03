@@ -262,7 +262,7 @@ export default function DiagnosisPanel({
             </p>
 
             <h3>
-              Assessment History
+              Clinical Assessment
             </h3>
           </div>
         </div>
@@ -281,34 +281,81 @@ export default function DiagnosisPanel({
           )}
 
         {!loading &&
-          diagnoses.map(diagnosis => (
-            <div
-              key={diagnosis.id}
-              className="doctor-recorded-diagnosis"
-            >
-              <div>
-                <strong>
-                  {diagnosis.diagnosis_name}
-                </strong>
+          diagnoses.length > 0 && (
+            <>
+              {(
+                [
+                  {
+                    type: 'PROVISIONAL' as DiagnosisType,
+                    title: 'Working / Provisional',
+                  },
+                  {
+                    type: 'DIFFERENTIAL' as DiagnosisType,
+                    title: 'Differential Diagnoses',
+                  },
+                  {
+                    type: 'FINAL' as DiagnosisType,
+                    title: 'Final Diagnoses',
+                  },
+                ]
+              ).map(group => {
+                const groupDiagnoses =
+                  diagnoses.filter(
+                    diagnosis =>
+                      diagnosis.diagnosis_type ===
+                      group.type,
+                  )
 
-                <span>
-                  {diagnosis.code_system &&
-                    `${diagnosis.code_system} · `}
-                  {diagnosis.code}
-                </span>
-              </div>
+                if (groupDiagnoses.length === 0) {
+                  return null
+                }
 
-              <div className="doctor-diagnosis-badges">
-                <span>
-                  {diagnosis.diagnosis_type}
-                </span>
+                return (
+                  <div
+                    key={group.type}
+                    className="doctor-assessment-group"
+                  >
+                    <div className="doctor-assessment-group-header">
+                      <h4>
+                        {group.title}
+                      </h4>
+                    </div>
 
-                <span>
-                  {diagnosis.certainty}
-                </span>
-              </div>
-            </div>
-          ))}
+                    {groupDiagnoses.map(
+                      diagnosis => (
+                        <div
+                          key={diagnosis.id}
+                          className="doctor-recorded-diagnosis"
+                        >
+                          <div>
+                            <strong>
+                              {diagnosis.diagnosis_name}
+                            </strong>
+
+                            <span>
+                              {diagnosis.code_system &&
+                                `${diagnosis.code_system} · `}
+                              {diagnosis.code}
+                            </span>
+                          </div>
+
+                          <div className="doctor-diagnosis-badges">
+                            <span>
+                              {diagnosis.diagnosis_type}
+                            </span>
+
+                            <span>
+                              {diagnosis.certainty}
+                            </span>
+                          </div>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                )
+              })}
+            </>
+          )}
       </div>
     </section>
   )
