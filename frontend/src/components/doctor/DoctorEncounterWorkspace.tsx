@@ -773,6 +773,8 @@ export default function DoctorEncounterWorkspace({
 <DoctorInvestigationResults
   showResults={
     selectedEncounter.title ===
+      'Doctor Consultation' ||
+    selectedEncounter.title ===
       'Doctor Review' ||
     selectedEncounter.title ===
       'Ward Review'
