@@ -93,6 +93,12 @@ class InvalidConsultationDispositionError(EpisodeError):
     """
 
 
+class DoctorReviewEncounterRequiredError(EpisodeError):
+    """
+    Raised when an operation requires a Doctor Review Encounter.
+    """
+
+
 class InvalidWardReviewDispositionError(EpisodeError):
     """
     Raised when a Ward Review disposition is invalid.

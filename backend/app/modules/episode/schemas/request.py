@@ -58,6 +58,17 @@ class CompleteConsultationRequest(BaseModel):
         description="Clinical disposition selected by the doctor.",
     )
 
+class CompleteDoctorReviewRequest(BaseModel):
+    """
+    Complete an outpatient Doctor Review.
+    """
+
+    encounter_id: UUID = Field(
+        ...,
+        description="OPEN Doctor Review encounter being completed.",
+    )
+
+
 class WardReviewDisposition(str, Enum):
     """
     Clinical disposition selected during a Ward Review.

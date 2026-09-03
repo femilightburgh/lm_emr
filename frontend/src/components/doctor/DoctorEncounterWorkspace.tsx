@@ -259,6 +259,9 @@ interface Props {
   completingConsultation: boolean
   handleCompleteConsultation: AsyncAction
 
+  completingDoctorReview: boolean
+  handleCompleteDoctorReview: AsyncAction
+
   loadingClinicalResults: boolean
   diagnosticReports: DiagnosticReport[]
   diagnosticAttachments: Record<
@@ -469,6 +472,8 @@ export default function DoctorEncounterWorkspace({
   cancelOrder,
   completingConsultation,
   handleCompleteConsultation,
+  completingDoctorReview,
+  handleCompleteDoctorReview,
   loadingClinicalResults,
   diagnosticReports,
   diagnosticAttachments,
@@ -1466,6 +1471,41 @@ export default function DoctorEncounterWorkspace({
         {completingConsultation
           ? 'Completing...'
           : 'Complete Consultation'}
+      </button>
+    </section>
+  )}
+
+{selectedEncounter.title ===
+  'Doctor Review' &&
+  selectedEncounter.status ===
+    'OPEN' &&
+  selectedEpisode?.status ===
+    'OPEN' && (
+    <section className="workspace-panel">
+      <div className="panel-header">
+        <div>
+          <h2>
+            Doctor Review Completion
+          </h2>
+
+          <p>
+            Complete this review after documenting the assessment, results, and clinical plan.
+          </p>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        disabled={
+          completingDoctorReview
+        }
+        onClick={() =>
+          void handleCompleteDoctorReview()
+        }
+      >
+        {completingDoctorReview
+          ? 'Completing...'
+          : 'Complete Doctor Review'}
       </button>
     </section>
   )}

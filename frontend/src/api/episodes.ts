@@ -281,6 +281,24 @@ export async function completeConsultation(
 }
 
 
+export async function completeDoctorReview(
+  accessToken: string,
+  episodeId: string,
+  payload: {
+    encounter_id: string
+  },
+): Promise<Episode> {
+  return apiRequest<Episode>(
+    `/episodes/${episodeId}/complete-doctor-review`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    accessToken,
+  )
+}
+
+
 export type WardReviewDisposition =
   | 'CONTINUE_ADMISSION'
   | 'DISCHARGE'

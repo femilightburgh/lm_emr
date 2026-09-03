@@ -15,6 +15,7 @@ import {
 
 import {
   completeConsultation,
+  completeDoctorReview,
   getEpisode,
   type DoctorQueueItem,
   type Episode,
@@ -662,6 +663,9 @@ export default function DoctorWorkspace({
     const [completingConsultation, setCompletingConsultation] =
       useState(false)
 
+    const [completingDoctorReview, setCompletingDoctorReview] =
+      useState(false)
+
 
 
 
@@ -931,6 +935,55 @@ Vitals: ${formatted}`
       )
     } finally {
       setCompletingConsultation(false)
+    }
+  }
+
+
+  async function handleCompleteDoctorReview() {
+    if (
+      !selectedEpisode ||
+      !selectedEncounter ||
+      selectedEncounter.title !== 'Doctor Review'
+    ) {
+      return
+    }
+
+    setCompletingDoctorReview(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const updatedEpisode =
+        await completeDoctorReview(
+          accessToken,
+          selectedEpisode.id,
+          {
+            encounter_id:
+              selectedEncounter.id,
+          },
+        )
+
+      setSelectedEpisode(
+        updatedEpisode,
+      )
+
+      await refreshEncounterContext(
+        selectedEncounter.id,
+      )
+
+      await refreshDoctorQueues()
+
+      setSuccess(
+        'Doctor Review completed.',
+      )
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to complete Doctor Review.',
+      )
+    } finally {
+      setCompletingDoctorReview(false)
     }
   }
 
@@ -1345,6 +1398,8 @@ Vitals: ${formatted}`
           cancelOrder={cancelOrder}
           completingConsultation={completingConsultation}
           handleCompleteConsultation={handleCompleteConsultation}
+          completingDoctorReview={completingDoctorReview}
+          handleCompleteDoctorReview={handleCompleteDoctorReview}
           closingEncounter={closingEncounter}
           completeWardReview={completeWardReview}
           loadingClinicalResults={loadingClinicalResults}

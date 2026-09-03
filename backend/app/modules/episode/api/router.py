@@ -50,6 +50,7 @@ from app.modules.episode.exceptions import (
     EpisodeAlreadyRoutedError,
     EpisodeNotAwaitingCheckInError,
     InvalidConsultationDispositionError,
+    DoctorReviewEncounterRequiredError,
     InvalidWardReviewDispositionError,
     EpisodeNotFoundError,
     WardReviewEncounterRequiredError,
@@ -71,6 +72,7 @@ from app.modules.episode.repositories.episode_disposition_repository import (
 
 from app.modules.episode.schemas import (
     CompleteConsultationRequest,
+    CompleteDoctorReviewRequest,
     CompleteWardReviewRequest,
     CreateEpisodeRequest,
     DoctorQueueItemResponse,
@@ -737,6 +739,67 @@ def complete_consultation(
         ) from exc
 
     except InvalidConsultationDispositionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+
+# ============================================================================
+# Complete Doctor Review
+# ============================================================================
+
+
+@router.post(
+    "/{episode_id}/complete-doctor-review",
+    response_model=EpisodeResponse,
+    summary="Complete an outpatient Doctor Review",
+)
+def complete_doctor_review(
+    episode_id: UUID,
+    payload: CompleteDoctorReviewRequest,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: EpisodeService = Depends(
+        get_episode_service,
+    ),
+):
+    """
+    Complete an outpatient Doctor Review.
+    """
+
+    try:
+        episode = service.complete_doctor_review(
+            context=context,
+            episode_id=episode_id,
+            encounter_id=payload.encounter_id,
+        )
+
+        return EpisodeResponse.model_validate(
+            episode,
+        )
+
+    except EpisodeNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Episode not found.",
+        ) from exc
+
+    except EncounterNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Encounter not found.",
+        ) from exc
+
+    except (
+        EncounterNotBelongingToEpisodeError,
+        EncounterNotOpenError,
+        DoctorReviewEncounterRequiredError,
+        InvalidConsultationDispositionError,
+        EpisodeAlreadyClosedError,
+        EpisodeAlreadyCancelledError,
+    ) as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),

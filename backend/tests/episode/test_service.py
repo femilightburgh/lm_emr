@@ -58,6 +58,7 @@ from app.modules.episode.repositories.episode_repository import EpisodeRepositor
 from app.modules.clinical_orders.repositories.prescription_repository import PrescriptionRepository
 
 from app.modules.episode.exceptions import (
+    DoctorReviewEncounterRequiredError,
     EncounterNotBelongingToEpisodeError,
     EncounterNotOpenError,
     EpisodeAlreadyAdmittedError,
@@ -67,6 +68,7 @@ from app.modules.episode.exceptions import (
     EpisodeAlreadyCancelledError,
     EpisodeAlreadyClosedError,
     EpisodeNotAwaitingCheckInError,
+    InvalidConsultationDispositionError,
     EpisodeNotFoundError,
     PatientNotFoundError,
     StaffNotFoundError,
@@ -1668,6 +1670,183 @@ def test_complete_consultation_moves_episode_to_awaiting_investigations(
     )
     assert encounter.status == EncounterStatus.CLOSED
     assert encounter.ended_at is not None
+
+
+def test_complete_doctor_review_moves_episode_to_routed(
+    db,
+    hospital,
+):
+    """
+    Completing an outpatient Doctor Review closes the encounter
+    while keeping the Episode OPEN and returning it to ROUTED.
+    """
+
+    _, staff, context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+        staff_number="STF-DOC-REVIEW-COMPLETE-001",
+    )
+
+    service = build_episode_service(
+        db,
+    )
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number="PAT-DOC-REV-001",
+    )
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    episode.flow_status = EpisodeFlowStatus.AWAITING_REVIEW
+    db.commit()
+    db.refresh(episode)
+
+    encounter = create_open_encounter(
+        db=db,
+        hospital=hospital,
+        episode=episode,
+        staff=staff,
+    )
+
+    encounter.title = "Doctor Review"
+    db.commit()
+    db.refresh(encounter)
+
+    completed_at_before = datetime.now(UTC)
+
+    completed = service.complete_doctor_review(
+        context=context,
+        episode_id=episode.id,
+        encounter_id=encounter.id,
+    )
+
+    completed_at_after = datetime.now(UTC)
+
+    db.refresh(encounter)
+    db.refresh(completed)
+
+    assert completed.status == EpisodeStatus.OPEN
+    assert completed.flow_status == EpisodeFlowStatus.ROUTED
+
+    assert encounter.status == EncounterStatus.CLOSED
+    assert encounter.ended_at is not None
+    assert completed_at_before <= encounter.ended_at <= completed_at_after
+
+
+
+def test_complete_doctor_review_requires_awaiting_review(
+    db,
+    hospital,
+):
+    """
+    Doctor Review cannot be completed unless the Episode
+    is awaiting review.
+    """
+
+    _, staff, context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+        staff_number="STF-DOC-REVIEW-GUARD-001",
+    )
+
+    service = build_episode_service(
+        db,
+    )
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number="PAT-DOC-REV-002",
+    )
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    episode.flow_status = EpisodeFlowStatus.ROUTED
+    db.commit()
+    db.refresh(episode)
+
+    encounter = create_open_encounter(
+        db=db,
+        hospital=hospital,
+        episode=episode,
+        staff=staff,
+    )
+
+    encounter.title = "Doctor Review"
+    db.commit()
+    db.refresh(encounter)
+
+    with pytest.raises(InvalidConsultationDispositionError):
+        service.complete_doctor_review(
+            context=context,
+            episode_id=episode.id,
+            encounter_id=encounter.id,
+        )
+
+
+def test_complete_doctor_review_requires_doctor_review_encounter(
+    db,
+    hospital,
+):
+    """
+    Only a Doctor Review encounter can be completed
+    through the Doctor Review workflow.
+    """
+
+    _, staff, context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+        staff_number="STF-DOC-REVIEW-GUARD-002",
+    )
+
+    service = build_episode_service(
+        db,
+    )
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number="PAT-DOC-REV-003",
+    )
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    episode.flow_status = EpisodeFlowStatus.AWAITING_REVIEW
+    db.commit()
+    db.refresh(episode)
+
+    encounter = create_open_encounter(
+        db=db,
+        hospital=hospital,
+        episode=episode,
+        staff=staff,
+    )
+
+    encounter.title = "Doctor Consultation"
+    db.commit()
+    db.refresh(encounter)
+
+    with pytest.raises(DoctorReviewEncounterRequiredError):
+        service.complete_doctor_review(
+            context=context,
+            episode_id=episode.id,
+            encounter_id=encounter.id,
+        )
+
 
 
 def test_admit_episode_creates_admission_event(

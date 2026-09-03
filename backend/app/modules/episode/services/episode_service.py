@@ -59,6 +59,7 @@ from app.modules.encounter.services.encounter_service import (
 )
 
 from app.modules.episode.exceptions import (
+    DoctorReviewEncounterRequiredError,
     DepartmentHospitalMismatchError,
     DepartmentInactiveError,
     DepartmentNotFoundError,
@@ -837,6 +838,87 @@ class EpisodeService:
                 episode.flow_status = (
                     EpisodeFlowStatus.AWAITING_INVESTIGATIONS
                 )
+
+            self.repository.db.flush()
+            self.repository.db.commit()
+
+        except Exception:
+            self.repository.db.rollback()
+            raise
+
+        self.repository.refresh(
+            episode,
+        )
+
+        return episode
+
+
+    # =========================================================================
+    # Complete Doctor Review
+    # =========================================================================
+
+    def complete_doctor_review(
+        self,
+        *,
+        context: RequestContext,
+        episode_id: UUID,
+        encounter_id: UUID,
+    ) -> Episode:
+        """
+        Complete an outpatient Doctor Review.
+
+        The Doctor Review Encounter is closed while the Episode remains
+        OPEN and returns to ROUTED for any subsequent clinical action.
+        """
+
+        episode = self._get_episode(
+            context=context,
+            episode_id=episode_id,
+        )
+
+        if episode.status == EpisodeStatus.CLOSED:
+            raise EpisodeAlreadyClosedError()
+
+        if episode.status == EpisodeStatus.CANCELLED:
+            raise EpisodeAlreadyCancelledError()
+
+        if episode.status != EpisodeStatus.OPEN:
+            raise InvalidConsultationDispositionError(
+                "Doctor Review requires an OPEN Episode.",
+            )
+
+        if episode.flow_status != EpisodeFlowStatus.AWAITING_REVIEW:
+            raise InvalidConsultationDispositionError(
+                "Doctor Review can only be completed when the Episode "
+                "is awaiting review.",
+            )
+
+        encounter = self.encounter_service.get_encounter(
+            context=context,
+            encounter_id=encounter_id,
+        )
+
+        if encounter is None:
+            raise EncounterNotFoundError()
+
+        if encounter.episode_id != episode.id:
+            raise EncounterNotBelongingToEpisodeError()
+
+        if encounter.title != "Doctor Review":
+            raise DoctorReviewEncounterRequiredError(
+                "Only a Doctor Review encounter can be completed "
+                "through this workflow.",
+            )
+
+        if encounter.status != EncounterStatus.OPEN:
+            raise EncounterNotOpenError()
+
+        completed_at = datetime.now(UTC)
+
+        try:
+            encounter.status = EncounterStatus.CLOSED
+            encounter.ended_at = completed_at
+            episode.flow_status = EpisodeFlowStatus.ROUTED
 
             self.repository.db.flush()
             self.repository.db.commit()
