@@ -496,6 +496,22 @@ export default function DoctorEncounterWorkspace({
 
   const renderDiagnosis = () => (
 <DiagnosisPanel
+  eyebrow={
+    isWardReview
+      ? 'CLINICAL ASSESSMENT'
+      : 'INITIAL ASSESSMENT'
+  }
+  title={
+    isWardReview
+      ? 'Clinical Assessment'
+      : 'Initial Assessment'
+  }
+  description={
+    isWardReview
+      ? 'Review and update the patient\'s current diagnoses and clinical assessment.'
+      : 'Record the working, provisional, and differential diagnoses that guide the investigation plan.'
+  }
+
   diagnoses={diagnoses}
   loading={loadingDiagnoses}
   saving={savingDiagnosis}

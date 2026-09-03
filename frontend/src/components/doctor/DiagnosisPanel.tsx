@@ -15,6 +15,10 @@ interface Props {
   saving: boolean
   encounterClosed: boolean
 
+  eyebrow: string
+  title: string
+  description: string
+
   query: string
   results: TerminologyConcept[]
   selected: TerminologyConcept | null
@@ -45,6 +49,10 @@ export default function DiagnosisPanel({
   saving,
   encounterClosed,
 
+  eyebrow,
+  title,
+  description,
+
   query,
   results,
   selected,
@@ -65,16 +73,15 @@ export default function DiagnosisPanel({
       <div className="panel-header">
         <div>
           <p className="eyebrow">
-            INITIAL ASSESSMENT
+            {eyebrow}
           </p>
 
           <h2>
-            Initial Assessment
+            {title}
           </h2>
 
           <p>
-            Record the working, provisional, and differential
-            diagnoses that guide the investigation plan.
+            {description}
           </p>
         </div>
 
