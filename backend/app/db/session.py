@@ -28,7 +28,10 @@ from collections.abc import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+import os
+
 from app.core.config import settings
+
 import app.models  # ensure all ORM models are imported so SQLAlchemy registers mappers
 
 
@@ -36,8 +39,10 @@ import app.models  # ensure all ORM models are imported so SQLAlchemy registers 
 # Database Engine
 # ----------------------------------------------------------------------
 
+_database_url = os.environ.get("TEST_DATABASE_URL") or settings.database_url
+
 engine = create_engine(
-    settings.database_url,
+    _database_url,
     echo=True,
     pool_pre_ping=True,
 )
