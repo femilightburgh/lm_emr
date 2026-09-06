@@ -2,6 +2,7 @@ import { apiRequest } from './client'
 
 export type TerminologySystem =
   | 'ICD-10-CM'
+  | 'ICD-11'
   | 'SNOMED-CT'
 
 export interface TerminologyConcept {

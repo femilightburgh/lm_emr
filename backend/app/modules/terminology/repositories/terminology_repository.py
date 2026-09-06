@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import case, exists, or_, select
 from sqlalchemy.orm import Session
 
 from app.modules.terminology.enums import TerminologySystem
@@ -56,6 +56,7 @@ class TerminologyRepository:
         query: str,
         system: TerminologySystem | None = None,
         limit: int = 20,
+        leaf_only: bool = True,
     ) -> list[TerminologyConcept]:
         """
         Search active terminology concepts by code, display name,
@@ -71,22 +72,92 @@ class TerminologyRepository:
 
         pattern = f"%{normalized}%"
 
+        synonym_match = exists(
+            select(1)
+            .select_from(TerminologySynonym)
+            .where(
+                TerminologySynonym.concept_id == TerminologyConcept.id,
+                TerminologySynonym.term.ilike(pattern),
+            )
+        )
+
+        synonym_prefix_match = exists(
+            select(1)
+            .select_from(TerminologySynonym)
+            .where(
+                TerminologySynonym.concept_id == TerminologyConcept.id,
+                TerminologySynonym.term.ilike(
+                    f"{normalized}%",
+                ),
+            )
+        )
+
         statement = (
             select(TerminologyConcept)
-            .outerjoin(
-                TerminologySynonym,
-                TerminologySynonym.concept_id == TerminologyConcept.id,
-            )
             .where(
                 TerminologyConcept.active.is_(True),
                 or_(
                     TerminologyConcept.code.ilike(pattern),
                     TerminologyConcept.display_name.ilike(pattern),
-                    TerminologySynonym.term.ilike(pattern),
+                    synonym_match,
                 ),
             )
-            .distinct()
             .order_by(
+                case(
+                    (
+                        TerminologyConcept.code.ilike(normalized),
+                        0,
+                    ),
+                    (
+                        TerminologyConcept.display_name.ilike(normalized),
+                        1,
+                    ),
+                    (
+                        TerminologyConcept.display_name.ilike(
+                            f"{normalized}%",
+                        )
+                        & TerminologyConcept.is_residual.is_(False),
+                        2,
+                    ),
+                    (
+                        TerminologyConcept.display_name.ilike(
+                            f"{normalized}%",
+                        ),
+                        3,
+                    ),
+                    (
+                        TerminologyConcept.display_name.ilike(
+                            f"%{normalized}%",
+                        )
+                        & TerminologyConcept.is_residual.is_(False),
+                        4,
+                    ),
+                    (
+                        TerminologyConcept.display_name.ilike(
+                            f"%{normalized}%",
+                        ),
+                        5,
+                    ),
+                    (
+                        synonym_prefix_match
+                        & TerminologyConcept.is_residual.is_(False),
+                        6,
+                    ),
+                    (
+                        synonym_prefix_match,
+                        7,
+                    ),
+                    (
+                        synonym_match
+                        & TerminologyConcept.is_residual.is_(False),
+                        8,
+                    ),
+                    (
+                        synonym_match,
+                        9,
+                    ),
+                    else_=10,
+                ),
                 TerminologyConcept.display_name.asc(),
             )
             .limit(limit)
@@ -95,6 +166,11 @@ class TerminologyRepository:
         if system is not None:
             statement = statement.where(
                 TerminologyConcept.system == system,
+            )
+
+        if leaf_only:
+            statement = statement.where(
+                TerminologyConcept.is_leaf.is_(True),
             )
 
         return list(

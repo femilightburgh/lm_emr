@@ -186,13 +186,18 @@ interface Props {
   diagnosisQuery: string
   diagnosisResults: TerminologyConcept[]
   selectedDiagnosis: TerminologyConcept | null
+  manualDiagnosis: string
+  diagnosisSearchPerformed: boolean
   diagnosisType: DiagnosisType
   certainty: DiagnosisCertainty
   searchDiagnoses: (
     query: string,
   ) => Promise<void>
-  setSelectedDiagnosis: (
-    value: TerminologyConcept | null,
+  enterManualDiagnosis: () => void
+  exitManualDiagnosis: () => void
+  setManualDiagnosis: StringChangeHandler
+  selectDiagnosis: (
+    concept: TerminologyConcept,
   ) => void
   setDiagnosisType: (
     value: DiagnosisType,
@@ -414,10 +419,15 @@ export default function DoctorEncounterWorkspace({
   diagnosisQuery,
   diagnosisResults,
   selectedDiagnosis,
+  manualDiagnosis,
+  diagnosisSearchPerformed,
   diagnosisType,
   certainty,
   searchDiagnoses,
-  setSelectedDiagnosis,
+  enterManualDiagnosis,
+  exitManualDiagnosis,
+  setManualDiagnosis,
+  selectDiagnosis,
   setDiagnosisType,
   setCertainty,
   saveDiagnosis,
@@ -527,6 +537,8 @@ export default function DoctorEncounterWorkspace({
   query={diagnosisQuery}
   results={diagnosisResults}
   selected={selectedDiagnosis}
+  manualDiagnosis={manualDiagnosis}
+  diagnosisSearchPerformed={diagnosisSearchPerformed}
 
   diagnosisType={diagnosisType}
   certainty={certainty}
@@ -536,7 +548,19 @@ export default function DoctorEncounterWorkspace({
   }
 
   onSelect={
-    setSelectedDiagnosis
+    selectDiagnosis
+  }
+
+  onEnterManualDiagnosis={
+    enterManualDiagnosis
+  }
+
+  onExitManualDiagnosis={
+    exitManualDiagnosis
+  }
+
+  onManualDiagnosisChange={
+    setManualDiagnosis
   }
 
   onDiagnosisTypeChange={

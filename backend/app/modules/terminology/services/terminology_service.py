@@ -21,6 +21,7 @@ class TerminologyService:
         query: str,
         system: TerminologySystem | None = None,
         limit: int = 20,
+        leaf_only: bool = True,
     ) -> list[TerminologyConcept]:
         if limit < 1 or limit > 100:
             raise ValueError(
@@ -31,4 +32,5 @@ class TerminologyService:
             query=query,
             system=system,
             limit=limit,
+            leaf_only=leaf_only,
         )

@@ -54,6 +54,29 @@ class TerminologyConcept(BaseEntity):
         nullable=True,
     )
 
+    uri: Mapped[str | None] = mapped_column(
+        String(2048),
+        nullable=True,
+    )
+
+    release_version: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        index=True,
+    )
+
+    is_leaf: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        index=True,
+    )
+
+    is_residual: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        index=True,
+    )
+
     active: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,

@@ -15,4 +15,5 @@ class TerminologyConceptResponse(BaseModel):
     code: str
     display_name: str
     description: str | None
+    uri: str | None
     active: bool

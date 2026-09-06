@@ -48,6 +48,9 @@ def seed_concept(
         code=code,
         display_name=display_name,
         active=True,
+        release_version="TEST",
+        is_leaf=True,
+        is_residual=False,
     )
 
     db.add(concept)
@@ -176,6 +179,9 @@ def test_search_diagnoses_endpoint_filters_system(
         code="TEST-38341003",
         display_name="Hypertensive disorder",
         active=True,
+        release_version="TEST",
+        is_leaf=True,
+        is_residual=False,
     )
 
     db.add(other)
@@ -203,6 +209,132 @@ def test_search_diagnoses_endpoint_filters_system(
     assert [item["id"] for item in body] == [
         str(concept.id),
     ]
+
+
+def test_search_diagnoses_endpoint_returns_icd11_leaf_concepts(
+    client,
+    db,
+):
+    hospital = create_hospital(db)
+
+    user = create_user(
+        db,
+        hospital=hospital,
+        email=f"doctor-{uuid4()}@example.com",
+        role_name="Doctor",
+    )
+
+    leaf = TerminologyConcept(
+        system=TerminologySystem.ICD_11,
+        code="1A00",
+        display_name="Cholera",
+        active=True,
+        release_version="TEST",
+        is_leaf=True,
+        is_residual=False,
+    )
+
+    non_leaf = TerminologyConcept(
+        system=TerminologySystem.ICD_11,
+        code="1A00-GROUP",
+        display_name="Cholera group",
+        active=True,
+        release_version="TEST",
+        is_leaf=False,
+        is_residual=False,
+    )
+
+    db.add_all([leaf, non_leaf])
+    db.commit()
+
+    token = authenticate(
+        db,
+        hospital=hospital,
+        email=user.email,
+    )
+
+    response = client.get(
+        "/api/v1/terminology/diagnoses/search",
+        params={
+            "q": "cholera",
+            "system": "ICD-11",
+        },
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert [item["id"] for item in body] == [
+        str(leaf.id),
+    ]
+    assert body[0]["system"] == "ICD-11"
+    assert body[0]["code"] == "1A00"
+    assert body[0]["display_name"] == "Cholera"
+
+
+def test_search_diagnoses_endpoint_returns_icd11_leaf_concepts(
+    client,
+    db,
+):
+    hospital = create_hospital(db)
+
+    user = create_user(
+        db,
+        hospital=hospital,
+        email=f"doctor-{uuid4()}@example.com",
+        role_name="Doctor",
+    )
+
+    leaf = TerminologyConcept(
+        system=TerminologySystem.ICD_11,
+        code="1A00",
+        display_name="Cholera",
+        active=True,
+        release_version="TEST",
+        is_leaf=True,
+        is_residual=False,
+    )
+
+    non_leaf = TerminologyConcept(
+        system=TerminologySystem.ICD_11,
+        code="1A00-GROUP",
+        display_name="Cholera group",
+        active=True,
+        release_version="TEST",
+        is_leaf=False,
+        is_residual=False,
+    )
+
+    db.add_all([leaf, non_leaf])
+    db.commit()
+
+    token = authenticate(
+        db,
+        hospital=hospital,
+        email=user.email,
+    )
+
+    response = client.get(
+        "/api/v1/terminology/diagnoses/search",
+        params={
+            "q": "cholera",
+            "system": "ICD-11",
+        },
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert [item["id"] for item in body] == [
+        str(leaf.id),
+    ]
+    assert body[0]["system"] == "ICD-11"
+    assert body[0]["code"] == "1A00"
+    assert body[0]["display_name"] == "Cholera"
 
 
 def test_search_diagnoses_requires_permission(

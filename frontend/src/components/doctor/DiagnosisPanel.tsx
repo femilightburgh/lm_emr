@@ -22,6 +22,8 @@ interface Props {
   query: string
   results: TerminologyConcept[]
   selected: TerminologyConcept | null
+  manualDiagnosis: string
+  diagnosisSearchPerformed: boolean
 
   diagnosisType: DiagnosisType
   certainty: DiagnosisCertainty
@@ -30,6 +32,9 @@ interface Props {
   onSelect: (
     concept: TerminologyConcept,
   ) => void
+  onEnterManualDiagnosis: () => void
+  onExitManualDiagnosis: () => void
+  onManualDiagnosisChange: (value: string) => void
 
   onDiagnosisTypeChange: (
     value: DiagnosisType,
@@ -56,12 +61,17 @@ export default function DiagnosisPanel({
   query,
   results,
   selected,
+  manualDiagnosis,
+  diagnosisSearchPerformed,
 
   diagnosisType,
   certainty,
 
   onQueryChange,
   onSelect,
+  onEnterManualDiagnosis,
+  onExitManualDiagnosis,
+  onManualDiagnosisChange,
 
   onDiagnosisTypeChange,
   onCertaintyChange,
@@ -95,64 +105,114 @@ export default function DiagnosisPanel({
       </div>
 
       <div className="doctor-assessment-entry">
-        <div className="doctor-diagnosis-search">
-          <label>
-            <span>
-              Clinical diagnosis
-            </span>
+        {!manualDiagnosis && (
+          <div className="doctor-diagnosis-search">
+            <label>
+              <span>
+                Clinical diagnosis
+              </span>
 
-            <input
-              disabled={encounterClosed}
-              value={query}
-              onChange={event =>
-                onQueryChange(
-                  event.target.value,
-                )
-              }
-              placeholder="Search diagnosis or ICD-10-CM code"
-            />
-          </label>
+              <input
+                disabled={encounterClosed}
+                value={query}
+                onChange={event =>
+                  onQueryChange(
+                    event.target.value,
+                  )
+                }
+                placeholder="Search diagnosis or ICD-11 code"
+              />
+            </label>
 
-          {results.length > 0 && (
-            <div className="doctor-diagnosis-results">
-              {results.map(concept => (
-                <button
-                  key={concept.id}
-                  type="button"
-                  className={
-                    selected?.id === concept.id
-                      ? 'doctor-diagnosis-result selected'
-                      : 'doctor-diagnosis-result'
-                  }
-                  disabled={encounterClosed}
-                  onClick={() =>
-                    onSelect(concept)
-                  }
-                >
-                  <span>
-                    <strong>
-                      {concept.display_name}
-                    </strong>
+            {results.length > 0 && !selected && (
+              <div className="doctor-diagnosis-results">
+                {results.map(concept => (
+                  <button
+                    key={concept.id}
+                    type="button"
+                    className="doctor-diagnosis-result"
+                    disabled={encounterClosed}
+                    onClick={() =>
+                      onSelect(concept)
+                    }
+                  >
+                    <span>
+                      <strong>
+                        {concept.display_name}
+                      </strong>
 
-                    <small>
-                      {concept.system}
-                      {' · '}
-                      {concept.code}
-                    </small>
-                  </span>
-
-                  {selected?.id === concept.id && (
-                    <span className="doctor-diagnosis-check">
-                      Selected
+                      <small>
+                        {concept.system}
+                        {' · '}
+                        {concept.code}
+                      </small>
                     </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
 
-        {selected && (
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {diagnosisSearchPerformed &&
+              results.length === 0 && (
+                <p className="doctor-assessment-empty">
+                  No suitable ICD-11 diagnoses found.
+                </p>
+              )}
+
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={
+                encounterClosed ||
+                !query.trim()
+              }
+              onClick={onEnterManualDiagnosis}
+            >
+              Enter diagnosis manually
+            </button>
+          </div>
+        )}
+
+        {manualDiagnosis && (
+          <div className="doctor-diagnosis-search">
+            <label>
+              <span>
+                Clinical diagnosis
+              </span>
+
+              <input
+                disabled={encounterClosed}
+                value={manualDiagnosis}
+                onChange={event =>
+                  onManualDiagnosisChange(
+                    event.target.value,
+                  )
+                }
+                placeholder="Enter clinical diagnosis"
+              />
+            </label>
+
+            <p className="eyebrow">
+              UNCODED DIAGNOSIS
+            </p>
+
+            <p className="doctor-assessment-empty">
+              This diagnosis will be recorded without an ICD-11 code.
+            </p>
+
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={encounterClosed}
+              onClick={onExitManualDiagnosis}
+            >
+              Search ICD-11 instead
+            </button>
+          </div>
+        )}
+
+        {selected && !manualDiagnosis && (
           <div className="doctor-selected-diagnosis">
             <div>
               <p className="eyebrow">

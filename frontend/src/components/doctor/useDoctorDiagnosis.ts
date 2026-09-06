@@ -30,6 +30,7 @@ interface Props {
   accessToken: string
   selectedEncounter: Encounter | null
   selectedDiagnosis: TerminologyConcept | null
+  manualDiagnosis: string
   refreshEncounterContext: (
     encounterId: string,
   ) => Promise<void>
@@ -42,6 +43,7 @@ export function useDoctorDiagnosis({
   accessToken,
   selectedEncounter,
   selectedDiagnosis,
+  manualDiagnosis,
   refreshEncounterContext,
   resetDiagnosisSearch,
   onError,
@@ -57,9 +59,13 @@ export function useDoctorDiagnosis({
     useState(false)
 
   async function saveDiagnosis() {
+    const manualDiagnosisName =
+      manualDiagnosis.trim()
+
     if (
       !selectedEncounter ||
-      !selectedDiagnosis
+      (!selectedDiagnosis &&
+        !manualDiagnosisName)
     ) {
       return
     }
@@ -76,13 +82,19 @@ export function useDoctorDiagnosis({
             selectedEncounter.id,
 
           diagnosis_name:
-            selectedDiagnosis.display_name,
+            selectedDiagnosis
+              ? selectedDiagnosis.display_name
+              : manualDiagnosisName,
 
           code_system:
-            selectedDiagnosis.system,
+            selectedDiagnosis
+              ? selectedDiagnosis.system
+              : null,
 
           code:
-            selectedDiagnosis.code,
+            selectedDiagnosis
+              ? selectedDiagnosis.code
+              : null,
 
           diagnosis_type:
             diagnosisType,

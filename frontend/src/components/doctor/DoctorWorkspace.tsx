@@ -178,7 +178,12 @@ export default function DoctorWorkspace({
     diagnosisResults,
     setDiagnosisResults,
     selectedDiagnosis,
-    setSelectedDiagnosis,
+    manualDiagnosis,
+    setManualDiagnosis,
+    diagnosisSearchPerformed,
+    enterManualDiagnosis,
+    exitManualDiagnosis,
+    selectDiagnosis,
     searchDiagnoses,
   } = useDoctorDiagnosisSearch({
     accessToken,
@@ -196,11 +201,12 @@ export default function DoctorWorkspace({
     accessToken,
     selectedEncounter,
     selectedDiagnosis,
+    manualDiagnosis,
     refreshEncounterContext,
     resetDiagnosisSearch: () => {
       setDiagnosisQuery('')
       setDiagnosisResults([])
-      setSelectedDiagnosis(null)
+      setManualDiagnosis('')
     },
     onError: setError,
     onSuccess: setSuccess,
@@ -995,8 +1001,8 @@ Vitals: ${formatted}`
 
 
   return (
-    <section className="doctor-workspace">
-      <div className="workspace-header">
+    <section className="workspace-content doctor-workspace">
+      <div className="page-header">
         <div>
           <p className="eyebrow">
             Clinical workspace
@@ -1340,10 +1346,15 @@ Vitals: ${formatted}`
           diagnosisQuery={diagnosisQuery}
           diagnosisResults={diagnosisResults}
           selectedDiagnosis={selectedDiagnosis}
+          manualDiagnosis={manualDiagnosis}
+          diagnosisSearchPerformed={diagnosisSearchPerformed}
           diagnosisType={diagnosisType}
           certainty={certainty}
           searchDiagnoses={searchDiagnoses}
-          setSelectedDiagnosis={setSelectedDiagnosis}
+          selectDiagnosis={selectDiagnosis}
+          enterManualDiagnosis={enterManualDiagnosis}
+          exitManualDiagnosis={exitManualDiagnosis}
+          setManualDiagnosis={setManualDiagnosis}
           setDiagnosisType={setDiagnosisType}
           setCertainty={setCertainty}
           saveDiagnosis={saveDiagnosis}
