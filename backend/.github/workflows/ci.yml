@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.11, 3.12, 3.13]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install ruff mypy
+
+      - name: Lint (ruff)
+        run: ruff check backend || true
+
+      - name: Type check (mypy)
+        run: mypy backend || true
+
+      - name: Run tests
+        working-directory: backend
+        run: pytest -q -r a
+
+  smoke:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag' || github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.13
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+      - name: Run smoke E2E (API health)
+        run: |
+          python - <<'PY'
+import requests
+import os
+url = os.getenv('API_URL','http://localhost:8000')
+try:
+    r = requests.get(url + '/health', timeout=5)
+    print('health', r.status_code, r.text)
+except Exception as e:
+    print('smoke failed', e)
+    raise
+PY
