@@ -340,6 +340,370 @@ def test_pharmacist_can_receive_and_start_prescription(
     assert start_response.json()["started_at"] is not None
 
 
+
+
+def test_dispensing_one_of_multiple_medications_keeps_episode_open(
+    client,
+    db: Session,
+):
+    """
+    Dispensing one medication while another remains outstanding keeps
+    an AWAITING_PHARMACY Episode open. The final medication closes it.
+    """
+    from app.core.context import RequestContext
+    from app.modules.clinical_orders.enums import ClinicalOrderStatus
+    from app.modules.clinical_orders.models import ClinicalOrder
+    from app.modules.episode.models import (
+        EpisodeFlowStatus,
+        EpisodeStatus,
+    )
+
+    hospital = create_hospital(db)
+
+    doctor = create_user(
+        db,
+        hospital=hospital,
+        email=f"multi-med-doctor-{uuid4()}@example.com",
+        role_name="Doctor",
+    )
+
+    pharmacist = create_user(
+        db,
+        hospital=hospital,
+        email=f"multi-med-pharmacist-{uuid4()}@example.com",
+        role_name="Pharmacist",
+    )
+
+    pharmacist_staff_service = StaffService(
+        repository=StaffRepository(db),
+        hospital_repository=__import__(
+            "app.modules.organization.repository",
+            fromlist=["HospitalRepository"],
+        ).HospitalRepository(db),
+        employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
+    )
+
+    pharmacist_staff = pharmacist_staff_service.create_staff(
+        StaffCreate(
+            hospital_id=hospital.id,
+            staff_number=f"STAFF-MULTI-{uuid4().hex[:8]}",
+            first_name="Multiple",
+            last_name="Pharmacist",
+            gender=Gender.FEMALE,
+            date_of_birth=date(1988, 1, 1),
+            profession=Profession.PHARMACIST,
+            employment_status=EmploymentStatus.ACTIVE,
+            employment_type=EmploymentType.FULL_TIME,
+            date_employed=date(2026, 1, 1),
+        ),
+    )
+
+    pharmacist_staff_service.link_user_account(
+        pharmacist_staff.id,
+        pharmacist.id,
+    )
+
+    _, encounter = create_doctor_encounter(
+        db,
+        hospital,
+        doctor,
+    )
+
+    doctor_token = authenticate(
+        db,
+        hospital=hospital,
+        email=doctor.email,
+    )
+
+    def create_prescription(medicine_name, quantity):
+        response = client.post(
+            "/api/v1/prescriptions",
+            headers=auth_headers(doctor_token),
+            json={
+                "encounter_id": str(encounter.id),
+                "priority": "ROUTINE",
+                "medicine_name": medicine_name,
+                "strength": "500 mg",
+                "dose": "500",
+                "dose_unit": "mg",
+                "route": "ORAL",
+                "frequency": "QID",
+                "duration": "3",
+                "duration_unit": "days",
+                "quantity": quantity,
+                "directions": "Take after food.",
+                "indication": "Fever.",
+            },
+        )
+
+        assert response.status_code == 201
+        return response.json()["clinical_order_id"]
+
+    order_one_id = create_prescription(
+        "Paracetamol",
+        "12 tablets",
+    )
+    order_two_id = create_prescription(
+        "Amoxicillin",
+        "15 capsules",
+    )
+
+    episode = encounter.episode
+    episode.flow_status = EpisodeFlowStatus.AWAITING_PHARMACY
+    episode.status = EpisodeStatus.OPEN
+    db.commit()
+    db.refresh(episode)
+
+    pharmacist_token = authenticate(
+        db,
+        hospital=hospital,
+        email=pharmacist.email,
+    )
+
+    for order_id in (order_one_id, order_two_id):
+        receive_response = client.post(
+            f"/api/v1/prescriptions/{order_id}/receive",
+            headers=auth_headers(pharmacist_token),
+        )
+
+        assert receive_response.status_code == 200
+        assert receive_response.json()["status"] == "RECEIVED"
+
+        start_response = client.post(
+            f"/api/v1/prescriptions/{order_id}/start",
+            headers=auth_headers(pharmacist_token),
+        )
+
+        assert start_response.status_code == 200
+        assert start_response.json()["status"] == "IN_PROGRESS"
+
+    context = RequestContext(
+        user_id=pharmacist.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
+    service = DispensingService(
+        dispensing_repository=DispensingRepository(db),
+        clinical_order_repository=ClinicalOrderRepository(db),
+        prescription_repository=PrescriptionRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+        staff_repository=StaffRepository(db),
+        episode_repository=EpisodeRepository(db),
+    )
+
+    service.dispense(
+        context=context,
+        order_id=order_one_id,
+        quantity_dispensed="12 tablets",
+        notes="First medication dispensed.",
+    )
+
+    first_order = (
+        db.query(ClinicalOrder)
+        .filter(ClinicalOrder.id == order_one_id)
+        .one()
+    )
+
+    db.refresh(episode)
+
+    assert first_order.status == ClinicalOrderStatus.COMPLETED
+    assert episode.status == EpisodeStatus.OPEN
+    assert (
+        episode.flow_status
+        == EpisodeFlowStatus.AWAITING_PHARMACY
+    )
+    assert episode.closed_at is None
+
+    service.dispense(
+        context=context,
+        order_id=order_two_id,
+        quantity_dispensed="15 capsules",
+        notes="Final medication dispensed.",
+    )
+
+    second_order = (
+        db.query(ClinicalOrder)
+        .filter(ClinicalOrder.id == order_two_id)
+        .one()
+    )
+
+    db.refresh(episode)
+
+    assert second_order.status == ClinicalOrderStatus.COMPLETED
+    assert episode.status == EpisodeStatus.CLOSED
+    assert episode.closed_at is not None
+
+def test_dispensing_last_medication_closes_awaiting_pharmacy_episode(
+    client,
+    db: Session,
+):
+    """
+    Dispensing the final outstanding medication closes an Episode
+    that is awaiting pharmacy.
+    """
+    from app.core.context import RequestContext
+    from app.modules.clinical_orders.enums import ClinicalOrderStatus
+    from app.modules.clinical_orders.models import ClinicalOrder
+    from app.modules.episode.models import (
+        EpisodeFlowStatus,
+        EpisodeStatus,
+    )
+
+    hospital = create_hospital(db)
+
+    doctor = create_user(
+        db,
+        hospital=hospital,
+        email=f"lifecycle-doctor-{uuid4()}@example.com",
+        role_name="Doctor",
+    )
+
+    pharmacist = create_user(
+        db,
+        hospital=hospital,
+        email=f"lifecycle-pharmacist-{uuid4()}@example.com",
+        role_name="Pharmacist",
+    )
+
+    pharmacist_staff_service = StaffService(
+        repository=StaffRepository(db),
+        hospital_repository=__import__(
+            "app.modules.organization.repository",
+            fromlist=["HospitalRepository"],
+        ).HospitalRepository(db),
+        employment_repository=StaffEmploymentRepository(db),
+        identity_repository=IdentityRepository(db),
+    )
+
+    pharmacist_staff = pharmacist_staff_service.create_staff(
+        StaffCreate(
+            hospital_id=hospital.id,
+            staff_number=f"STAFF-LIFE-{uuid4().hex[:8]}",
+            first_name="Lifecycle",
+            last_name="Pharmacist",
+            gender=Gender.FEMALE,
+            date_of_birth=date(1988, 1, 1),
+            profession=Profession.PHARMACIST,
+            employment_status=EmploymentStatus.ACTIVE,
+            employment_type=EmploymentType.FULL_TIME,
+            date_employed=date(2026, 1, 1),
+        ),
+    )
+
+    pharmacist_staff_service.link_user_account(
+        pharmacist_staff.id,
+        pharmacist.id,
+    )
+
+    _, encounter = create_doctor_encounter(
+        db,
+        hospital,
+        doctor,
+    )
+
+    doctor_token = authenticate(
+        db,
+        hospital=hospital,
+        email=doctor.email,
+    )
+
+    create_response = client.post(
+        "/api/v1/prescriptions",
+        headers=auth_headers(doctor_token),
+        json={
+            "encounter_id": str(encounter.id),
+            "priority": "ROUTINE",
+            "medicine_name": "Paracetamol",
+            "strength": "500 mg",
+            "dose": "500",
+            "dose_unit": "mg",
+            "route": "ORAL",
+            "frequency": "QID",
+            "duration": "3",
+            "duration_unit": "days",
+            "quantity": "12 tablets",
+            "directions": "Take after food.",
+            "indication": "Fever.",
+        },
+    )
+
+    assert create_response.status_code == 201
+
+    order_id = create_response.json()["clinical_order_id"]
+
+    episode = encounter.episode
+    episode.flow_status = EpisodeFlowStatus.AWAITING_PHARMACY
+    episode.status = EpisodeStatus.OPEN
+    db.commit()
+    db.refresh(episode)
+
+    pharmacist_token = authenticate(
+        db,
+        hospital=hospital,
+        email=pharmacist.email,
+    )
+
+    receive_response = client.post(
+        f"/api/v1/prescriptions/{order_id}/receive",
+        headers=auth_headers(pharmacist_token),
+    )
+
+    assert receive_response.status_code == 200
+    assert receive_response.json()["status"] == "RECEIVED"
+
+    start_response = client.post(
+        f"/api/v1/prescriptions/{order_id}/start",
+        headers=auth_headers(pharmacist_token),
+    )
+
+    assert start_response.status_code == 200
+    assert start_response.json()["status"] == "IN_PROGRESS"
+
+    context = RequestContext(
+        user_id=pharmacist.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
+    service = DispensingService(
+        dispensing_repository=DispensingRepository(db),
+        clinical_order_repository=ClinicalOrderRepository(db),
+        prescription_repository=PrescriptionRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+        staff_repository=StaffRepository(db),
+        episode_repository=EpisodeRepository(db),
+    )
+
+    dispensing = service.dispense(
+        context=context,
+        order_id=order_id,
+        quantity_dispensed="12 tablets",
+        notes="Dispensed in full.",
+    )
+
+    assert dispensing.id is not None
+
+    order = (
+        db.query(ClinicalOrder)
+        .filter(ClinicalOrder.id == order_id)
+        .one()
+    )
+
+    db.refresh(episode)
+
+    assert order.status == ClinicalOrderStatus.COMPLETED
+    assert order.completed_at is not None
+
+    assert episode.status == EpisodeStatus.CLOSED
+    assert episode.closed_at is not None
+
+
 def test_pharmacist_can_dispense_in_progress_prescription(
     client,
     db: Session,
@@ -464,6 +828,7 @@ def test_pharmacist_can_dispense_in_progress_prescription(
             repository=ClinicalEventRepository(db),
         ),
         staff_repository=StaffRepository(db),
+        episode_repository=EpisodeRepository(db),
     )
 
     dispensing = service.dispense(

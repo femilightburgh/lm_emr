@@ -130,6 +130,12 @@ class ClinicalOrder(BaseEntity):
 
     encounter: Mapped["Encounter"] = relationship()
 
+    items: Mapped[list["ClinicalOrderItem"]] = relationship(
+        back_populates="clinical_order",
+        cascade="all, delete-orphan",
+        order_by="ClinicalOrderItem.display_order",
+    )
+
     prescription: Mapped["Prescription | None"] = relationship(
         back_populates="clinical_order",
         uselist=False,

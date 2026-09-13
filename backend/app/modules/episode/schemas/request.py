@@ -41,6 +41,7 @@ from enum import Enum
 
 class ConsultationDisposition(str, Enum):
     COMPLETE = "COMPLETE"
+    DISCHARGE = "DISCHARGE"
 
 
 class CompleteConsultationRequest(BaseModel):

@@ -70,8 +70,14 @@ class LaboratoryTest(BaseEntity):
         index=True,
     )
 
+    hospital = relationship(
+        "Hospital",
+        back_populates="laboratory_tests",
+    )
+
     analytes = relationship(
         "LaboratoryTestAnalyte",
         back_populates="laboratory_test",
+        cascade="all, delete-orphan",
         order_by="LaboratoryTestAnalyte.display_order",
     )

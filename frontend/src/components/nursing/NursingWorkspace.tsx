@@ -77,7 +77,7 @@ import NursingPatientSummary from './NursingPatientSummary'
 import NursingVitalsForm from './NursingVitalsForm'
 import NursingIntakeForm from './NursingIntakeForm'
 import NursingRoutingSection from './NursingRoutingSection'
-import NursingMedicationSection from './NursingMedicationSection'
+import InpatientNursingWorkspace from './InpatientNursingWorkspace'
 
 
 interface Props {
@@ -568,22 +568,31 @@ export default function NursingWorkspace({
   // Save Vitals
   // ==========================================================================
 
-  async function handleSaveVitals() {
+  async function handleSaveVitals(
+    nextVitals?: VitalsFormState,
+  ): Promise<boolean> {
     if (!nursingEncounter) {
-      return
+      return false
     }
+
+    const formVitals =
+      nextVitals ?? vitals
 
     const created =
       await saveVitals(
         nursingEncounter.id,
-        vitals,
+        formVitals,
       )
 
     if (created) {
       setVitals(
         resetVitals(),
       )
+
+      return true
     }
+
+    return false
   }
 
 
@@ -816,16 +825,8 @@ export default function NursingWorkspace({
       'SIGNED'
 
 
-    const latestVitals =
-      recordedVitals.length > 0
-        ? recordedVitals[
-            recordedVitals.length - 1
-          ]
-        : null
-
-
     return (
-      <section className="workspace-content">
+      <section className="workspace-content nursing-workspace">
 
         {/* ================================================================ */}
         {/* Header                                                           */}
@@ -835,6 +836,7 @@ export default function NursingWorkspace({
         {/* Patient Header                                                   */}
         {/* ================================================================ */}
 
+        {selectedEpisode.status !== 'ADMITTED' && (
         <div className="nursing-patient-header">
 
           <div className="nursing-patient-identity">
@@ -946,6 +948,7 @@ export default function NursingWorkspace({
           </div>
 
         </div>
+        )}
 
 
 
@@ -972,348 +975,67 @@ export default function NursingWorkspace({
         {/* Patient Summary                                                  */}
         {/* ================================================================ */}
 
-        <NursingPatientSummary
-          episode={selectedEpisode}
-          encounter={nursingEncounter}
-          patient={patient}
-          loadingPatient={loadingPatient}
-          previousEpisodes={
-            previousEpisodes
-          }
-          loadingPreviousEpisodes={
-            loadingPreviousEpisodes
-          }
-          previousVisits={
-            previousVisits
-          }
-          loadingPreviousVisits={
-            loadingPreviousVisits
-          }
-        />
+        {selectedEpisode.status !== 'ADMITTED' && (
+          <NursingPatientSummary
+            episode={selectedEpisode}
+            encounter={nursingEncounter}
+            patient={patient}
+            loadingPatient={loadingPatient}
+            previousEpisodes={
+              previousEpisodes
+            }
+            loadingPreviousEpisodes={
+              loadingPreviousEpisodes
+            }
+            previousVisits={
+              previousVisits
+            }
+            loadingPreviousVisits={
+              loadingPreviousVisits
+            }
+          />
+        )}
 
 
         {selectedEpisode.status === 'ADMITTED' ? (
 
-          <>
-            {/* ============================================================ */}
-            {/* Inpatient Medication Administration                         */}
-            {/* ============================================================ */}
-
-            <NursingMedicationSection
-              accessToken={accessToken}
-              summary={medicationSummary}
-              loading={loadingMedications}
-              savingDoseId={
-                savingMedicationDoseId
-              }
-              onAdminister={(
+          <InpatientNursingWorkspace
+            accessToken={accessToken}
+            episode={selectedEpisode}
+            encounter={nursingEncounter}
+            patient={patient}
+            patientNames={patientNames}
+            medicationSummary={medicationSummary}
+            loadingMedications={loadingMedications}
+            savingMedicationDoseId={
+              savingMedicationDoseId
+            }
+            recordedVitals={recordedVitals}
+            loadingVitals={loadingVitals}
+            savingVitals={savingVitals}
+            onBack={handleBackToQueue}
+            onAdministerMedication={(
+              doseId,
+              status,
+              reason,
+            ) => {
+              void administerMedicationDose(
                 doseId,
                 status,
                 reason,
-              ) => {
-                void administerMedicationDose(
-                  doseId,
-                  status,
-                  reason,
-                ).then(
-                  success => {
-                    if (
-                      success &&
-                      selectedEpisode
-                    ) {
-                      void loadMedicationDoses(
-                        selectedEpisode.id,
-                      )
-                    }
-                  },
-                )
-              }}
-            />
-
-
-            {/* ============================================================ */}
-            {/* Inpatient Observations                                       */}
-            {/* ============================================================ */}
-
-                          <section className="workspace-section">
-
-                <div className="section-heading">
-
-                  <div>
-
-                    <p className="eyebrow">
-                      VITAL SIGNS
-                    </p>
-
-                    <h3>
-                      Latest observations
-                    </h3>
-
-                  </div>
-
-                  {latestVitals && (
-                    <span className="nursing-vitals-time">
-                      {new Date(
-                        latestVitals.occurred_at,
-                      ).toLocaleTimeString(
-                        [],
-                        {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        },
-                      )}
-                    </span>
-                  )}
-
-                </div>
-
-
-                {loadingVitals && (
-                  <div className="admin-empty-state">
-                    Loading recorded vital signs...
-                  </div>
-                )}
-
-
-                {!loadingVitals &&
-                  !latestVitals && (
-                    <div className="admin-empty-state">
-                      No vital signs have been
-                      recorded for this encounter
-                      yet.
-                    </div>
-                  )}
-
-
-                {!loadingVitals &&
-                  latestVitals && (
-                    <div className="nursing-latest-vitals">
-
-                      <div className="nursing-latest-vital">
-                        <span>
-                          HR
-                        </span>
-
-                        <strong>
-                          {latestVitals.payload.heart_rate != null
-                            ? `${latestVitals.payload.heart_rate} bpm`
-                            : '—'}
-                        </strong>
-                      </div>
-
-
-                      <div className="nursing-latest-vital">
-                        <span>
-                          BP
-                        </span>
-
-                        <strong>
-                          {latestVitals.payload.systolic_bp != null &&
-                          latestVitals.payload.diastolic_bp != null
-                            ? `${latestVitals.payload.systolic_bp}/${latestVitals.payload.diastolic_bp}`
-                            : '—'}
-                        </strong>
-
-                        {latestVitals.payload.systolic_bp != null &&
-                        latestVitals.payload.diastolic_bp != null && (
-                          <small>
-                            mmHg
-                          </small>
-                        )}
-                      </div>
-
-
-                      <div className="nursing-latest-vital">
-                        <span>
-                          RR
-                        </span>
-
-                        <strong>
-                          {latestVitals.payload.respiratory_rate != null
-                            ? `${latestVitals.payload.respiratory_rate} /min`
-                            : '—'}
-                        </strong>
-                      </div>
-
-
-                      <div className="nursing-latest-vital">
-                        <span>
-                          SpO₂
-                        </span>
-
-                        <strong>
-                          {latestVitals.payload.spo2 != null
-                            ? `${latestVitals.payload.spo2}%`
-                            : '—'}
-                        </strong>
-                      </div>
-
-
-                      <div className="nursing-latest-vital">
-                        <span>
-                          Temp
-                        </span>
-
-                        <strong>
-                          {latestVitals.payload.temperature != null
-                            ? `${latestVitals.payload.temperature} °C`
-                            : '—'}
-                        </strong>
-                      </div>
-
-
-                      <div className="nursing-latest-vital">
-                        <span>
-                          Weight
-                        </span>
-
-                        <strong>
-                          {latestVitals.payload.weight != null
-                            ? `${latestVitals.payload.weight} kg`
-                            : '—'}
-                        </strong>
-                      </div>
-
-                    </div>
-                  )}
-
-
-                {latestVitals && (
-                  <div className="nursing-vital-recorded">
-                    Recorded{' '}
-                    {new Date(
-                      latestVitals.occurred_at,
-                    ).toLocaleString()}
-                  </div>
-                )}
-
-
-                {recordedVitals.length > 1 && (
-                  <details className="nursing-collapsible nursing-vitals-history">
-
-                    <summary>
-
-                      <div>
-
-                        <span className="nursing-collapsible-label">
-                          PREVIOUS OBSERVATIONS
-                        </span>
-
-                        <span className="nursing-collapsible-summary">
-                          {recordedVitals.length - 1}
-                          {' '}
-                          {recordedVitals.length - 1 === 1
-                            ? 'previous observation'
-                            : 'previous observations'}
-                        </span>
-
-                      </div>
-
-                      <span className="nursing-collapsible-chevron">
-                        ▾
-                      </span>
-
-                    </summary>
-
-
-                    <div className="nursing-compact-content">
-
-                      {recordedVitals
-                        .slice(0, -1)
-                        .reverse()
-                        .map(
-                          observation => (
-                            <div
-                              key={
-                                observation.id
-                              }
-                              className="nursing-vitals-history-row"
-                            >
-
-                              <div>
-                                <strong>
-                                  {new Date(
-                                    observation.occurred_at,
-                                  ).toLocaleString()}
-                                </strong>
-                              </div>
-
-
-                              <div className="nursing-vitals-history-values">
-
-                                <span>
-                                  HR{' '}
-                                  {observation.payload.heart_rate != null
-                                    ? `${observation.payload.heart_rate}`
-                                    : '—'}
-                                </span>
-
-                                <span>
-                                  BP{' '}
-                                  {observation.payload.systolic_bp != null &&
-                                  observation.payload.diastolic_bp != null
-                                    ? `${observation.payload.systolic_bp}/${observation.payload.diastolic_bp}`
-                                    : '—'}
-                                </span>
-
-                                <span>
-                                  RR{' '}
-                                  {observation.payload.respiratory_rate != null
-                                    ? `${observation.payload.respiratory_rate}`
-                                    : '—'}
-                                </span>
-
-                                <span>
-                                  SpO₂{' '}
-                                  {observation.payload.spo2 != null
-                                    ? `${observation.payload.spo2}%`
-                                    : '—'}
-                                </span>
-
-                                <span>
-                                  Temp{' '}
-                                  {observation.payload.temperature != null
-                                    ? `${observation.payload.temperature} °C`
-                                    : '—'}
-                                </span>
-
-                                <span>
-                                  Weight{' '}
-                                  {observation.payload.weight != null
-                                    ? `${observation.payload.weight} kg`
-                                    : '—'}
-                                </span>
-
-                              </div>
-
-                            </div>
-                          ),
-                        )}
-
-                    </div>
-
-                  </details>
-                )}
-
-              </section>
-
-
-
-            {/* ============================================================ */}
-            {/* Record Inpatient Vitals                                      */}
-            {/* ============================================================ */}
-
-            <NursingVitalsForm
-              vitals={vitals}
-              disabled={false}
-              saving={savingVitals}
-              onChange={updateVitals}
-              onSave={() =>
-                void handleSaveVitals()
-              }
-            />
-
-          </>
+              ).then(success => {
+                if (
+                  success &&
+                  selectedEpisode
+                ) {
+                  void loadMedicationDoses(
+                    selectedEpisode.id,
+                  )
+                }
+              })
+            }}
+            onSaveVitals={handleSaveVitals}
+          />
 
         ) : (
 
@@ -1394,7 +1116,7 @@ export default function NursingWorkspace({
   // ==========================================================================
 
   return (
-    <section className="workspace-content">
+    <section className="workspace-content nursing-workspace">
 
       <div className="welcome-panel">
 

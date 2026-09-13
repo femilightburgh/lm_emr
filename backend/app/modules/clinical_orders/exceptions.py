@@ -55,6 +55,30 @@ class ClinicalOrderCannotReceiveError(Exception):
     """Raised when a Clinical Order cannot be received."""
 
 
+class ClinicalOrderItemNotFoundError(Exception):
+    """Raised when a Clinical Order Item cannot be found."""
+
+
+class ClinicalOrderItemAlreadyReceivedError(Exception):
+    """Raised when an already-received item is received again."""
+
+
+class ClinicalOrderItemCannotReceiveError(Exception):
+    """Raised when a Clinical Order Item cannot be received."""
+
+
+class ClinicalOrderItemAlreadyInProgressError(Exception):
+    """Raised when an already-in-progress item is started again."""
+
+
+class ClinicalOrderItemAlreadyCompletedError(Exception):
+    """Raised when a completed item is started again."""
+
+
+class ClinicalOrderItemCannotStartError(Exception):
+    """Raised when a Clinical Order Item cannot be started."""
+
+
 class MedicationAdministrationStaffNotFoundError(Exception):
     """Raised when the authenticated user has no Staff profile."""
 

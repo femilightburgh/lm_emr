@@ -58,6 +58,7 @@ interface Props {
   selectedEncounter: Encounter
   selectedEpisode: Episode | null
   accessToken: string
+  onBackToQueue: () => void
   patient: Patient | null
   loadingPatientContext: boolean
 
@@ -217,11 +218,9 @@ interface Props {
   orderType: ClinicalOrderType
   orderPriority: string
   laboratoryTests: LaboratoryTest[]
-  selectedLaboratoryTestId: string
+  selectedLaboratoryTestIds: string[]
   diagnosticInvestigations: DiagnosticInvestigation[]
   selectedDiagnosticInvestigationId: string
-  orderTestCode: string
-  orderTestName: string
   orderMedicationId: string
   orderDose: string
   prescriptionMedicine: string
@@ -242,8 +241,6 @@ interface Props {
   setOrderPriority: StringChangeHandler
   handleLaboratoryTestChange: StringChangeHandler
   handleDiagnosticInvestigationChange: StringChangeHandler
-  setOrderTestCode: StringChangeHandler
-  setOrderTestName: StringChangeHandler
   setOrderMedicationId: StringChangeHandler
   setOrderDose: StringChangeHandler
   setPrescriptionMedicine: StringChangeHandler
@@ -307,6 +304,7 @@ export default function DoctorEncounterWorkspace({
   selectedEncounter,
   accessToken,
   selectedEpisode,
+  onBackToQueue,
   patient,
   loadingPatientContext,
   previousEpisodes,
@@ -441,11 +439,9 @@ export default function DoctorEncounterWorkspace({
   orderType,
   orderPriority,
   laboratoryTests,
-  selectedLaboratoryTestId,
+  selectedLaboratoryTestIds,
   diagnosticInvestigations,
   selectedDiagnosticInvestigationId,
-  orderTestCode,
-  orderTestName,
   orderMedicationId,
   orderDose,
   prescriptionMedicine,
@@ -464,8 +460,6 @@ export default function DoctorEncounterWorkspace({
   setOrderPriority,
   handleLaboratoryTestChange,
   handleDiagnosticInvestigationChange,
-  setOrderTestCode,
-  setOrderTestName,
   setOrderMedicationId,
   setOrderDose,
   setPrescriptionMedicine,
@@ -488,8 +482,35 @@ export default function DoctorEncounterWorkspace({
   diagnosticReports,
   diagnosticAttachments,
 }: Props) {
+  const isDoctorReview =
+    selectedEncounter.title === 'Doctor Review'
+
   const isWardReview =
     selectedEncounter.title === 'Ward Review'
+
+  const encounterMode = isWardReview
+    ? {
+        eyebrow: 'WARD REVIEW',
+        title: 'Daily inpatient review',
+        description:
+          'Assess the patient’s current condition and ongoing care.',
+        className: 'doctor-encounter-mode--ward',
+      }
+    : isDoctorReview
+      ? {
+          eyebrow: 'DOCTOR REVIEW',
+          title: 'Post-investigation review',
+          description:
+            'Review investigation results, reassess the patient, and finalize the clinical plan.',
+          className: 'doctor-encounter-mode--review',
+        }
+      : {
+          eyebrow: 'DOCTOR CONSULTATION',
+          title: 'Outpatient consultation',
+          description:
+            'Assess the presenting problem, establish the diagnosis, and plan care.',
+          className: 'doctor-encounter-mode--clinic',
+        }
 
   const [wardReviewDisposition, setWardReviewDisposition] =
     useState<WardReviewDisposition>(
@@ -498,6 +519,11 @@ export default function DoctorEncounterWorkspace({
 
   const [wardReviewDetails, setWardReviewDetails] =
     useState('')
+
+  type DoctorTab = 'OVERVIEW' | 'DOCUMENTATION' | 'ASSESSMENT' | 'ORDERS' | 'RESULTS' | 'HISTORY'
+
+  const [activeTab, setActiveTab] =
+    useState<DoctorTab>('OVERVIEW')
 
   const wardReviewDetailsRequired =
     wardReviewDisposition === 'TRANSFER' ||
@@ -864,20 +890,14 @@ export default function DoctorEncounterWorkspace({
   laboratoryTests={
     laboratoryTests
   }
-  selectedLaboratoryTestId={
-    selectedLaboratoryTestId
+  selectedLaboratoryTestIds={
+    selectedLaboratoryTestIds
   }
   diagnosticInvestigations={
     diagnosticInvestigations
   }
   selectedDiagnosticInvestigationId={
     selectedDiagnosticInvestigationId
-  }
-  orderTestCode={
-    orderTestCode
-  }
-  orderTestName={
-    orderTestName
   }
   orderMedicationId={
     orderMedicationId
@@ -928,12 +948,6 @@ export default function DoctorEncounterWorkspace({
   }
   onDiagnosticInvestigationChange={
     handleDiagnosticInvestigationChange
-  }
-  onOrderTestCodeChange={
-    setOrderTestCode
-  }
-  onOrderTestNameChange={
-    setOrderTestName
   }
   onOrderMedicationIdChange={
     setOrderMedicationId
@@ -1058,30 +1072,31 @@ export default function DoctorEncounterWorkspace({
 
   return (
     <>
+<section className="doctor-encounter-navigation">
+  <button
+    type="button"
+    className="secondary-button doctor-back-to-queue"
+    onClick={onBackToQueue}
+  >
+    <span aria-hidden="true">←</span>
+    Back to Doctor Queue
+  </button>
+</section>
+
 <section
-  className={`doctor-encounter-mode ${
-    isWardReview
-      ? 'doctor-encounter-mode--ward'
-      : 'doctor-encounter-mode--clinic'
-  }`}
+  className={`doctor-encounter-mode ${encounterMode.className}`}
 >
   <div>
     <p className="eyebrow">
-      {isWardReview
-        ? 'WARD REVIEW'
-        : 'DOCTOR CONSULTATION'}
+      {encounterMode.eyebrow}
     </p>
 
     <h1>
-      {isWardReview
-        ? 'Daily inpatient review'
-        : 'Outpatient consultation'}
+      {encounterMode.title}
     </h1>
 
     <p>
-      {isWardReview
-        ? 'Assess the patient’s current condition and ongoing care.'
-        : 'Assess the presenting problem, establish the diagnosis, and plan care.'}
+      {encounterMode.description}
     </p>
   </div>
 
@@ -1169,370 +1184,171 @@ export default function DoctorEncounterWorkspace({
   )}
 </section>
 
-<PatientHistoryPanel
-  currentEpisode={
-    selectedEpisode
-  }
-
-  previousEpisodes={
-    previousEpisodes
-  }
-
-  selectedEpisode={
-    historicalEpisode
-  }
-
-  currentEpisodeEncounters={
-    currentEpisodeEncounters
-  }
-
-  historicalEncounters={
-    historicalEncounters
-  }
-
-  selectedHistoricalEncounter={
-    selectedHistoricalEncounter
-  }
-
-  loadingCurrentEncounters={
-    loadingPatientContext
-  }
-
-  loadingPreviousEpisodes={
-    loadingPreviousEpisodes
-  }
-
-  loadingHistorical={
-    loadingHistorical
-  }
-
-  onSelectCurrentEncounter={
-    encounter => {
-      if (
-        encounter.id ===
-        selectedEncounter?.id
-      ) {
-        return
-      }
-
-      if (!selectedEpisode) {
-        return
-      }
-
-      void openHistoricalEncounter(
-        selectedEpisode,
-        encounter,
-      )
-    }
-  }
-
-  onSelectPreviousEpisode={
-    episode =>
-      void openHistoricalEpisode(
-        episode,
-      )
-  }
-
-  onSelectHistoricalEncounter={
-    encounter => {
-      if (!historicalEpisode) {
-        return
-      }
-
-      void openHistoricalEncounter(
-        historicalEpisode,
-        encounter,
-      )
-    }
-  }
-/>
-
-<HistoricalEncounterPanel
-  episode={historicalEpisode}
-  encounter={
-    selectedHistoricalEncounter
-  }
-  documents={historicalDocuments}
-  diagnoses={historicalDiagnoses}
-  orders={historicalOrders}
-  vitals={historicalVitals}
-  timeline={historicalTimeline}
-  loading={loadingHistorical}
-  onCloseHistory={
-    closeHistoricalViewer
-  }
-/>
-
-<div className="doctor-vitals-section">
-  <VitalsPanel
-  vitals={vitals}
-  nursingVitals={nursingVitals}
-  saving={savingVitals}
-  encounterClosed={
-    selectedEncounter.status === 'CLOSED'
-  }
-  temperature={temperature}
-  heartRate={heartRate}
-  respiratoryRate={respiratoryRate}
-  systolicBp={systolicBp}
-  diastolicBp={diastolicBp}
-  spo2={spo2}
-  weight={weight}
-  onTemperatureChange={
-    setTemperature
-  }
-  onHeartRateChange={
-    setHeartRate
-  }
-  onRespiratoryRateChange={
-    setRespiratoryRate
-  }
-  onSystolicBpChange={
-    setSystolicBp
-  }
-  onDiastolicBpChange={
-    setDiastolicBp
-  }
-  onSpo2Change={
-    setSpo2
-  }
-  onWeightChange={
-    setWeight
-  }
-  onSave={() =>
-    void saveVitals()
-  }
-/>
-
+<div className="doctor-workspace-tabs" role="tablist" aria-label="Patient chart sections">
+  {([
+    ['OVERVIEW', 'Overview'],
+    ['DOCUMENTATION', 'Notes'],
+    ['ASSESSMENT', 'Assessment'],
+    ['ORDERS', 'Orders'],
+    ['RESULTS', 'Results'],
+    ['HISTORY', 'History'],
+  ] as const).map(([key, label]) => (
+    <button
+      key={key}
+      type="button"
+      role="tab"
+      aria-selected={activeTab === key}
+      className={activeTab === key ? 'doctor-workspace-tab active' : 'doctor-workspace-tab'}
+      onClick={() => setActiveTab(key)}
+    >
+      {label}
+    </button>
+  ))}
 </div>
 
-{isWardReview ? (
-  <>
-    {renderDiagnosis()}
-
-    <NursingHandoffPanel
-      encounter={nursingEncounter}
-      document={nursingDocument}
-      loading={loadingNursingHandoff}
-    />
-
-    {selectedEpisode && (
-      <DoctorMedicationTreatmentReview
-        accessToken={accessToken}
-        episodeId={selectedEpisode.id}
-      />
-    )}
-
-    {renderInvestigationResults()}
-
-    {renderTimeline()}
-
-    {renderDocumentation()}
-
-    {renderOrders()}
-  </>
-) : (
-  <>
-    {renderDocumentation()}
-
-    {renderDiagnosis()}
-
-    {renderOrders()}
-
-    {renderInvestigationResults()}
-  </>
-)}
-
-{selectedEncounter.title ===
-  'Ward Review' &&
-  selectedEncounter.status ===
-    'OPEN' && (
-    <section className="workspace-panel">
-      <div className="panel-header">
-        <div>
-          <h2>
-            Complete Ward Review
-          </h2>
-          <p>
-            Record the patient's disposition after
-            documentation, review, and clinical actions
-            are finished.
-          </p>
-        </div>
+<div className="doctor-tab-content">
+  {activeTab === 'OVERVIEW' && (
+    <div className="doctor-overview-grid">
+      <div className="doctor-vitals-section">
+        <VitalsPanel
+          vitals={vitals}
+          nursingVitals={nursingVitals}
+          saving={savingVitals}
+          encounterClosed={selectedEncounter.status === 'CLOSED'}
+          temperature={temperature}
+          heartRate={heartRate}
+          respiratoryRate={respiratoryRate}
+          systolicBp={systolicBp}
+          diastolicBp={diastolicBp}
+          spo2={spo2}
+          weight={weight}
+          onTemperatureChange={setTemperature}
+          onHeartRateChange={setHeartRate}
+          onRespiratoryRateChange={setRespiratoryRate}
+          onSystolicBpChange={setSystolicBp}
+          onDiastolicBpChange={setDiastolicBp}
+          onSpo2Change={setSpo2}
+          onWeightChange={setWeight}
+          onSave={() => void saveVitals()}
+        />
       </div>
 
-      <div className="doctor-note-field">
-        <label>
-          <span>Disposition</span>
+      {renderDiagnosis()}
 
-          <select
-            value={wardReviewDisposition}
-            disabled={closingEncounter}
-            onChange={event => {
-              const disposition =
-                event.target.value as WardReviewDisposition
-
-              setWardReviewDisposition(
-                disposition,
-              )
-
-              if (
-                disposition !== 'TRANSFER' &&
-                disposition !== 'REFERRAL' &&
-                disposition !== 'OTHER'
-              ) {
-                setWardReviewDetails('')
-              }
-            }}
-          >
-            <option value="CONTINUE_ADMISSION">
-              Continue admission
-            </option>
-
-            <option value="DISCHARGE">
-              Discharge
-            </option>
-
-            <option value="TRANSFER">
-              Transfer
-            </option>
-
-            <option value="REFERRAL">
-              Referral
-            </option>
-
-            <option value="OTHER">
-              Other
-            </option>
-          </select>
-        </label>
-      </div>
-
-      {wardReviewDetailsRequired && (
-        <div className="doctor-note-field">
-          <label>
-            <span>Details</span>
-
-            <textarea
-              rows={5}
-              value={wardReviewDetails}
-              disabled={closingEncounter}
-              onChange={event =>
-                setWardReviewDetails(
-                  event.target.value,
-                )
-              }
-              placeholder={
-                wardReviewDisposition === 'TRANSFER'
-                  ? 'Receiving facility, service, or transfer details.'
-                  : wardReviewDisposition === 'REFERRAL'
-                    ? 'Referral destination, specialty, or referral details.'
-                    : 'Provide details for this disposition.'
-              }
-            />
-          </label>
-        </div>
+      {isWardReview && (
+        <NursingHandoffPanel
+          encounter={nursingEncounter}
+          document={nursingDocument}
+          loading={loadingNursingHandoff}
+        />
       )}
 
-      <button
-        type="button"
-        disabled={
-          closingEncounter ||
-          !wardReviewReady
-        }
-        onClick={() =>
-          void completeWardReview(
-            wardReviewDisposition,
-            wardReviewDetailsRequired
-              ? wardReviewDetails.trim()
-              : null,
-          )
-        }
-      >
-        {closingEncounter
-          ? 'Completing...'
-          : 'Complete Ward Review'}
-      </button>
-    </section>
+      {isWardReview && selectedEpisode && (
+        <DoctorMedicationTreatmentReview
+          accessToken={accessToken}
+          episodeId={selectedEpisode.id}
+        />
+      )}
+
+      {renderTimeline()}
+    </div>
   )}
 
-{selectedEncounter.title ===
-  'Doctor Consultation' &&
-  selectedEncounter.status ===
-    'OPEN' &&
-  selectedEpisode?.status ===
-    'OPEN' &&
-  progressNote?.document_type ===
-    'INITIAL_CLERKING' &&
-  progressNote.status ===
-    'SIGNED' && (
-    <section className="workspace-panel">
-      <div className="panel-header">
-        <div>
-          <h2>
-            Consultation Completion
-          </h2>
+  {activeTab === 'DOCUMENTATION' && renderDocumentation()}
+  {activeTab === 'ASSESSMENT' && renderDiagnosis()}
+  {activeTab === 'ORDERS' && renderOrders()}
+  {activeTab === 'RESULTS' && renderInvestigationResults()}
 
-          <p>
-            Complete this consultation while keeping the episode open for investigation and review.
-          </p>
-        </div>
+  {activeTab === 'HISTORY' && (
+    <>
+      <PatientHistoryPanel
+        currentEpisode={selectedEpisode}
+        previousEpisodes={previousEpisodes}
+        selectedEpisode={historicalEpisode}
+        currentEpisodeEncounters={currentEpisodeEncounters}
+        historicalEncounters={historicalEncounters}
+        selectedHistoricalEncounter={selectedHistoricalEncounter}
+        loadingCurrentEncounters={loadingPatientContext}
+        loadingPreviousEpisodes={loadingPreviousEpisodes}
+        loadingHistorical={loadingHistorical}
+        onSelectCurrentEncounter={encounter => {
+          if (encounter.id === selectedEncounter?.id || !selectedEpisode) return
+          void openHistoricalEncounter(selectedEpisode, encounter)
+        }}
+        onSelectPreviousEpisode={episode => void openHistoricalEpisode(episode)}
+        onSelectHistoricalEncounter={encounter => {
+          if (!historicalEpisode) return
+          void openHistoricalEncounter(historicalEpisode, encounter)
+        }}
+      />
+
+      <HistoricalEncounterPanel
+        episode={historicalEpisode}
+        encounter={selectedHistoricalEncounter}
+        documents={historicalDocuments}
+        diagnoses={historicalDiagnoses}
+        orders={historicalOrders}
+        vitals={historicalVitals}
+        timeline={historicalTimeline}
+        loading={loadingHistorical}
+        onCloseHistory={closeHistoricalViewer}
+      />
+    </>
+  )}
+</div>
+
+{isWardReview && selectedEncounter.status === 'OPEN' && (
+  <section className="workspace-panel doctor-completion-panel">
+    <div className="panel-header">
+      <div>
+        <p className="eyebrow">DISPOSITION</p>
+        <h2>Complete Ward Review</h2>
+        <p>Finalize today's inpatient review after documentation and clinical actions are complete.</p>
       </div>
-
-      <button
-        type="button"
-        disabled={
-          completingConsultation ||
-          progressNote?.document_type !==
-            'INITIAL_CLERKING' ||
-          progressNote.status !==
-            'SIGNED'
-        }
-        onClick={() =>
-          void handleCompleteConsultation()
-        }
-      >
-        {completingConsultation
-          ? 'Completing...'
-          : 'Complete Consultation'}
+    </div>
+    <div className="doctor-completion-controls">
+      <label>
+        <span>Disposition</span>
+        <select value={wardReviewDisposition} disabled={closingEncounter} onChange={event => {
+          const disposition = event.target.value as WardReviewDisposition
+          setWardReviewDisposition(disposition)
+          if (!['TRANSFER', 'REFERRAL', 'OTHER'].includes(disposition)) setWardReviewDetails('')
+        }}>
+          <option value="CONTINUE_ADMISSION">Continue admission</option>
+          <option value="DISCHARGE">Discharge</option>
+          <option value="TRANSFER">Transfer</option>
+          <option value="REFERRAL">Referral</option>
+          <option value="OTHER">Other</option>
+        </select>
+      </label>
+      {wardReviewDetailsRequired && (
+        <label className="doctor-completion-details">
+          <span>Details</span>
+          <textarea rows={3} value={wardReviewDetails} disabled={closingEncounter} onChange={event => setWardReviewDetails(event.target.value)} />
+        </label>
+      )}
+      <button type="button" disabled={closingEncounter || !wardReviewReady} onClick={() => void completeWardReview(wardReviewDisposition, wardReviewDetailsRequired ? wardReviewDetails.trim() : null)}>
+        {closingEncounter ? 'Completing...' : 'Complete Ward Review'}
       </button>
-    </section>
-  )}
+    </div>
+  </section>
+)}
 
-{selectedEncounter.title ===
-  'Doctor Review' &&
-  selectedEncounter.status ===
-    'OPEN' &&
-  selectedEpisode?.status ===
-    'OPEN' && (
-    <section className="workspace-panel">
-      <div className="panel-header">
-        <div>
-          <h2>
-            Doctor Review Completion
-          </h2>
+{selectedEncounter.title === 'Doctor Consultation' && selectedEncounter.status === 'OPEN' && selectedEpisode?.status === 'OPEN' && progressNote?.document_type === 'INITIAL_CLERKING' && progressNote.status === 'SIGNED' && (
+  <section className="workspace-panel doctor-completion-panel">
+    <div className="panel-header"><div><p className="eyebrow">DISPOSITION</p><h2>Consultation ready to complete</h2><p>The initial clerking is signed. Complete the consultation while keeping the episode open for investigations and review.</p></div></div>
+    <button type="button" disabled={completingConsultation} onClick={() => void handleCompleteConsultation()}>{completingConsultation ? 'Completing...' : 'Complete Consultation'}</button>
+  </section>
+)}
 
-          <p>
-            Complete this review after documenting the assessment, results, and clinical plan.
-          </p>
-        </div>
-      </div>
+{selectedEncounter.title === 'Doctor Review' && selectedEncounter.status === 'OPEN' && selectedEpisode?.status === 'OPEN' && (
+  <section className="workspace-panel doctor-completion-panel">
+    <div className="panel-header"><div><p className="eyebrow">DISPOSITION</p><h2>Doctor review ready to complete</h2><p>Complete the review after documenting the assessment, results, and clinical plan.</p></div></div>
+    <button type="button" disabled={completingDoctorReview} onClick={() => void handleCompleteDoctorReview()}>{completingDoctorReview ? 'Completing...' : 'Complete Doctor Review'}</button>
+  </section>
+)}
 
-      <button
-        type="button"
-        disabled={
-          completingDoctorReview
-        }
-        onClick={() =>
-          void handleCompleteDoctorReview()
-        }
-      >
-        {completingDoctorReview
-          ? 'Completing...'
-          : 'Complete Doctor Review'}
-      </button>
-    </section>
-  )}
+
 
     </>
   )

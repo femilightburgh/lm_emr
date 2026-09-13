@@ -14,11 +14,15 @@ import {
 import {
   listLaboratoryQueue,
   listLaboratoryTests,
-  receiveLaboratoryOrder,
-  startLaboratoryOrder,
+  receiveLaboratoryOrderItem,
+  startLaboratoryOrderItem,
   type LaboratoryQueueItem,
   type LaboratoryTest,
 } from '../../api/laboratory'
+
+import type {
+  ClinicalOrderItem,
+} from '../../api/clinicalOrders'
 
 interface Props {
   accessToken: string
@@ -31,24 +35,35 @@ interface ResultValue {
 }
 
 
-function getLaboratoryTestForOrder(
-  order: LaboratoryQueueItem | null,
+function getLaboratoryTestForItem(
+  item: ClinicalOrderItem | null,
   laboratoryTests: LaboratoryTest[],
 ): LaboratoryTest | null {
-  if (!order) {
+  if (!item || item.item_type !== 'LABORATORY') {
     return null
   }
 
+  if (item.laboratory_test_id) {
+    const testById =
+      laboratoryTests.find(
+        test =>
+          test.id === item.laboratory_test_id,
+      )
+
+    if (testById) {
+      return testById
+    }
+  }
+
   const code =
-    typeof order.details.test_code === 'string'
-      ? order.details.test_code.trim().toUpperCase()
+    typeof item.details.test_code === 'string'
+      ? item.details.test_code.trim().toUpperCase()
       : ''
 
   const name =
-    typeof order.details.test_name === 'string'
-      ? order.details.test_name.trim().toUpperCase()
+    typeof item.details.test_name === 'string'
+      ? item.details.test_name.trim().toUpperCase()
       : ''
-
 
   return (
     laboratoryTests.find(
@@ -61,15 +76,17 @@ function getLaboratoryTestForOrder(
 
 
 function getLaboratoryStatusLabel(
-  status: LaboratoryQueueItem['status'],
+  status: ClinicalOrderItem['status'],
 ): string {
   const labels: Record<
-    LaboratoryQueueItem['status'],
+    ClinicalOrderItem['status'],
     string
   > = {
     REQUESTED: 'Awaiting receipt',
     RECEIVED: 'Received',
     IN_PROGRESS: 'Processing',
+    COMPLETED: 'Completed',
+    CANCELLED: 'Cancelled',
   }
 
   return labels[status]
@@ -165,6 +182,9 @@ export default function LaboratoryWorkspace({
   const [selectedOrder, setSelectedOrder] =
     useState<LaboratoryQueueItem | null>(null)
 
+  const [selectedOrderItem, setSelectedOrderItem] =
+    useState<ClinicalOrderItem | null>(null)
+
   const [loading, setLoading] =
     useState(true)
 
@@ -197,6 +217,12 @@ export default function LaboratoryWorkspace({
 
   const [reviewingResult, setReviewingResult] =
     useState(false)
+
+  const [queueFilter, setQueueFilter] =
+    useState<'ALL' | ClinicalOrderItem['status']>('ALL')
+
+  const [queueSearch, setQueueSearch] =
+    useState('')
 
   const draftLoadToken =
     useRef(0)
@@ -235,6 +261,28 @@ export default function LaboratoryWorkspace({
               ) ?? null
             : queue[0] ?? null,
       )
+
+      setSelectedOrderItem(
+        currentItem => {
+          if (!currentItem) {
+            return null
+          }
+
+          const refreshedOrder =
+            queue.find(
+              order =>
+                order.id ===
+                selectedOrder?.id,
+            )
+
+          return (
+            refreshedOrder?.items.find(
+              item =>
+                item.id === currentItem.id,
+            ) ?? null
+          )
+        },
+      )
     } catch (err) {
       setError(
         err instanceof Error
@@ -253,13 +301,14 @@ export default function LaboratoryWorkspace({
 
 
   function resetResultForm(
-    order?: LaboratoryQueueItem | null,
+    item?: ClinicalOrderItem | null,
   ) {
     setDraftResultId(null)
     setReviewingResult(false)
+
     const test =
-      getLaboratoryTestForOrder(
-        order ?? null,
+      getLaboratoryTestForItem(
+        item ?? null,
         laboratoryTests,
       )
 
@@ -283,6 +332,7 @@ export default function LaboratoryWorkspace({
 
   async function loadDraftForOrder(
     order: LaboratoryQueueItem,
+    orderItem: ClinicalOrderItem,
   ) {
     const token =
       ++draftLoadToken.current
@@ -308,7 +358,9 @@ export default function LaboratoryWorkspace({
       const draft =
         results.find(
           result =>
-            result.status === 'DRAFT',
+            result.status === 'DRAFT' &&
+            result.order_item_id ===
+              orderItem.id,
         )
 
       if (!draft) {
@@ -316,8 +368,8 @@ export default function LaboratoryWorkspace({
       }
 
       const test =
-        getLaboratoryTestForOrder(
-          order,
+        getLaboratoryTestForItem(
+          orderItem,
           laboratoryTests,
         )
 
@@ -392,21 +444,26 @@ export default function LaboratoryWorkspace({
   }
 
 
-  function selectOrder(
+  function selectOrderItem(
     order: LaboratoryQueueItem,
+    orderItem: ClinicalOrderItem,
   ) {
     draftLoadToken.current += 1
 
     setSelectedOrder(order)
+    setSelectedOrderItem(orderItem)
     setError(null)
     setSuccess(null)
-    resetResultForm(order)
+    resetResultForm(orderItem)
 
     if (
-      order.status ===
+      orderItem.status ===
       'IN_PROGRESS'
     ) {
-      void loadDraftForOrder(order)
+      void loadDraftForOrder(
+        order,
+        orderItem,
+      )
     }
   }
 
@@ -449,18 +506,44 @@ export default function LaboratoryWorkspace({
   }
 
 
+  const filteredOrders = orders.filter(order => {
+    const matchesStatus =
+      queueFilter === 'ALL' ||
+      order.items.some(item => item.item_type === 'LABORATORY' && item.status === queueFilter)
+
+    const search = queueSearch.trim().toLowerCase()
+    const matchesSearch = !search ||
+      order.patient_name.toLowerCase().includes(search) ||
+      order.hospital_number.toLowerCase().includes(search) ||
+      order.items.some(item => {
+        const name = typeof item.details.test_name === 'string' ? item.details.test_name : ''
+        const code = typeof item.details.test_code === 'string' ? item.details.test_code : ''
+        return name.toLowerCase().includes(search) || code.toLowerCase().includes(search)
+      })
+
+    return matchesStatus && matchesSearch
+  })
+
   const groupedOrders =
-    groupLaboratoryOrders(orders)
+    groupLaboratoryOrders(filteredOrders)
+
+  const laboratoryItemCount = orders.flatMap(order => order.items).filter(item => item.item_type === 'LABORATORY')
+  const queueCounts = {
+    all: laboratoryItemCount.length,
+    requested: laboratoryItemCount.filter(item => item.status === 'REQUESTED').length,
+    received: laboratoryItemCount.filter(item => item.status === 'RECEIVED').length,
+    processing: laboratoryItemCount.filter(item => item.status === 'IN_PROGRESS').length,
+  }
 
   const selectedLaboratoryTest =
-    getLaboratoryTestForOrder(
-      selectedOrder,
+    getLaboratoryTestForItem(
+      selectedOrderItem,
       laboratoryTests,
     )
 
 
-  async function receiveSelectedOrder() {
-    if (!selectedOrder) {
+  async function receiveSelectedOrderItem() {
+    if (!selectedOrder || !selectedOrderItem) {
       return
     }
 
@@ -470,9 +553,9 @@ export default function LaboratoryWorkspace({
 
     try {
       const updated =
-        await receiveLaboratoryOrder(
+        await receiveLaboratoryOrderItem(
           accessToken,
-          selectedOrder.id,
+          selectedOrderItem.id,
         )
 
       const updatedQueueItem:
@@ -480,10 +563,23 @@ export default function LaboratoryWorkspace({
           ...selectedOrder,
           status: updated.status as
             LaboratoryQueueItem['status'],
+          items: updated.items,
         }
+
+      const updatedItem =
+        updated.items.find(
+          item =>
+            item.id ===
+            selectedOrderItem.id,
+        )
 
       setSelectedOrder(
         updatedQueueItem,
+      )
+
+      setSelectedOrderItem(
+        updatedItem ??
+          selectedOrderItem,
       )
 
       setOrders(
@@ -497,13 +593,13 @@ export default function LaboratoryWorkspace({
       )
 
       setSuccess(
-        'Laboratory order received.',
+        'Laboratory investigation received.',
       )
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : 'Unable to receive laboratory order.',
+          : 'Unable to receive laboratory investigation.',
       )
     } finally {
       setStartingOrder(false)
@@ -511,8 +607,8 @@ export default function LaboratoryWorkspace({
   }
 
 
-  async function startSelectedOrder() {
-    if (!selectedOrder) {
+  async function startSelectedOrderItem() {
+    if (!selectedOrder || !selectedOrderItem) {
       return
     }
 
@@ -522,22 +618,35 @@ export default function LaboratoryWorkspace({
 
     try {
       const updated =
-        await startLaboratoryOrder(
+        await startLaboratoryOrderItem(
           accessToken,
-          selectedOrder.id,
+          selectedOrderItem.id,
         )
 
-      const updatedQueueItem: LaboratoryQueueItem =
-        {
+      const updatedQueueItem:
+        LaboratoryQueueItem = {
           ...selectedOrder,
           status: updated.status as
             LaboratoryQueueItem['status'],
           started_at:
             updated.started_at,
+          items: updated.items,
         }
+
+      const updatedItem =
+        updated.items.find(
+          item =>
+            item.id ===
+            selectedOrderItem.id,
+        )
 
       setSelectedOrder(
         updatedQueueItem,
+      )
+
+      setSelectedOrderItem(
+        updatedItem ??
+          selectedOrderItem,
       )
 
       setOrders(
@@ -551,13 +660,13 @@ export default function LaboratoryWorkspace({
       )
 
       setSuccess(
-        'Laboratory order started.',
+        'Laboratory investigation started.',
       )
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : 'Unable to start laboratory order.',
+          : 'Unable to start laboratory investigation.',
       )
     } finally {
       setStartingOrder(false)
@@ -566,12 +675,15 @@ export default function LaboratoryWorkspace({
 
 
   async function saveResultDraft() {
-    if (!selectedOrder) {
+    if (!selectedOrder || !selectedOrderItem) {
+      setError(
+        'Select a laboratory investigation before saving a result.',
+      )
       return
     }
 
     if (
-      selectedOrder.status !==
+      selectedOrderItem.status !==
       'IN_PROGRESS'
     ) {
       setError(
@@ -581,8 +693,8 @@ export default function LaboratoryWorkspace({
     }
 
     const test =
-      getLaboratoryTestForOrder(
-        selectedOrder,
+      getLaboratoryTestForItem(
+        selectedOrderItem,
         laboratoryTests,
       )
 
@@ -683,6 +795,9 @@ export default function LaboratoryWorkspace({
         order_id:
           selectedOrder.id,
 
+        order_item_id:
+          selectedOrderItem.id,
+
         result_type:
           'LABORATORY' as const,
 
@@ -779,9 +894,9 @@ export default function LaboratoryWorkspace({
 
 
   return (
-    <section className="workspace-content">
+    <section className="workspace-content laboratory-workspace">
       <div className="doctor-workspace">
-        <div className="workspace-header">
+        <div className="page-header">
           <div>
             <p className="eyebrow">
               CLINICAL WORKSPACE
@@ -817,25 +932,32 @@ export default function LaboratoryWorkspace({
         )}
 
 
-        <div className="doctor-workspace-grid">
-          <section className="workspace-panel">
-            <div className="panel-header">
+        <section className="laboratory-metrics" aria-label="Laboratory queue summary">
+          <button type="button" className={queueFilter === 'ALL' ? 'laboratory-metric active' : 'laboratory-metric'} onClick={() => setQueueFilter('ALL')}>
+            <strong>{queueCounts.all}</strong><span>Total tests</span>
+          </button>
+          <button type="button" className={queueFilter === 'REQUESTED' ? 'laboratory-metric active' : 'laboratory-metric'} onClick={() => setQueueFilter('REQUESTED')}>
+            <strong>{queueCounts.requested}</strong><span>Awaiting specimen</span>
+          </button>
+          <button type="button" className={queueFilter === 'RECEIVED' ? 'laboratory-metric active' : 'laboratory-metric'} onClick={() => setQueueFilter('RECEIVED')}>
+            <strong>{queueCounts.received}</strong><span>Ready to process</span>
+          </button>
+          <button type="button" className={queueFilter === 'IN_PROGRESS' ? 'laboratory-metric active' : 'laboratory-metric'} onClick={() => setQueueFilter('IN_PROGRESS')}>
+            <strong>{queueCounts.processing}</strong><span>Processing</span>
+          </button>
+        </section>
+
+        <div className="laboratory-workspace-grid">
+          <section className="workspace-panel laboratory-queue-panel">
+            <div className="laboratory-queue-toolbar">
               <div>
-                <h2>
-                  Laboratory Queue
-                </h2>
-
-                <p>
-                  Orders waiting for laboratory processing.
-                </p>
+                <p className="eyebrow">WORK QUEUE</p>
+                <h2>Laboratory Queue</h2>
               </div>
-
-              <span>
-                {groupedOrders.length}{' '}
-                {groupedOrders.length === 1
-                  ? 'patient'
-                  : 'patients'}
-              </span>
+              <span>{groupedOrders.length} {groupedOrders.length === 1 ? 'patient' : 'patients'}</span>
+            </div>
+            <div className="laboratory-queue-search">
+              <input value={queueSearch} onChange={event => setQueueSearch(event.target.value)} placeholder="Search patient, MRN or test" aria-label="Search laboratory queue" />
             </div>
 
             {loading && (
@@ -881,32 +1003,77 @@ export default function LaboratoryWorkspace({
 
                   <div>
                     {group.orders.map(order => (
-                      <button
+                      <section
                         key={order.id}
-                        type="button"
-                        className={
-                          selectedOrder?.id === order.id
-                            ? 'laboratory-order-item active'
-                            : 'laboratory-order-item'
-                        }
-                        onClick={() =>
-                          selectOrder(order)
-                        }
+                        className="laboratory-order-group"
                       >
-                        <span>
-                          {getInvestigationName(
-                            order,
-                          )}
-                        </span>
+                        <div className="laboratory-order-group-header">
+                          <strong>
+                            Laboratory Order
+                          </strong>
 
-                        <small>
-                          {getLaboratoryStatusLabel(
-                            order.status,
-                          )}
-                          {' · '}
-                          {order.priority}
-                        </small>
-                      </button>
+                          <span>
+                            {order.priority}
+                          </span>
+                        </div>
+
+                        <div>
+                          {order.items
+                            .filter(
+                              item =>
+                                item.item_type ===
+                                'LABORATORY',
+                            )
+                            .map(item => {
+                              const test =
+                                getLaboratoryTestForItem(
+                                  item,
+                                  laboratoryTests,
+                                )
+
+                              const label =
+                                test?.name ??
+                                (
+                                  typeof item.details.test_name ===
+                                  'string'
+                                    ? item.details.test_name
+                                    : typeof item.details.test_code ===
+                                      'string'
+                                      ? item.details.test_code
+                                      : 'Laboratory Investigation'
+                                )
+
+                              return (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  className={
+                                    selectedOrder?.id === order.id &&
+                                    selectedOrderItem?.id === item.id
+                                      ? 'laboratory-order-item active'
+                                      : 'laboratory-order-item'
+                                  }
+                                  onClick={() =>
+                                    selectOrderItem(
+                                      order,
+                                      item,
+                                    )
+                                  }
+                                >
+                                  <span>
+                                    {label}
+                                  </span>
+
+                                  <small>
+                                    {getLaboratoryStatusLabel(
+                                      item.status as LaboratoryQueueItem['status'],
+                                    )}
+                                  </small>
+                                </button>
+                              )
+                            })}
+                        </div>
+                      </section>
                     ))}
                   </div>
                 </section>
@@ -914,7 +1081,7 @@ export default function LaboratoryWorkspace({
           </section>
 
 
-          <section className="workspace-panel">
+          <section className="workspace-panel laboratory-detail-panel">
             {!selectedOrder ? (
               <p>
                 Select a laboratory order to begin.
@@ -939,9 +1106,11 @@ export default function LaboratoryWorkspace({
                   </div>
 
                   <span className="laboratory-status-badge">
-                    {getLaboratoryStatusLabel(
-                      selectedOrder.status,
-                    )}
+                    {selectedOrderItem
+                      ? getLaboratoryStatusLabel(
+                          selectedOrderItem.status as LaboratoryQueueItem['status'],
+                        )
+                      : 'No investigation selected'}
                   </span>
 
                   <div className="laboratory-investigation-meta">
@@ -968,7 +1137,7 @@ export default function LaboratoryWorkspace({
                 </div>
 
 
-                {selectedOrder.status ===
+                {selectedOrderItem?.status ===
                   'REQUESTED' && (
                   <section className="laboratory-workflow-card">
                     <div className="laboratory-workflow-indicator pending">
@@ -996,7 +1165,7 @@ export default function LaboratoryWorkspace({
                       className="primary-button laboratory-workflow-action"
                       disabled={startingOrder}
                       onClick={() =>
-                        void receiveSelectedOrder()
+                        void receiveSelectedOrderItem()
                       }
                     >
                       {startingOrder
@@ -1007,7 +1176,7 @@ export default function LaboratoryWorkspace({
                 )}
 
 
-                {selectedOrder.status ===
+                {selectedOrderItem?.status ===
                   'RECEIVED' && (
                   <section className="laboratory-workflow-card">
                     <div className="laboratory-workflow-indicator received">
@@ -1035,7 +1204,7 @@ export default function LaboratoryWorkspace({
                       className="primary-button laboratory-workflow-action"
                       disabled={startingOrder}
                       onClick={() =>
-                        void startSelectedOrder()
+                        void startSelectedOrderItem()
                       }
                     >
                       {startingOrder
@@ -1046,7 +1215,7 @@ export default function LaboratoryWorkspace({
                 )}
 
 
-                {selectedOrder.status ===
+                {selectedOrderItem?.status ===
                   'IN_PROGRESS' && (
                   reviewingResult ? (
                     <section className="laboratory-result-form laboratory-result-review">

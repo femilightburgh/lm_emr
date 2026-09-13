@@ -293,7 +293,6 @@ export default function AdministrationStaff({
   async function handleCreateStaff(
     event: FormEvent<HTMLFormElement>,
   ) {
-    console.log('CREATE STAFF SUBMITTED')
     event.preventDefault()
 
     setCreateError(null)
@@ -339,20 +338,6 @@ export default function AdministrationStaff({
       )
       return
     }
-
-    console.log('CREATE STAFF VALIDATION PASSED')
-    console.log('CREATE STAFF PAYLOAD', {
-        hospital_id: hospitalId,
-        staff_number: form.staffNumber,
-        first_name: form.firstName,
-        last_name: form.lastName,
-        gender: form.gender,
-        date_of_birth: form.dateOfBirth,
-        profession: form.profession,
-        employment_status: form.employmentStatus,
-        employment_type: form.employmentType,
-        date_employed: form.dateEmployed,
-    })
 
     setCreating(true)
 
@@ -432,14 +417,6 @@ export default function AdministrationStaff({
     staffId: string,
     userId: string,
     ) {
-    console.log(
-        'USER SELECTED',
-        {
-        staffId,
-        userId,
-        },
-    )
-
     setSelectedUsers(current => ({
         ...current,
         [staffId]: userId,
@@ -450,15 +427,6 @@ export default function AdministrationStaff({
   async function handleLinkUser(
     member: Staff,
     ) {
-    console.log(
-        'LINK BUTTON CLICKED',
-        {
-        staffId: member.id,
-        selectedUserId:
-            getSelectedUserId(member.id),
-        },
-    )
-
     const userId =
         getSelectedUserId(member.id)
 

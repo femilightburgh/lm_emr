@@ -6,7 +6,9 @@ import {
 
 import {
   createDiagnosticReport,
+  downloadDiagnosticAttachment,
   finalizeDiagnosticReport,
+  getDiagnosticReportByOrder,
   listDiagnosticAttachments,
   listDiagnosticInvestigations,
   listDiagnosticQueue,
@@ -116,6 +118,9 @@ export default function DiagnosticsWorkspace({
   const [uploading, setUploading] =
     useState(false)
 
+  const [downloadingAttachmentId, setDownloadingAttachmentId] =
+    useState<string | null>(null)
+
   const [error, setError] =
     useState<string | null>(null)
 
@@ -131,6 +136,9 @@ export default function DiagnosticsWorkspace({
         ),
       [selectedOrder, investigations],
     )
+
+  const selectedOrderId = selectedOrder?.id
+  const selectedOrderStatus = selectedOrder?.status
 
   async function loadWorkspace() {
     setLoading(true)
@@ -187,6 +195,51 @@ export default function DiagnosticsWorkspace({
     setMeasurements({})
     setSuccess(null)
   }, [selectedOrder?.id])
+
+  useEffect(() => {
+    if (
+      !selectedOrderId ||
+      selectedOrderStatus !== 'IN_PROGRESS'
+    ) {
+      return
+    }
+
+    let cancelled = false
+
+    void getDiagnosticReportByOrder(
+      accessToken,
+      selectedOrderId,
+    )
+      .then(existingReport => {
+        if (!cancelled) {
+          setReport(existingReport)
+        }
+      })
+      .catch(err => {
+        if (cancelled) {
+          return
+        }
+
+        // A report is created on the first save, so a missing
+        // report is an expected state for a new investigation.
+        if (
+          err instanceof Error &&
+          err.message === 'Diagnostic report not found.'
+        ) {
+          return
+        }
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Unable to load diagnostic report.',
+        )
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [accessToken, selectedOrderId, selectedOrderStatus])
 
   useEffect(() => {
     if (!report) {
@@ -433,9 +486,40 @@ export default function DiagnosticsWorkspace({
     }
   }
 
+  async function handleDownload(
+    attachment: DiagnosticReportAttachment,
+  ) {
+    setDownloadingAttachmentId(attachment.id)
+    setError(null)
+
+    try {
+      const blob = await downloadDiagnosticAttachment(
+        accessToken,
+        attachment.id,
+      )
+
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+
+      link.href = url
+      link.download = attachment.file_name
+      link.click()
+
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to download attachment.',
+      )
+    } finally {
+      setDownloadingAttachmentId(null)
+    }
+  }
+
   if (loading) {
     return (
-      <section className="diagnostics-page">
+      <section className="workspace-content diagnostics-page">
         <div className="diagnostics-empty">
           Loading diagnostics...
         </div>
@@ -444,7 +528,7 @@ export default function DiagnosticsWorkspace({
   }
 
   return (
-    <section className="diagnostics-page">
+    <section className="workspace-content diagnostics-page">
       <header className="diagnostics-page-header">
         <div>
           <p className="eyebrow">
@@ -864,13 +948,20 @@ export default function DiagnosticsWorkspace({
                           <div className="diagnostic-attachment-list">
                             {attachments.map(
                               attachment => (
-                                <a
+                                <button
                                   key={
                                     attachment.id
                                   }
-                                  href={`/api/v1/diagnostics/attachments/${attachment.id}`}
-                                  target="_blank"
-                                  rel="noreferrer"
+                                  type="button"
+                                  disabled={
+                                    downloadingAttachmentId ===
+                                    attachment.id
+                                  }
+                                  onClick={() =>
+                                    void handleDownload(
+                                      attachment,
+                                    )
+                                  }
                                 >
                                   <strong>
                                     {
@@ -882,7 +973,7 @@ export default function DiagnosticsWorkspace({
                                       attachment.content_type
                                     }
                                   </small>
-                                </a>
+                                </button>
                               ),
                             )}
                           </div>

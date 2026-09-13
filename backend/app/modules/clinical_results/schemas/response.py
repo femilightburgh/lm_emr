@@ -60,6 +60,7 @@ class ClinicalResultResponse(BaseModel):
 
     id: UUID
     order_id: UUID
+    order_item_id: UUID | None
     result_type: ClinicalResultType
     status: ClinicalResultStatus
 

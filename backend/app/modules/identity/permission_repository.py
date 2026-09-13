@@ -100,6 +100,8 @@ class PermissionRepository:
             name=definition.name,
             description=definition.description,
             is_platform_permission=True,
+            module=(definition.code.split(".")[0] if definition.code and "." in definition.code else definition.code),
+            is_system_permission=False,
         )
 
         self.session.add(permission)

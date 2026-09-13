@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   getPatient: vi.fn(),
   listEpisodeEncounters: vi.fn(),
   createEncounter: vi.fn(),
+  startDoctorConsultation: vi.fn(),
   completeConsultation: vi.fn(),
   completeDoctorReview: vi.fn(),
 
@@ -52,6 +53,7 @@ vi.mock('../../api/episodes', () => ({
   completeConsultation: mocks.completeConsultation,
   completeDoctorReview: mocks.completeDoctorReview,
   getEpisode: mocks.getEpisode,
+  startDoctorConsultation: mocks.startDoctorConsultation,
 }))
 
 vi.mock('../../api/patients', () => ({
@@ -379,7 +381,10 @@ describe('DoctorWorkspace workflow controller', () => {
 
     mocks.getEpisode.mockResolvedValue(episode())
     mocks.getPatient.mockResolvedValue(patient)
-    mocks.listEpisodeEncounters.mockResolvedValue([])
+      mocks.listEpisodeEncounters.mockResolvedValue([])
+    mocks.startDoctorConsultation.mockResolvedValue(
+      episode(),
+    )
     mocks.createEncounter.mockImplementation(
       async (
         _token: string,
@@ -406,6 +411,9 @@ describe('DoctorWorkspace workflow controller', () => {
 
   it('creates a Doctor Consultation when no open clinic encounter exists', async () => {
     mocks.doctorQueue.clinicQueue = [clinicItem]
+    mocks.listEpisodeEncounters
+      .mockResolvedValueOnce([])
+      .mockResolvedValue(encounter('Doctor Consultation'))
 
     const user = userEvent.setup()
 
@@ -419,14 +427,12 @@ describe('DoctorWorkspace workflow controller', () => {
       }),
     )
 
-    expect(mocks.createEncounter).toHaveBeenCalledWith(
+    expect(mocks.startDoctorConsultation).toHaveBeenCalledWith(
       'test-token',
-      {
-        episode_id: 'episode-1',
-        staff_id: 'staff-1',
-        title: 'Doctor Consultation',
-      },
+      'episode-1',
     )
+
+    expect(mocks.createEncounter).not.toHaveBeenCalled()
   })
 
   it('creates a Doctor Review when the episode is awaiting review', async () => {

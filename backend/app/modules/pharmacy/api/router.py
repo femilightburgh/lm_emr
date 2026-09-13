@@ -30,6 +30,12 @@ from app.modules.clinical_orders.repositories import (
     MedicationTreatmentRepository,
     PrescriptionRepository,
 )
+from app.modules.diagnostics.repositories.diagnostic_repository import (
+    DiagnosticRepository,
+)
+from app.modules.laboratory.repositories.laboratory_test_repository import (
+    LaboratoryTestRepository,
+)
 from app.modules.clinical_orders.schemas import (
     CreatePrescriptionRequest,
     ClinicalOrderResponse,
@@ -84,6 +90,8 @@ def get_clinical_order_service(
         episode_repository=EpisodeRepository(db),
         staff_repository=StaffRepository(db),
         prescription_repository=PrescriptionRepository(db),
+        laboratory_test_repository=LaboratoryTestRepository(db),
+        diagnostic_repository=DiagnosticRepository(db),
         inpatient_medication_service=InpatientMedicationService(
             db=db,
             episode_repository=EpisodeRepository(db),
@@ -332,6 +340,7 @@ def dispense_prescription(
             repository=ClinicalEventRepository(db),
         ),
         staff_repository=StaffRepository(db),
+        episode_repository=EpisodeRepository(db),
     )
 
     try:

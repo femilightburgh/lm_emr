@@ -63,6 +63,7 @@ from app.modules.organization.enums import (
     HospitalType,
 )
 from app.modules.organization.models import Hospital
+from app.modules.laboratory.models.laboratory_test import LaboratoryTest
 from app.modules.organization.schemas import HospitalCreate
 from app.modules.organization.service import HospitalService
 
@@ -346,6 +347,15 @@ def test_create_clinical_order_endpoint(
         email=user.email,
     )
 
+    laboratory_test = (
+        db.query(LaboratoryTest)
+        .filter(
+            LaboratoryTest.hospital_id == hospital.id,
+            LaboratoryTest.code == "CBC",
+        )
+        .one()
+    )
+
     response = client.post(
         "/api/v1/clinical-orders",
         headers=auth_headers(token),
@@ -357,6 +367,11 @@ def test_create_clinical_order_endpoint(
                 "test_code": "CBC",
                 "test_name": "Full Blood Count",
             },
+            "items": [
+                {
+                    "laboratory_test_id": str(laboratory_test.id),
+                }
+            ],
         },
     )
 
@@ -368,6 +383,9 @@ def test_create_clinical_order_endpoint(
     assert body["ordered_by"] == str(staff.id)
     assert body["order_type"] == "LABORATORY"
     assert body["status"] == "REQUESTED"
+    assert len(body["items"]) == 1
+    assert body["items"][0]["laboratory_test_id"] == str(laboratory_test.id)
+    assert body["items"][0]["diagnostic_investigation_id"] is None
 
     event = db.query(ClinicalEvent).filter(
         ClinicalEvent.encounter_id == encounter.id,
@@ -542,6 +560,9 @@ def test_doctor_can_create_diagnostic_order_and_diagnostics_queue_returns_it(
     from app.modules.diagnostics.repositories import (
         DiagnosticRepository,
     )
+    from app.modules.laboratory.repositories import (
+        LaboratoryTestRepository,
+    )
     from app.modules.encounter.repositories.encounter_repository import (
         EncounterRepository,
     )
@@ -598,6 +619,8 @@ def test_doctor_can_create_diagnostic_order_and_diagnostics_queue_returns_it(
         episode_repository=EpisodeRepository(db),
         staff_repository=StaffRepository(db),
         prescription_repository=PrescriptionRepository(db),
+        laboratory_test_repository=LaboratoryTestRepository(db),
+        diagnostic_repository=diagnostic_repository,
     )
 
     order = order_service.create_order(
@@ -608,14 +631,23 @@ def test_doctor_can_create_diagnostic_order_and_diagnostics_queue_returns_it(
         details={
             "investigation_id": str(ecg.id),
         },
+        items=[
+            {
+                "diagnostic_investigation_id": ecg.id,
+            }
+        ],
     )
 
     assert order.order_type == ClinicalOrderType.DIAGNOSTIC
     assert order.status.value == "REQUESTED"
     assert order.details["investigation_id"] == str(ecg.id)
-    assert order.details["investigation_code"] == "ECG"
-    assert order.details["investigation_name"] == "Electrocardiogram"
-    assert order.details["diagnostic_category"] == "CARDIOLOGY"
+
+    assert len(order.items) == 1
+    assert order.items[0].diagnostic_investigation_id == ecg.id
+    assert order.items[0].laboratory_test_id is None
+    assert order.items[0].details["investigation_code"] == "ECG"
+    assert order.items[0].details["investigation_name"] == "Electrocardiogram"
+    assert order.items[0].details["diagnostic_category"] == "CARDIOLOGY"
 
     token = authenticate(
         db,
@@ -640,7 +672,390 @@ def test_doctor_can_create_diagnostic_order_and_diagnostics_queue_returns_it(
 
     assert queue_item["order_type"] == "DIAGNOSTIC"
     assert queue_item["status"] == "REQUESTED"
-    assert queue_item["details"]["investigation_code"] == "ECG"
-    assert queue_item["details"]["investigation_name"] == (
+    assert len(queue_item["items"]) == 1
+    assert queue_item["items"][0]["diagnostic_investigation_id"] == str(ecg.id)
+    assert queue_item["items"][0]["laboratory_test_id"] is None
+    assert queue_item["items"][0]["details"]["investigation_code"] == "ECG"
+    assert queue_item["items"][0]["details"]["investigation_name"] == (
         "Electrocardiogram"
     )
+    assert queue_item["items"][0]["details"]["diagnostic_category"] == (
+        "CARDIOLOGY"
+    )
+
+def test_doctor_can_receive_single_grouped_laboratory_item(
+    client,
+    db,
+):
+    from app.core.context import RequestContext
+    from app.modules.clinical_orders.repositories import (
+        ClinicalOrderRepository,
+        MedicationTreatmentRepository,
+        PrescriptionRepository,
+    )
+    from app.modules.clinical_orders.services import (
+        ClinicalOrderService,
+        InpatientMedicationService,
+    )
+    from app.modules.diagnostics.repositories.diagnostic_repository import (
+        DiagnosticRepository,
+    )
+    from app.modules.episode.repositories.episode_repository import (
+        EpisodeRepository,
+    )
+    from app.modules.events.repositories import ClinicalEventRepository
+    from app.modules.events.services import ClinicalEventService
+    from app.modules.laboratory.repositories.laboratory_test_repository import (
+        LaboratoryTestRepository,
+    )
+
+    hospital = create_hospital(db)
+
+    doctor_user = create_user(
+        db,
+        hospital=hospital,
+        email=f"grouped-receive-{uuid4()}@example.com",
+        role_name="Doctor",
+    )
+
+    _, encounter = create_doctor_encounter(
+        db,
+        hospital,
+        doctor_user,
+    )
+
+    laboratory_tests = db.query(LaboratoryTest).filter(
+        LaboratoryTest.hospital_id == hospital.id,
+        LaboratoryTest.code.in_(["APTT", "BCS", "CBC"]),
+        LaboratoryTest.active.is_(True),
+    ).order_by(LaboratoryTest.code).all()
+
+    assert [test.code for test in laboratory_tests] == [
+        "APTT",
+        "BCS",
+        "CBC",
+    ]
+
+    context = RequestContext(
+        user_id=doctor_user.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
+    service = ClinicalOrderService(
+        repository=ClinicalOrderRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+        encounter_repository=EncounterRepository(db),
+        episode_repository=EpisodeRepository(db),
+        staff_repository=StaffRepository(db),
+        prescription_repository=PrescriptionRepository(db),
+        laboratory_test_repository=LaboratoryTestRepository(db),
+        diagnostic_repository=DiagnosticRepository(db),
+        inpatient_medication_service=InpatientMedicationService(
+            db=db,
+            episode_repository=EpisodeRepository(db),
+            treatment_repository=MedicationTreatmentRepository(db),
+        ),
+    )
+
+    order = service.create_order(
+        context=context,
+        encounter_id=encounter.id,
+        order_type=ClinicalOrderType.LABORATORY,
+        priority="ROUTINE",
+        details={
+            "test_code": "CBC",
+            "test_name": "Full Blood Count",
+        },
+        items=[
+            {"laboratory_test_id": test.id}
+            for test in laboratory_tests
+        ],
+    )
+
+    target_item = next(
+        item
+        for item in order.items
+        if item.details["test_code"] == "CBC"
+    )
+
+    token = authenticate(
+        db,
+        hospital=hospital,
+        email=doctor_user.email,
+    )
+
+    response = client.post(
+        f"/api/v1/clinical-orders/items/{target_item.id}/receive",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    returned_target = next(
+        item
+        for item in body["items"]
+        if item["id"] == str(target_item.id)
+    )
+
+    assert returned_target["status"] == "RECEIVED"
+
+    sibling_statuses = {
+        item["details"]["test_code"]: item["status"]
+        for item in body["items"]
+        if item["id"] != str(target_item.id)
+    }
+
+    assert sibling_statuses == {
+        "APTT": "REQUESTED",
+        "BCS": "REQUESTED",
+    }
+
+
+def test_doctor_can_start_single_received_grouped_laboratory_item(
+    client,
+    db,
+):
+    from app.core.context import RequestContext
+    from app.modules.clinical_orders.repositories import (
+        ClinicalOrderRepository,
+        MedicationTreatmentRepository,
+        PrescriptionRepository,
+    )
+    from app.modules.clinical_orders.services import (
+        ClinicalOrderService,
+        InpatientMedicationService,
+    )
+    from app.modules.diagnostics.repositories.diagnostic_repository import (
+        DiagnosticRepository,
+    )
+    from app.modules.episode.repositories.episode_repository import (
+        EpisodeRepository,
+    )
+    from app.modules.events.repositories import ClinicalEventRepository
+    from app.modules.events.services import ClinicalEventService
+    from app.modules.laboratory.repositories.laboratory_test_repository import (
+        LaboratoryTestRepository,
+    )
+
+    hospital = create_hospital(db)
+
+    doctor_user = create_user(
+        db,
+        hospital=hospital,
+        email=f"grouped-start-{uuid4()}@example.com",
+        role_name="Doctor",
+    )
+
+    _, encounter = create_doctor_encounter(
+        db,
+        hospital,
+        doctor_user,
+    )
+
+    laboratory_tests = db.query(LaboratoryTest).filter(
+        LaboratoryTest.hospital_id == hospital.id,
+        LaboratoryTest.code.in_(["APTT", "BCS", "CBC"]),
+        LaboratoryTest.active.is_(True),
+    ).order_by(LaboratoryTest.code).all()
+
+    context = RequestContext(
+        user_id=doctor_user.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
+    service = ClinicalOrderService(
+        repository=ClinicalOrderRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+        encounter_repository=EncounterRepository(db),
+        episode_repository=EpisodeRepository(db),
+        staff_repository=StaffRepository(db),
+        prescription_repository=PrescriptionRepository(db),
+        laboratory_test_repository=LaboratoryTestRepository(db),
+        diagnostic_repository=DiagnosticRepository(db),
+        inpatient_medication_service=InpatientMedicationService(
+            db=db,
+            episode_repository=EpisodeRepository(db),
+            treatment_repository=MedicationTreatmentRepository(db),
+        ),
+    )
+
+    order = service.create_order(
+        context=context,
+        encounter_id=encounter.id,
+        order_type=ClinicalOrderType.LABORATORY,
+        priority="ROUTINE",
+        details={
+            "test_code": "CBC",
+            "test_name": "Full Blood Count",
+        },
+        items=[
+            {"laboratory_test_id": test.id}
+            for test in laboratory_tests
+        ],
+    )
+
+    target_item = next(
+        item
+        for item in order.items
+        if item.details["test_code"] == "CBC"
+    )
+
+    token = authenticate(
+        db,
+        hospital=hospital,
+        email=doctor_user.email,
+    )
+
+    receive_response = client.post(
+        f"/api/v1/clinical-orders/items/{target_item.id}/receive",
+        headers=auth_headers(token),
+    )
+
+    assert receive_response.status_code == 200
+
+    start_response = client.post(
+        f"/api/v1/clinical-orders/items/{target_item.id}/start",
+        headers=auth_headers(token),
+    )
+
+    assert start_response.status_code == 200
+
+    body = start_response.json()
+
+    returned_target = next(
+        item
+        for item in body["items"]
+        if item["id"] == str(target_item.id)
+    )
+
+    assert returned_target["status"] == "IN_PROGRESS"
+
+    sibling_statuses = {
+        item["details"]["test_code"]: item["status"]
+        for item in body["items"]
+        if item["id"] != str(target_item.id)
+    }
+
+    assert sibling_statuses == {
+        "APTT": "REQUESTED",
+        "BCS": "REQUESTED",
+    }
+
+
+def test_grouped_laboratory_item_cannot_be_accessed_across_hospitals(
+    client,
+    db,
+):
+    from app.core.context import RequestContext
+    from app.modules.clinical_orders.repositories import (
+        ClinicalOrderRepository,
+        MedicationTreatmentRepository,
+        PrescriptionRepository,
+    )
+    from app.modules.clinical_orders.services import (
+        ClinicalOrderService,
+        InpatientMedicationService,
+    )
+    from app.modules.diagnostics.repositories.diagnostic_repository import (
+        DiagnosticRepository,
+    )
+    from app.modules.episode.repositories.episode_repository import (
+        EpisodeRepository,
+    )
+    from app.modules.events.repositories import ClinicalEventRepository
+    from app.modules.events.services import ClinicalEventService
+    from app.modules.laboratory.repositories.laboratory_test_repository import (
+        LaboratoryTestRepository,
+    )
+
+    hospital_a = create_hospital(db)
+    hospital_b = create_hospital(db)
+
+    doctor_a = create_user(
+        db,
+        hospital=hospital_a,
+        email=f"tenant-a-{uuid4()}@example.com",
+        role_name="Doctor",
+    )
+
+    doctor_b = create_user(
+        db,
+        hospital=hospital_b,
+        email=f"tenant-b-{uuid4()}@example.com",
+        role_name="Doctor",
+    )
+
+    _, encounter = create_doctor_encounter(
+        db,
+        hospital_a,
+        doctor_a,
+    )
+
+    laboratory_test = db.query(LaboratoryTest).filter(
+        LaboratoryTest.hospital_id == hospital_a.id,
+        LaboratoryTest.code == "CBC",
+        LaboratoryTest.active.is_(True),
+    ).one()
+
+    context = RequestContext(
+        user_id=doctor_a.id,
+        hospital_id=hospital_a.id,
+        permissions=frozenset(),
+    )
+
+    service = ClinicalOrderService(
+        repository=ClinicalOrderRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+        encounter_repository=EncounterRepository(db),
+        episode_repository=EpisodeRepository(db),
+        staff_repository=StaffRepository(db),
+        prescription_repository=PrescriptionRepository(db),
+        laboratory_test_repository=LaboratoryTestRepository(db),
+        diagnostic_repository=DiagnosticRepository(db),
+        inpatient_medication_service=InpatientMedicationService(
+            db=db,
+            episode_repository=EpisodeRepository(db),
+            treatment_repository=MedicationTreatmentRepository(db),
+        ),
+    )
+
+    order = service.create_order(
+        context=context,
+        encounter_id=encounter.id,
+        order_type=ClinicalOrderType.LABORATORY,
+        priority="ROUTINE",
+        details={
+            "test_code": "CBC",
+            "test_name": "Full Blood Count",
+        },
+        items=[
+            {"laboratory_test_id": laboratory_test.id},
+        ],
+    )
+
+    target_item = order.items[0]
+
+    token_b = authenticate(
+        db,
+        hospital=hospital_b,
+        email=doctor_b.email,
+    )
+
+    response = client.post(
+        f"/api/v1/clinical-orders/items/{target_item.id}/receive",
+        headers=auth_headers(token_b),
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Clinical Order Item not found."
+

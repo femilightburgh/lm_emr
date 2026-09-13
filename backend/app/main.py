@@ -82,7 +82,14 @@ allowed_origins = [
 ]
 
 if not allowed_origins:
-    allowed_origins = ["http://localhost:5173"]
+    # Include common Vite dev server ports so local frontend dev servers can
+    # communicate with the API without CORS errors.
+    allowed_origins = [
+        "http://localhost:5173",
+        "http://localhost:5174",
+    ]
+
+logging.getLogger(__name__).info("Resolved allowed_origins: %s", allowed_origins)
 
 app.add_middleware(
     CORSMiddleware,
@@ -90,6 +97,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_origin_regex=r"^https?://localhost(:5173|:5174)$",
 )
 
 register_exception_handlers(app)

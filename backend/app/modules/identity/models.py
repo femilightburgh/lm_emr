@@ -319,6 +319,8 @@ class Role(BaseEntity):
         nullable=True,
     )
 
+
+
     # Indicates whether this role was created automatically by
     # LIGHTBURGH during hospital provisioning.
     #
@@ -445,6 +447,19 @@ class Permission(BaseEntity):
     description: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
+    )
+
+    # Module name derived from the permission code (e.g. 'patient' from 'patient.read')
+    module: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+
+    # Indicates whether this is a system-level permission (not hospital-specific)
+    is_system_permission: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
     )
 
     # Indicates whether this permission is provided by

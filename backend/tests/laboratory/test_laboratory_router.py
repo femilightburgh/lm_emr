@@ -18,6 +18,13 @@ from app.main import app
 from app.bootstrap.laboratory import (
     bootstrap_laboratory_tests,
 )
+from app.modules.diagnostics.repositories.diagnostic_repository import (
+    DiagnosticRepository,
+)
+from app.modules.laboratory.models import LaboratoryTest
+from app.modules.laboratory.repositories import (
+    LaboratoryTestRepository,
+)
 from app.modules.identity.auth_service import AuthService
 from app.modules.identity.repository import IdentityRepository
 from app.modules.identity.token_service import TokenService
@@ -351,7 +358,21 @@ def test_laboratory_queue_returns_patient_and_order_context(
         episode_repository=EpisodeRepository(db),
         staff_repository=StaffRepository(db),
         prescription_repository=PrescriptionRepository(db),
+        laboratory_test_repository=LaboratoryTestRepository(db),
+        diagnostic_repository=DiagnosticRepository(db),
     )
+
+    laboratory_tests = {
+        code: (
+            db.query(LaboratoryTest)
+            .filter(
+                LaboratoryTest.hospital_id == hospital.id,
+                LaboratoryTest.code == code,
+            )
+            .one()
+        )
+        for code in ("CBC", "APTT", "BCS")
+    }
 
     order = order_service.create_order(
         context=doctor_context,
@@ -359,9 +380,13 @@ def test_laboratory_queue_returns_patient_and_order_context(
         order_type=ClinicalOrderType.LABORATORY,
         priority="ROUTINE",
         details={
-            "test_code": "CBC",
-            "test_name": "Full Blood Count",
+            "request_type": "LABORATORY",
         },
+        items=[
+            {"laboratory_test_id": laboratory_tests["CBC"].id},
+            {"laboratory_test_id": laboratory_tests["APTT"].id},
+            {"laboratory_test_id": laboratory_tests["BCS"].id},
+        ],
     )
 
     lab_token = authenticate(
@@ -398,7 +423,23 @@ def test_laboratory_queue_returns_patient_and_order_context(
     assert queue_item["order_type"] == "LABORATORY"
     assert queue_item["status"] == "REQUESTED"
     assert queue_item["priority"] == "ROUTINE"
-    assert queue_item["details"]["test_code"] == "CBC"
+    assert queue_item["details"]["request_type"] == "LABORATORY"
+
+    # One clinical order represents the patient's laboratory request.
+    # Multiple investigations are represented as items within that order.
+    assert len(body) == 1
+    assert len(queue_item["items"]) == 3
+
+    item_codes = [
+        item["details"]["test_code"]
+        for item in queue_item["items"]
+    ]
+
+    assert item_codes == ["CBC", "APTT", "BCS"]
+    assert all(
+        item["item_type"] == "LABORATORY"
+        for item in queue_item["items"]
+    )
 
 
 def test_laboratory_scientist_can_start_and_record_result(
@@ -478,6 +519,8 @@ def test_laboratory_scientist_can_start_and_record_result(
         episode_repository=EpisodeRepository(db),
         staff_repository=StaffRepository(db),
         prescription_repository=PrescriptionRepository(db),
+        laboratory_test_repository=LaboratoryTestRepository(db),
+        diagnostic_repository=DiagnosticRepository(db),
     )
 
     order = order_service.create_order(
@@ -486,9 +529,21 @@ def test_laboratory_scientist_can_start_and_record_result(
         order_type=ClinicalOrderType.LABORATORY,
         priority="ROUTINE",
         details={
-            "test_code": "CBC",
-            "test_name": "Full Blood Count",
+            "request_type": "LABORATORY",
         },
+        items=[
+            {
+                "laboratory_test_id": (
+                    db.query(LaboratoryTest)
+                    .filter(
+                        LaboratoryTest.hospital_id == hospital.id,
+                        LaboratoryTest.code == "CBC",
+                    )
+                    .one()
+                    .id
+                ),
+            },
+        ],
     )
 
     lab_token = authenticate(
@@ -497,16 +552,17 @@ def test_laboratory_scientist_can_start_and_record_result(
         email=lab_user.email,
     )
 
+    order_item = order.items[0]
+
     receive_response = client.post(
-        f"/api/v1/clinical-orders/{order.id}/receive",
+        f"/api/v1/clinical-orders/items/{order_item.id}/receive",
         headers=auth_headers(lab_token),
     )
 
     assert receive_response.status_code == status.HTTP_200_OK
-    assert receive_response.json()["status"] == "RECEIVED"
 
     start_response = client.post(
-        f"/api/v1/clinical-orders/{order.id}/start",
+        f"/api/v1/clinical-orders/items/{order_item.id}/start",
         headers=auth_headers(lab_token),
     )
 
@@ -514,15 +570,15 @@ def test_laboratory_scientist_can_start_and_record_result(
 
     started_body = start_response.json()
 
-    assert started_body["id"] == str(order.id)
-    assert started_body["status"] == "IN_PROGRESS"
-    assert started_body["started_at"] is not None
+    assert started_body["items"][0]["id"] == str(order_item.id)
+    assert started_body["items"][0]["status"] == "IN_PROGRESS"
 
     result_response = client.post(
         "/api/v1/clinical-results",
         headers=auth_headers(lab_token),
         json={
             "order_id": str(order.id),
+            "order_item_id": str(order_item.id),
             "result_type": "LABORATORY",
             "result_data": {
                 "hemoglobin": 13.2,
@@ -622,6 +678,8 @@ def test_laboratory_scientist_can_receive_lab_order(
         episode_repository=EpisodeRepository(db),
         staff_repository=StaffRepository(db),
         prescription_repository=PrescriptionRepository(db),
+        laboratory_test_repository=LaboratoryTestRepository(db),
+        diagnostic_repository=DiagnosticRepository(db),
     )
 
     order = order_service.create_order(
@@ -630,9 +688,21 @@ def test_laboratory_scientist_can_receive_lab_order(
         order_type=ClinicalOrderType.LABORATORY,
         priority="ROUTINE",
         details={
-            "test_code": "CBC",
-            "test_name": "Full Blood Count",
+            "request_type": "LABORATORY",
         },
+        items=[
+            {
+                "laboratory_test_id": (
+                    db.query(LaboratoryTest)
+                    .filter(
+                        LaboratoryTest.hospital_id == hospital.id,
+                        LaboratoryTest.code == "CBC",
+                    )
+                    .one()
+                    .id
+                ),
+            },
+        ],
     )
 
     lab_token = authenticate(
@@ -732,15 +802,29 @@ def test_laboratory_scientist_can_save_draft_and_finalize_result(
         episode_repository=EpisodeRepository(db),
         staff_repository=StaffRepository(db),
         prescription_repository=PrescriptionRepository(db),
+        laboratory_test_repository=LaboratoryTestRepository(db),
+        diagnostic_repository=DiagnosticRepository(db),
     ).create_order(
         context=doctor_context,
         encounter_id=encounter.id,
         order_type=ClinicalOrderType.LABORATORY,
         priority="ROUTINE",
         details={
-            "test_code": "CBC",
-            "test_name": "Full Blood Count",
+            "request_type": "LABORATORY",
         },
+        items=[
+            {
+                "laboratory_test_id": (
+                    db.query(LaboratoryTest)
+                    .filter(
+                        LaboratoryTest.hospital_id == hospital.id,
+                        LaboratoryTest.code == "CBC",
+                    )
+                    .one()
+                    .id
+                ),
+            },
+        ],
     )
 
     lab_token = authenticate(
@@ -749,15 +833,17 @@ def test_laboratory_scientist_can_save_draft_and_finalize_result(
         email=lab_user.email,
     )
 
+    order_item = order.items[0]
+
     receive_response = client.post(
-        f"/api/v1/clinical-orders/{order.id}/receive",
+        f"/api/v1/clinical-orders/items/{order_item.id}/receive",
         headers=auth_headers(lab_token),
     )
 
     assert receive_response.status_code == status.HTTP_200_OK
 
     start_response = client.post(
-        f"/api/v1/clinical-orders/{order.id}/start",
+        f"/api/v1/clinical-orders/items/{order_item.id}/start",
         headers=auth_headers(lab_token),
     )
 
@@ -768,6 +854,7 @@ def test_laboratory_scientist_can_save_draft_and_finalize_result(
         headers=auth_headers(lab_token),
         json={
             "order_id": str(order.id),
+            "order_item_id": str(order_item.id),
             "result_type": "LABORATORY",
             "status": "DRAFT",
             "specimen": "EDTA blood",
@@ -876,15 +963,29 @@ def test_laboratory_scientist_cannot_finalize_result_twice(
         episode_repository=EpisodeRepository(db),
         staff_repository=StaffRepository(db),
         prescription_repository=PrescriptionRepository(db),
+        laboratory_test_repository=LaboratoryTestRepository(db),
+        diagnostic_repository=DiagnosticRepository(db),
     ).create_order(
         context=doctor_context,
         encounter_id=encounter.id,
         order_type=ClinicalOrderType.LABORATORY,
         priority="ROUTINE",
         details={
-            "test_code": "CBC",
-            "test_name": "Full Blood Count",
+            "request_type": "LABORATORY",
         },
+        items=[
+            {
+                "laboratory_test_id": (
+                    db.query(LaboratoryTest)
+                    .filter(
+                        LaboratoryTest.hospital_id == hospital.id,
+                        LaboratoryTest.code == "CBC",
+                    )
+                    .one()
+                    .id
+                ),
+            },
+        ],
     )
 
     lab_token = authenticate(
@@ -893,13 +994,15 @@ def test_laboratory_scientist_cannot_finalize_result_twice(
         email=lab_user.email,
     )
 
+    order_item = order.items[0]
+
     client.post(
-        f"/api/v1/clinical-orders/{order.id}/receive",
+        f"/api/v1/clinical-orders/items/{order_item.id}/receive",
         headers=auth_headers(lab_token),
     )
 
     client.post(
-        f"/api/v1/clinical-orders/{order.id}/start",
+        f"/api/v1/clinical-orders/items/{order_item.id}/start",
         headers=auth_headers(lab_token),
     )
 
@@ -908,6 +1011,7 @@ def test_laboratory_scientist_cannot_finalize_result_twice(
         headers=auth_headers(lab_token),
         json={
             "order_id": str(order.id),
+            "order_item_id": str(order_item.id),
             "result_type": "LABORATORY",
             "status": "DRAFT",
             "values": [],

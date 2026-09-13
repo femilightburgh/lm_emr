@@ -31,7 +31,16 @@ function formatDateTime(
 ): string {
   return new Date(
     value,
-  ).toLocaleString()
+  ).toLocaleString(
+    [],
+    {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    },
+  )
 }
 
 
@@ -43,31 +52,47 @@ function formatTime(
   ).toLocaleTimeString(
     [],
     {
-      hour: 'numeric',
+      hour: '2-digit',
       minute: '2-digit',
     },
   )
 }
 
 
-function getMedicationDisplay(
+function medicationDisplay(
   dose: MedicationNursingDose,
 ): string {
-  const parts = [
+  return [
     dose.dose,
     dose.dose_unit,
     dose.route,
-  ].filter(Boolean)
-
-  return parts.join(' · ')
+  ]
+    .filter(Boolean)
+    .join(' · ')
 }
 
 
-function getStatusLabel(
+function statusLabel(
   dose: MedicationNursingDose,
 ): string {
-  return dose.administration_status
-    ?? dose.scheduled_state
+  return (
+    dose.administration_status ??
+    dose.scheduled_state
+  )
+}
+
+
+function statusClass(
+  dose: MedicationNursingDose,
+): string {
+  const status =
+    (
+      dose.administration_status ??
+      dose.scheduled_state ??
+      ''
+    ).toLowerCase()
+
+  return `nursing-medication-status nursing-medication-status-${status}`
 }
 
 
@@ -75,10 +100,10 @@ function isActionable(
   dose: MedicationNursingDose,
 ): boolean {
   return (
-    dose.administration_status === null
-    && (
-      dose.scheduled_state === 'DUE'
-      || dose.scheduled_state === 'OVERDUE'
+    dose.administration_status === null &&
+    (
+      dose.scheduled_state === 'DUE' ||
+      dose.scheduled_state === 'OVERDUE'
     )
   )
 }
@@ -98,6 +123,7 @@ function DoseList({
   onAdminister,
   showActions,
 }: DoseListProps) {
+
   const [
     selectedDoseId,
     setSelectedDoseId,
@@ -115,6 +141,7 @@ function DoseList({
     setSelectedDoseId(
       doseId,
     )
+
     setReason('')
   }
 
@@ -142,10 +169,21 @@ function DoseList({
   }
 
 
+  if (doses.length === 0) {
+    return (
+      <div className="nursing-medication-empty">
+        No doses in this round.
+      </div>
+    )
+  }
+
+
   return (
-    <>
+    <div className="nursing-medication-dose-list">
+
       {doses.map(
         dose => {
+
           const actionable =
             showActions &&
             isActionable(dose)
@@ -153,38 +191,49 @@ function DoseList({
           const saving =
             savingDoseId === dose.id
 
+          const selected =
+            selectedDoseId === dose.id
+
+
           return (
             <article
               key={dose.id}
-              className="nursing-medication-item"
+              className={
+                actionable
+                  ? 'nursing-medication-dose nursing-medication-dose-actionable'
+                  : 'nursing-medication-dose'
+              }
             >
-              <div>
-                <p className="eyebrow">
+
+              <div className="nursing-medication-dose-main">
+
+                <div className="nursing-medication-dose-time">
                   {formatDateTime(
                     dose.scheduled_at,
                   )}
-                </p>
+                </div>
 
-                <strong>
+                <h4>
                   {dose.medicine_name}
-                </strong>
+                </h4>
 
-                <p>
-                  {getMedicationDisplay(
+                <p className="nursing-medication-dose-primary">
+                  {medicationDisplay(
                     dose,
                   )}
                 </p>
 
-                <p>
+                <p className="nursing-medication-dose-secondary">
                   {dose.frequency}
+
                   {dose.strength
                     ? ` · ${dose.strength}`
                     : ''}
                 </p>
 
                 {dose.administration_at && (
-                  <p>
-                    Recorded:{' '}
+                  <p className="nursing-medication-dose-meta">
+                    Recorded{' '}
                     {formatDateTime(
                       dose.administration_at,
                     )}
@@ -192,144 +241,138 @@ function DoseList({
                 )}
 
                 {dose.reason && (
-                  <p>
+                  <p className="nursing-medication-dose-meta">
                     Reason: {dose.reason}
                   </p>
                 )}
+
               </div>
 
-              <div>
-                <span className="nursing-queue-status">
-                  {getStatusLabel(dose)}
+
+              <div className="nursing-medication-dose-action">
+
+                <span
+                  className={statusClass(dose)}
+                >
+                  {statusLabel(dose)}
                 </span>
 
+
                 {actionable && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: '0.5rem',
-                      flexWrap: 'wrap',
-                      marginTop: '0.75rem',
-                    }}
+                  <button
+                    type="button"
+                    className="nursing-medication-record-button"
+                    disabled={saving}
+                    onClick={() =>
+                      openAction(
+                        dose.id,
+                      )
+                    }
                   >
-                    <button
-                      type="button"
-                      className="primary-button"
-                      disabled={saving}
-                      onClick={() =>
-                        openAction(
-                          dose.id,
+                    {saving
+                      ? 'Saving...'
+                      : 'Record outcome'}
+                  </button>
+                )}
+
+              </div>
+
+
+              {selected && (
+                <div className="nursing-medication-outcome">
+
+                  <div>
+
+                    <p className="nursing-medication-outcome-eyebrow">
+                      MEDICATION OUTCOME
+                    </p>
+
+                    <h5>
+                      Record nursing outcome
+                    </h5>
+
+                  </div>
+
+
+                  <label className="nursing-medication-reason">
+
+                    <span>
+                      Reason / note
+                    </span>
+
+                    <textarea
+                      value={reason}
+                      onChange={event =>
+                        setReason(
+                          event.target.value,
                         )
                       }
+                      rows={3}
+                      placeholder="Add a note when clinically relevant."
+                    />
+
+                  </label>
+
+
+                  <div className="nursing-medication-outcome-actions">
+
+                    <button
+                      type="button"
+                      className="nursing-medication-outcome-given"
+                      onClick={() =>
+                        submit('GIVEN')
+                      }
                     >
-                      {saving
-                        ? 'Saving...'
-                        : 'Record outcome'}
+                      Given
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        submit('HELD')
+                      }
+                    >
+                      Held
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        submit('MISSED')
+                      }
+                    >
+                      Missed
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        submit('REFUSED')
+                      }
+                    >
+                      Refused
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={
+                        closeAction
+                      }
+                    >
+                      Cancel
+                    </button>
+
                   </div>
-                )}
-              </div>
+
+                </div>
+              )}
+
             </article>
           )
         },
       )}
 
-      {selectedDoseId && (
-        <div
-          className="nursing-medication-action"
-          style={{
-            marginTop: '1rem',
-            padding: '1rem',
-            border: '1px solid var(--border-color, #e5e7eb)',
-            borderRadius: '0.5rem',
-          }}
-        >
-          <p className="eyebrow">
-            MEDICATION OUTCOME
-          </p>
-
-          <h4>
-            Record nursing outcome
-          </h4>
-
-          <label>
-            <span>
-              Reason / note
-            </span>
-
-            <textarea
-              value={reason}
-              onChange={event =>
-                setReason(
-                  event.target.value,
-                )
-              }
-              rows={3}
-              placeholder="Required for held, missed, or refused doses."
-            />
-          </label>
-
-          <div
-            style={{
-              display: 'flex',
-              gap: '0.5rem',
-              flexWrap: 'wrap',
-              marginTop: '0.75rem',
-            }}
-          >
-            <button
-              type="button"
-              className="primary-button"
-              onClick={() =>
-                submit('GIVEN')
-              }
-            >
-              Given
-            </button>
-
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() =>
-                submit('HELD')
-              }
-            >
-              Held
-            </button>
-
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() =>
-                submit('MISSED')
-              }
-            >
-              Missed
-            </button>
-
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() =>
-                submit('REFUSED')
-              }
-            >
-              Refused
-            </button>
-
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={
-                closeAction
-              }
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-    </>
+    </div>
   )
 }
 
@@ -347,32 +390,56 @@ function RoundBlock({
   onAdminister: Props['onAdminister']
   showActions: boolean
 }) {
+
   if (!round) {
     return null
   }
 
-  return (
-    <section>
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">
-            {title}
-          </p>
 
-          <h4>
+  return (
+    <section className="nursing-medication-round">
+
+      <div className="nursing-medication-round-heading">
+
+        <div>
+
+          <span>
+            {title}
+          </span>
+
+          <strong>
             {formatTime(
               round.scheduled_at,
             )}
-          </h4>
+          </strong>
+
         </div>
+
+        <small>
+          {round.doses.length}
+          {' '}
+          dose
+          {round.doses.length === 1
+            ? ''
+            : 's'}
+        </small>
+
       </div>
+
 
       <DoseList
         doses={round.doses}
-        savingDoseId={savingDoseId}
-        onAdminister={onAdminister}
-        showActions={showActions}
+        savingDoseId={
+          savingDoseId
+        }
+        onAdminister={
+          onAdminister
+        }
+        showActions={
+          showActions
+        }
       />
+
     </section>
   )
 }
@@ -385,6 +452,7 @@ export default function NursingMedicationSection({
   savingDoseId,
   onAdminister,
 }: Props) {
+
   const [
     selectedTreatmentId,
     setSelectedTreatmentId,
@@ -400,30 +468,43 @@ export default function NursingMedicationSection({
     setLoadingTreatmentHistory,
   ] = useState(false)
 
+
   async function togglePrescriptionHistory(
     treatmentId: string,
   ) {
+
     if (
-      selectedTreatmentId === treatmentId
+      selectedTreatmentId ===
+      treatmentId
     ) {
       setSelectedTreatmentId(null)
       setTreatmentHistory(null)
       return
     }
 
-    setSelectedTreatmentId(treatmentId)
+
+    setSelectedTreatmentId(
+      treatmentId,
+    )
+
     setTreatmentHistory(null)
     setLoadingTreatmentHistory(true)
 
+
     try {
+
       const history =
         await getMedicationTreatmentHistory(
           accessToken,
           treatmentId,
         )
 
-      setTreatmentHistory(history)
+      setTreatmentHistory(
+        history,
+      )
+
     } catch (err) {
+
       console.error(
         'Unable to load medication history.',
         err,
@@ -431,132 +512,122 @@ export default function NursingMedicationSection({
 
       setSelectedTreatmentId(null)
       setTreatmentHistory(null)
+
     } finally {
+
       setLoadingTreatmentHistory(false)
+
     }
   }
 
 
-  return (
-    <section className="workspace-section">
-
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">
-            MEDICATIONS
-          </p>
-
-          <h3>
-            Inpatient medication rounds
-          </h3>
-
-          <p>
-            Focus on the current medication round,
-            then review upcoming and recent rounds.
-          </p>
-        </div>
-
-        {summary && (
-          <span>
-            {summary.prescriptions.length}
-          </span>
-        )}
+  if (loading) {
+    return (
+      <div className="nursing-medication-state">
+        <span className="nursing-medication-state-indicator" />
+        Loading medication rounds...
       </div>
+    )
+  }
 
 
-      {loading && (
-        <div className="admin-empty-state">
-          Loading medication rounds...
+  if (!summary) {
+    return (
+      <div className="nursing-medication-state">
+        No medication summary available.
+      </div>
+    )
+  }
+
+
+  return (
+    <div className="nursing-medication-module">
+
+      {/* ================================================================ */}
+      {/* Current round                                                    */}
+      {/* ================================================================ */}
+
+      {summary.round.current_round ? (
+
+        <RoundBlock
+          title="CURRENT ROUND"
+          round={
+            summary.round.current_round
+          }
+          savingDoseId={
+            savingDoseId
+          }
+          onAdminister={
+            onAdminister
+          }
+          showActions
+        />
+
+      ) : (
+
+        <div className="nursing-medication-no-due">
+
+          <div className="nursing-medication-no-due-mark">
+            ✓
+          </div>
+
+          <div>
+
+            <strong>
+              No doses currently due or overdue
+            </strong>
+
+            <span>
+              There is no immediate medication administration
+              action for this patient.
+            </span>
+
+          </div>
+
         </div>
+
       )}
 
 
-      {!loading && !summary && (
-        <div className="admin-empty-state">
-          No medication summary available.
-        </div>
-      )}
+      {/* ================================================================ */}
+      {/* Upcoming rounds                                                  */}
+      {/* ================================================================ */}
 
+      {summary.round.upcoming_rounds.length > 0 && (
 
-      {!loading && summary && (
-        <div className="nursing-medication-list">
+        <details className="nursing-medication-collapsible">
 
-          {summary.round.current_round ? (
-            <RoundBlock
-              title="CURRENT ROUND"
-              round={
-                summary.round.current_round
-              }
-              savingDoseId={
-                savingDoseId
-              }
-              onAdminister={
-                onAdminister
-              }
-              showActions
-            />
-          ) : (
-            <div className="admin-empty-state">
-              No medication doses are currently
-              due or overdue.
+          <summary>
+
+            <div>
+
+              <span>
+                UPCOMING ROUNDS
+              </span>
+
+              <strong>
+                Next scheduled administrations
+              </strong>
+
             </div>
-          )}
+
+            <span>
+              {summary.round.upcoming_rounds.length}
+            </span>
+
+          </summary>
 
 
-          {summary.round.upcoming_rounds.length > 0 && (
-            <details className="nursing-collapsible">
-              <summary>
-                <span>
-                  UPCOMING ROUNDS
-                </span>
+          <div className="nursing-medication-collapsible-body">
 
-                <strong>
-                  {summary.round.upcoming_rounds.length}
-                </strong>
-              </summary>
-
-              <div className="nursing-collapsible-content">
-                {summary.round.upcoming_rounds.map(
-                  round => (
-                    <RoundBlock
-                      key={round.scheduled_at}
-                      title="ROUND"
-                      round={round}
-                      savingDoseId={
-                        savingDoseId
-                      }
-                      onAdminister={
-                        onAdminister
-                      }
-                      showActions={false}
-                    />
-                  ),
-                )}
-              </div>
-            </details>
-          )}
-
-
-          {summary.round.previous_round && (
-            <details className="nursing-collapsible">
-              <summary>
-                <span>
-                  PREVIOUS ROUND
-                </span>
-
-                <strong>
-                  {formatTime(
-                    summary.round.previous_round.scheduled_at,
-                  )}
-                </strong>
-              </summary>
-
-              <div className="nursing-collapsible-content">
+            {summary.round.upcoming_rounds.map(
+              round => (
                 <RoundBlock
-                  title="PREVIOUS ROUND"
-                  round={
-                    summary.round.previous_round
+                  key={
+                    round.scheduled_at
                   }
+                  title="UPCOMING ROUND"
+                  round={round}
                   savingDoseId={
                     savingDoseId
                   }
@@ -565,29 +636,108 @@ export default function NursingMedicationSection({
                   }
                   showActions={false}
                 />
-              </div>
-            </details>
-          )}
+              ),
+            )}
 
-
-        <section
-          style={{
-            marginTop: '1.5rem',
-          }}
-        >
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">
-                ACTIVE PRESCRIPTIONS
-              </p>
-            </div>
           </div>
+
+        </details>
+
+      )}
+
+
+      {/* ================================================================ */}
+      {/* Previous round                                                   */}
+      {/* ================================================================ */}
+
+      {summary.round.previous_round && (
+
+        <details className="nursing-medication-collapsible">
+
+          <summary>
+
+            <div>
+
+              <span>
+                PREVIOUS ROUND
+              </span>
+
+              <strong>
+                Administration history
+              </strong>
+
+            </div>
+
+            <span>
+              {formatTime(
+                summary.round.previous_round.scheduled_at,
+              )}
+            </span>
+
+          </summary>
+
+
+          <div className="nursing-medication-collapsible-body">
+
+            <RoundBlock
+              title="PREVIOUS ROUND"
+              round={
+                summary.round.previous_round
+              }
+              savingDoseId={
+                savingDoseId
+              }
+              onAdminister={
+                onAdminister
+              }
+              showActions={false}
+            />
+
+          </div>
+
+        </details>
+
+      )}
+
+
+      {/* ================================================================ */}
+      {/* Active prescriptions                                              */}
+      {/* ================================================================ */}
+
+      <section className="nursing-medication-prescriptions">
+
+        <div className="nursing-medication-subheading">
+
+          <div>
+
+            <span>
+              ACTIVE PRESCRIPTIONS
+            </span>
+
+            <strong>
+              {summary.prescriptions.length}
+              {' '}
+              active
+            </strong>
+
+          </div>
+
+          <small>
+            Select a prescription to review its administration history.
+          </small>
+
+        </div>
+
+
+        <div className="nursing-medication-prescription-list">
 
           {summary.prescriptions.map(
             prescription => {
+
               const expanded =
                 selectedTreatmentId ===
                 prescription.treatment_id
+
 
               const history =
                 expanded &&
@@ -597,28 +747,47 @@ export default function NursingMedicationSection({
                   ? treatmentHistory
                   : null
 
+
+              const nextState =
+                prescription.next_dose_state
+
+
               return (
                 <article
-                  key={prescription.treatment_id}
-                  className="nursing-medication-item"
+                  key={
+                    prescription.treatment_id
+                  }
+                  className="nursing-medication-prescription"
                 >
+
                   <button
                     type="button"
-                    className="secondary-button"
+                    className="nursing-medication-prescription-trigger"
                     onClick={() =>
                       void togglePrescriptionHistory(
                         prescription.treatment_id,
                       )
                     }
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                    }}
                   >
-                    <div>
-                      <strong>
-                        {prescription.medicine_name}
-                      </strong>
+
+                    <div className="nursing-medication-prescription-main">
+
+                      <div className="nursing-medication-prescription-name-row">
+
+                        <strong>
+                          {prescription.medicine_name}
+                        </strong>
+
+                        {nextState && (
+                          <span
+                            className={`nursing-medication-next-state nursing-medication-next-state-${nextState.toLowerCase()}`}
+                          >
+                            {nextState}
+                          </span>
+                        )}
+
+                      </div>
+
 
                       <p>
                         {prescription.dose}
@@ -631,70 +800,125 @@ export default function NursingMedicationSection({
                         {prescription.frequency}
                       </p>
 
-                      <p>
-                        {prescription.given_count}
-                        {' given · '}
-                        {prescription.held_count}
-                        {' held · '}
-                        {prescription.missed_count}
-                        {' missed · '}
-                        {prescription.refused_count}
-                        {' refused · '}
-                        {prescription.remaining_count}
-                        {' remaining'}
+
+                      <p className="nursing-medication-prescription-counts">
+
+                        <span>
+                          {prescription.given_count}
+                          {' given'}
+                        </span>
+
+                        <span>
+                          {prescription.held_count}
+                          {' held'}
+                        </span>
+
+                        <span>
+                          {prescription.missed_count}
+                          {' missed'}
+                        </span>
+
+                        <span>
+                          {prescription.refused_count}
+                          {' refused'}
+                        </span>
+
+                        <span>
+                          {prescription.remaining_count}
+                          {' remaining'}
+                        </span>
+
                       </p>
 
-                      {prescription.next_dose_at && (
-                        <p>
-                          Next dose:{' '}
-                          {formatDateTime(
-                            prescription.next_dose_at,
-                          )}
-                        </p>
-                      )}
                     </div>
+
+
+                    <div className="nursing-medication-prescription-next">
+
+                      {prescription.next_dose_at ? (
+                        <>
+                          <span>
+                            NEXT DOSE
+                          </span>
+
+                          <strong>
+                            {formatDateTime(
+                              prescription.next_dose_at,
+                            )}
+                          </strong>
+                        </>
+                      ) : (
+                        <span>
+                          No next dose scheduled
+                        </span>
+                      )}
+
+                    </div>
+
+
+                    <span className="nursing-medication-prescription-chevron">
+                      {expanded
+                        ? '↑'
+                        : '→'}
+                    </span>
+
                   </button>
 
+
                   {expanded && (
-                    <div
-                      style={{
-                        marginTop: '1rem',
-                        paddingTop: '1rem',
-                        borderTop:
-                          '1px solid var(--border-color, #e5e7eb)',
-                      }}
-                    >
-                      <p className="eyebrow">
-                        MEDICATION HISTORY
-                      </p>
+
+                    <div className="nursing-medication-history">
+
+                      <div className="nursing-medication-history-heading">
+
+                        <div>
+
+                          <span>
+                            MEDICATION HISTORY
+                          </span>
+
+                          <strong>
+                            Administration record
+                          </strong>
+
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            togglePrescriptionHistory(
+                              prescription.treatment_id,
+                            )
+                          }
+                        >
+                          Close
+                        </button>
+
+                      </div>
+
 
                       {loadingTreatmentHistory && (
-                        <div className="admin-empty-state">
+                        <div className="nursing-medication-state">
                           Loading medication history...
                         </div>
                       )}
 
+
                       {!loadingTreatmentHistory &&
                         history && (
-                          <div>
+
+                          <div className="nursing-medication-history-list">
+
                             {history.doses.map(
                               dose => (
+
                                 <div
                                   key={dose.id}
-                                  style={{
-                                    display: 'flex',
-                                    justifyContent:
-                                      'space-between',
-                                    alignItems:
-                                      'flex-start',
-                                    gap: '1rem',
-                                    padding:
-                                      '0.65rem 0',
-                                    borderBottom:
-                                      '1px solid var(--border-color, #e5e7eb)',
-                                  }}
+                                  className="nursing-medication-history-row"
                                 >
+
                                   <div>
+
                                     <strong>
                                       {formatDateTime(
                                         dose.scheduled_at,
@@ -702,56 +926,69 @@ export default function NursingMedicationSection({
                                     </strong>
 
                                     {dose.administration_at && (
-                                      <p>
-                                        Recorded:{' '}
+                                      <span>
+                                        Recorded{' '}
                                         {formatDateTime(
                                           dose.administration_at,
                                         )}
-                                      </p>
+                                      </span>
                                     )}
 
                                     {dose.dose_given && (
-                                      <p>
+                                      <span>
                                         Dose given:{' '}
                                         {dose.dose_given}
-                                      </p>
+                                      </span>
                                     )}
 
                                     {dose.reason && (
-                                      <p>
+                                      <span>
                                         Reason:{' '}
                                         {dose.reason}
-                                      </p>
+                                      </span>
                                     )}
 
                                     {dose.notes && (
-                                      <p>
+                                      <span>
                                         Notes:{' '}
                                         {dose.notes}
-                                      </p>
+                                      </span>
                                     )}
+
                                   </div>
 
-                                  <span className="nursing-queue-status">
-                                    {dose.administration_status ??
-                                      dose.scheduled_state}
+
+                                  <span
+                                    className={statusClass(
+                                      dose,
+                                    )}
+                                  >
+                                    {statusLabel(
+                                      dose,
+                                    )}
                                   </span>
+
                                 </div>
+
                               ),
                             )}
+
                           </div>
+
                         )}
+
                     </div>
                   )}
+
                 </article>
               )
             },
           )}
-        </section>
 
         </div>
-      )}
 
-    </section>
+      </section>
+
+    </div>
   )
 }

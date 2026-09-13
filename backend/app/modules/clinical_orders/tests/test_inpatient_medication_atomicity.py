@@ -30,6 +30,12 @@ from app.modules.clinical_orders.repositories import (
     MedicationTreatmentRepository,
     PrescriptionRepository,
 )
+from app.modules.diagnostics.repositories.diagnostic_repository import (
+    DiagnosticRepository,
+)
+from app.modules.laboratory.repositories.laboratory_test_repository import (
+    LaboratoryTestRepository,
+)
 from app.modules.clinical_orders.services import (
     ClinicalOrderService,
     InpatientMedicationService,
@@ -71,6 +77,8 @@ def build_service(db) -> ClinicalOrderService:
         episode_repository=EpisodeRepository(db),
         staff_repository=StaffRepository(db),
         prescription_repository=PrescriptionRepository(db),
+        laboratory_test_repository=LaboratoryTestRepository(db),
+        diagnostic_repository=DiagnosticRepository(db),
         inpatient_medication_service=InpatientMedicationService(
             db=db,
             episode_repository=EpisodeRepository(db),

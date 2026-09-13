@@ -180,7 +180,9 @@ export default function PatientDetails({
 
                 <div>
                   <span>
-                    {episode.flow_status}
+                    {episode.status === 'CLOSED'
+                      ? 'Discharged'
+                      : episode.flow_status}
                   </span>
 
                   {episode.flow_status ===

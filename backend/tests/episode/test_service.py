@@ -50,6 +50,13 @@ from app.modules.clinical_orders.enums import (
 from app.modules.clinical_orders.repositories import (
     ClinicalOrderRepository,
 )
+from app.modules.diagnostics.repositories.diagnostic_repository import (
+    DiagnosticRepository,
+)
+from app.modules.laboratory.repositories.laboratory_test_repository import (
+    LaboratoryTestRepository,
+)
+from app.bootstrap.laboratory import bootstrap_laboratory_tests
 from app.modules.clinical_orders.services.clinical_order_service import (
     ClinicalOrderService,
 )
@@ -72,6 +79,7 @@ from app.modules.episode.exceptions import (
     EpisodeNotFoundError,
     PatientNotFoundError,
     StaffNotFoundError,
+    StaffNotDoctorError,
 )
 
 from app.modules.episode.models import (
@@ -1453,13 +1461,304 @@ def test_admit_episode_closes_consultation_encounter(
     assert encounter.ended_at is not None
 
 
-def test_complete_consultation_keeps_episode_open(
+def test_start_doctor_consultation_assigns_doctor_and_creates_encounter(
+    db,
+    hospital,
+):
+    """
+    Starting an outpatient Doctor Consultation assigns the authenticated
+    doctor as the Episode managing doctor and creates an OPEN consultation
+    Encounter owned by that doctor.
+    """
+
+    _, staff, context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+        staff_number="STF-DOC-START-001",
+    )
+
+    service = build_episode_service(db)
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number="PAT-DOC-START-001",
+    )
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    started = service.start_doctor_consultation(
+        context=context,
+        episode_id=episode.id,
+    )
+
+    db.refresh(started)
+
+    assert started.status == EpisodeStatus.OPEN
+    assert started.managing_doctor_id == staff.id
+
+    encounters = (
+        db.query(Encounter)
+        .filter(
+            Encounter.episode_id == episode.id,
+            Encounter.title == "Doctor Consultation",
+            Encounter.status == EncounterStatus.OPEN,
+        )
+        .all()
+    )
+
+    assert len(encounters) == 1
+    assert encounters[0].staff_id == staff.id
+
+
+def test_start_doctor_consultation_reuses_existing_open_encounter(
+    db,
+    hospital,
+):
+    """
+    Starting the same Doctor Consultation twice is idempotent and does
+    not create duplicate OPEN Doctor Consultation encounters.
+    """
+
+    _, staff, context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+        staff_number="STF-DOC-START-002",
+    )
+
+    service = build_episode_service(db)
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number="PAT-DOC-START-002",
+    )
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    first = service.start_doctor_consultation(
+        context=context,
+        episode_id=episode.id,
+    )
+
+    second = service.start_doctor_consultation(
+        context=context,
+        episode_id=episode.id,
+    )
+
+    db.refresh(second)
+
+    encounters = (
+        db.query(Encounter)
+        .filter(
+            Encounter.episode_id == episode.id,
+            Encounter.title == "Doctor Consultation",
+            Encounter.status == EncounterStatus.OPEN,
+        )
+        .all()
+    )
+
+    assert first.id == second.id
+    assert second.managing_doctor_id == staff.id
+    assert len(encounters) == 1
+    assert encounters[0].staff_id == staff.id
+
+
+def test_start_doctor_consultation_rejects_takeover_by_another_doctor(
+    db,
+    hospital,
+):
+    """
+    A second doctor cannot take ownership of an Episode already managed
+    by another doctor.
+    """
+
+    _, first_staff, first_context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+        staff_number="STF-DOC-START-003",
+    )
+
+    _, second_staff, second_context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+        staff_number="STF-DOC-START-004",
+    )
+
+    service = build_episode_service(db)
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number="PAT-DOC-START-003",
+    )
+
+    episode = service.create_episode(
+        context=first_context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    started = service.start_doctor_consultation(
+        context=first_context,
+        episode_id=episode.id,
+    )
+
+    assert started.managing_doctor_id == first_staff.id
+
+    with pytest.raises(InvalidConsultationDispositionError):
+        service.start_doctor_consultation(
+            context=second_context,
+            episode_id=episode.id,
+        )
+
+    db.refresh(episode)
+
+    assert episode.managing_doctor_id == first_staff.id
+
+    encounters = (
+        db.query(Encounter)
+        .filter(
+            Encounter.episode_id == episode.id,
+            Encounter.title == "Doctor Consultation",
+            Encounter.status == EncounterStatus.OPEN,
+        )
+        .all()
+    )
+
+    assert len(encounters) == 1
+    assert encounters[0].staff_id == first_staff.id
+
+
+def test_start_doctor_consultation_rejects_non_doctor(
+    db,
+    hospital,
+):
+    """
+    A staff member who is not a Doctor cannot start a Doctor Consultation.
+    """
+
+    user = UserAccount(
+        hospital_id=hospital.id,
+        email=f"nurse-{uuid4()}@example.com",
+        password_hash="test-password-hash",
+        status=AccountStatus.ACTIVE,
+        is_superuser=False,
+    )
+
+    db.add(user)
+    db.flush()
+
+    staff_service = StaffService(
+        repository=StaffRepository(db),
+        employment_repository=StaffEmploymentRepository(db),
+        hospital_repository=HospitalRepository(db),
+    )
+
+    staff = staff_service.create_staff(
+        data=StaffCreate(
+            hospital_id=hospital.id,
+            staff_number=f"STF-NURSE-{uuid4().hex[:8]}",
+            first_name="Jane",
+            last_name="Nurse",
+            gender=Gender.FEMALE,
+            profession=Profession.NURSE,
+            date_of_birth=date(1990, 1, 1),
+            employment_status=EmploymentStatus.ACTIVE,
+            employment_type=EmploymentType.FULL_TIME,
+            date_employed=date.today(),
+        ),
+    )
+
+    staff.user_account_id = user.id
+    db.flush()
+
+    context = RequestContext(
+        user_id=user.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
+    service = build_episode_service(db)
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number="PAT-DOC-START-005",
+    )
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    with pytest.raises(StaffNotDoctorError):
+        service.start_doctor_consultation(
+            context=context,
+            episode_id=episode.id,
+        )
+
+
+def test_start_doctor_consultation_rejects_awaiting_review_episode(
+    db,
+    hospital,
+):
+    """
+    An Episode awaiting Doctor Review cannot start a new Doctor Consultation.
+    """
+
+    _, staff, context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+        staff_number="STF-DOC-START-006",
+    )
+
+    service = build_episode_service(db)
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number="PAT-DOC-START-006",
+    )
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    episode.flow_status = EpisodeFlowStatus.AWAITING_REVIEW
+    db.commit()
+
+    with pytest.raises(InvalidConsultationDispositionError):
+        service.start_doctor_consultation(
+            context=context,
+            episode_id=episode.id,
+        )
+
+    db.refresh(episode)
+
+    assert episode.flow_status == EpisodeFlowStatus.AWAITING_REVIEW
+    assert episode.managing_doctor_id is None
+
+
+def test_complete_consultation_closes_episode_when_no_downstream_work(
     db,
     hospital,
 ):
     """
     Completing an outpatient Doctor Consultation closes the
-    consultation while keeping the Episode OPEN.
+    consultation and closes the Episode when no downstream
+    clinical work remains.
     """
 
     _, staff, context = create_authenticated_staff(
@@ -1543,8 +1842,8 @@ def test_complete_consultation_keeps_episode_open(
 
     db.refresh(encounter)
 
-    assert completed.status == EpisodeStatus.OPEN
-    assert completed.flow_status == episode.flow_status
+    assert completed.status == EpisodeStatus.CLOSED
+    assert completed.closed_at is not None
     assert encounter.status == EncounterStatus.CLOSED
     assert encounter.ended_at is not None
     assert encounter.ended_at > signed_at
@@ -1638,7 +1937,23 @@ def test_complete_consultation_moves_episode_to_awaiting_investigations(
         episode_repository=EpisodeRepository(db),
         staff_repository=StaffRepository(db),
         prescription_repository=PrescriptionRepository(db),
+        laboratory_test_repository=LaboratoryTestRepository(db),
+        diagnostic_repository=DiagnosticRepository(db),
     )
+
+    bootstrap_laboratory_tests(
+        db,
+        hospital_id=hospital.id,
+    )
+
+    laboratory_test = (
+        LaboratoryTestRepository(db).get_by_code(
+            hospital_id=hospital.id,
+            code="CBC",
+        )
+    )
+
+    assert laboratory_test is not None
 
     order = order_service.create_order(
         context=context,
@@ -1649,6 +1964,11 @@ def test_complete_consultation_moves_episode_to_awaiting_investigations(
             "test_code": "CBC",
             "test_name": "Full Blood Count",
         },
+        items=[
+            {
+                "laboratory_test_id": laboratory_test.id,
+            },
+        ],
     )
 
     assert order.status.value == "REQUESTED"
@@ -1672,13 +1992,142 @@ def test_complete_consultation_moves_episode_to_awaiting_investigations(
     assert encounter.ended_at is not None
 
 
-def test_complete_doctor_review_moves_episode_to_routed(
+def test_complete_consultation_moves_episode_to_awaiting_pharmacy(
     db,
     hospital,
 ):
     """
-    Completing an outpatient Doctor Review closes the encounter
-    while keeping the Episode OPEN and returning it to ROUTED.
+    Completing a consultation with an outstanding medication order
+    moves the Episode to AWAITING_PHARMACY.
+    """
+
+    _, staff, context = create_authenticated_staff(
+        db=db,
+        hospital=hospital,
+        staff_number="STF-DOC-MED-001",
+    )
+
+    service = build_episode_service(db)
+
+    patient = create_patient(
+        db=db,
+        hospital_id=hospital.id,
+        hospital_number="PAT-DOC-MED-001",
+    )
+
+    episode = service.create_episode(
+        context=context,
+        patient_id=patient.id,
+        title="Medical Consultation",
+    )
+
+    encounter = create_open_encounter(
+        db=db,
+        hospital=hospital,
+        episode=episode,
+        staff=staff,
+    )
+
+    encounter.title = "Doctor Consultation"
+    db.commit()
+    db.refresh(encounter)
+
+    document_service = ClinicalDocumentService(
+        repository=ClinicalDocumentRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+    )
+
+    document = document_service.create_draft(
+        context=context,
+        encounter_id=encounter.id,
+        document_type=ClinicalDocumentType.INITIAL_CLERKING,
+        authored_by=staff.id,
+        content={
+            "presenting_complaints": [
+                "Fever",
+            ],
+            "history_of_presenting_complaints": (
+                "Two days of fever."
+            ),
+        },
+    )
+
+    document_service.sign_document(
+        context=context,
+        document_id=document.id,
+        signed_at=datetime(
+            2026,
+            8,
+            26,
+            15,
+            0,
+            tzinfo=UTC,
+        ),
+    )
+
+    order_service = ClinicalOrderService(
+        repository=ClinicalOrderRepository(db),
+        event_service=ClinicalEventService(
+            repository=ClinicalEventRepository(db),
+        ),
+        encounter_repository=EncounterRepository(db),
+        episode_repository=EpisodeRepository(db),
+        staff_repository=StaffRepository(db),
+        prescription_repository=PrescriptionRepository(db),
+        laboratory_test_repository=LaboratoryTestRepository(db),
+        diagnostic_repository=DiagnosticRepository(db),
+    )
+
+    order = order_service.create_order(
+        context=context,
+        encounter_id=encounter.id,
+        order_type=ClinicalOrderType.MEDICATION,
+        priority="ROUTINE",
+        details={
+            "medication_id": str(uuid4()),
+            "medicine_name": "Paracetamol",
+            "strength": "500 mg",
+            "dose": "500",
+            "dose_unit": "mg",
+            "route": "ORAL",
+            "frequency": "QID",
+            "duration": "3",
+            "duration_unit": "days",
+            "quantity": "12 tablets",
+            "directions": "Take after food.",
+        },
+    )
+
+    assert order.status.value == "REQUESTED"
+
+    completed = service.complete_consultation(
+        context=context,
+        episode_id=episode.id,
+        encounter_id=encounter.id,
+        disposition=ConsultationDisposition.COMPLETE,
+    )
+
+    db.refresh(completed)
+    db.refresh(encounter)
+
+    assert completed.status == EpisodeStatus.OPEN
+    assert (
+        completed.flow_status
+        == EpisodeFlowStatus.AWAITING_PHARMACY
+    )
+    assert encounter.status == EncounterStatus.CLOSED
+    assert encounter.ended_at is not None
+
+
+def test_complete_doctor_review_closes_episode(
+    db,
+    hospital,
+):
+    """
+    Completing an outpatient Doctor Review closes both the
+    Doctor Review encounter and the Episode.
     """
 
     _, staff, context = create_authenticated_staff(
@@ -1731,8 +2180,9 @@ def test_complete_doctor_review_moves_episode_to_routed(
     db.refresh(encounter)
     db.refresh(completed)
 
-    assert completed.status == EpisodeStatus.OPEN
-    assert completed.flow_status == EpisodeFlowStatus.ROUTED
+    assert completed.status == EpisodeStatus.CLOSED
+    assert completed.closed_at is not None
+    assert completed_at_before <= completed.closed_at <= completed_at_after
 
     assert encounter.status == EncounterStatus.CLOSED
     assert encounter.ended_at is not None

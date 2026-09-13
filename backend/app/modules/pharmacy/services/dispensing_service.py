@@ -30,6 +30,13 @@ from app.modules.pharmacy.repositories import (
     DispensingRepository,
 )
 from app.modules.staff.repository import StaffRepository
+from app.modules.episode.models import (
+    EpisodeFlowStatus,
+    EpisodeStatus,
+)
+from app.modules.episode.repositories.episode_repository import (
+    EpisodeRepository,
+)
 
 
 class DispensingService:
@@ -45,12 +52,14 @@ class DispensingService:
         prescription_repository: PrescriptionRepository,
         event_service: ClinicalEventService,
         staff_repository: StaffRepository,
+        episode_repository: EpisodeRepository,
     ) -> None:
         self.dispensing_repository = dispensing_repository
         self.clinical_order_repository = clinical_order_repository
         self.prescription_repository = prescription_repository
         self.event_service = event_service
         self.staff_repository = staff_repository
+        self.episode_repository = episode_repository
 
     def dispense(
         self,
@@ -146,6 +155,28 @@ class DispensingService:
                 },
                 commit=False,
             )
+
+            episode = self.episode_repository.get_by_id(
+                hospital_id=context.hospital_id,
+                episode_id=order.encounter.episode_id,
+            )
+
+            if (
+                episode is not None
+                and episode.flow_status
+                == EpisodeFlowStatus.AWAITING_PHARMACY
+            ):
+                outstanding_medications = (
+                    self.clinical_order_repository
+                    .list_outstanding_medication_orders_for_episode(
+                        hospital_id=context.hospital_id,
+                        episode_id=episode.id,
+                    )
+                )
+
+                if not outstanding_medications:
+                    episode.status = EpisodeStatus.CLOSED
+                    episode.closed_at = dispensed_at
 
             self.dispensing_repository.db.commit()
 

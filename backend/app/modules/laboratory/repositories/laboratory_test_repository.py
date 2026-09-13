@@ -49,6 +49,25 @@ class LaboratoryTestRepository:
             self.db.scalars(statement),
         )
 
+    def get_by_id(
+        self,
+        *,
+        hospital_id,
+        test_id,
+    ) -> LaboratoryTest | None:
+        statement = (
+            select(LaboratoryTest)
+            .options(
+                selectinload(LaboratoryTest.analytes),
+            )
+            .where(
+                LaboratoryTest.hospital_id == hospital_id,
+                LaboratoryTest.id == test_id,
+            )
+        )
+
+        return self.db.scalar(statement)
+
     def get_by_code(
         self,
         *,

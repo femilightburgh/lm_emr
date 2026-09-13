@@ -23,6 +23,9 @@ from app.modules.clinical_orders.repositories import (
 from app.modules.clinical_orders.services import (
     ClinicalOrderService,
 )
+from app.modules.diagnostics.repositories.diagnostic_repository import (
+    DiagnosticRepository,
+)
 from app.modules.laboratory.repositories import (
     LaboratoryTestRepository,
 )
@@ -208,6 +211,73 @@ def create_order_service(db):
         episode_repository=EpisodeRepository(db),
         staff_repository=StaffRepository(db),
         prescription_repository=PrescriptionRepository(db),
+        laboratory_test_repository=LaboratoryTestRepository(db),
+        diagnostic_repository=DiagnosticRepository(db),
+    )
+
+
+def create_laboratory_order(
+    db,
+    *,
+    context,
+    encounter_id,
+    laboratory_test_id,
+):
+    order = create_order_service(db).create_order(
+        context=context,
+        encounter_id=encounter_id,
+        order_type=ClinicalOrderType.LABORATORY,
+        priority="ROUTINE",
+        details={},
+        items=[
+            {
+                "laboratory_test_id": laboratory_test_id,
+            },
+        ],
+    )
+
+    # Result-service tests begin at the point where the laboratory
+    # investigation is actively being processed.
+    order.items[0].status = ClinicalOrderStatus.IN_PROGRESS
+    db.commit()
+
+    return order
+
+
+def get_laboratory_test(
+    db,
+    *,
+    hospital_id,
+    code,
+):
+    return (
+        db.query(LaboratoryTest)
+        .filter(
+            LaboratoryTest.hospital_id == hospital_id,
+            LaboratoryTest.code == code,
+        )
+        .one()
+    )
+
+
+def create_laboratory_order_by_code(
+    db,
+    *,
+    context,
+    encounter_id,
+    code,
+):
+    laboratory_test = get_laboratory_test(
+        db,
+        hospital_id=context.hospital_id,
+        code=code,
+    )
+
+    return create_laboratory_order(
+        db,
+        context=context,
+        encounter_id=encounter_id,
+        laboratory_test_id=laboratory_test.id,
     )
 
 
@@ -216,7 +286,6 @@ def create_result_service(db):
         repository=ClinicalResultRepository(db),
         clinical_order_repository=ClinicalOrderRepository(db),
         episode_repository=EpisodeRepository(db),
-        laboratory_test_repository=LaboratoryTestRepository(db),
         event_service=ClinicalEventService(
             repository=ClinicalEventRepository(db),
         ),
@@ -235,22 +304,27 @@ def test_record_laboratory_result_completes_order_and_creates_event(
 
     order_service = create_order_service(db)
 
-    order = order_service.create_order(
+    laboratory_test = get_laboratory_test(
+        db,
+        hospital_id=hospital.id,
+        code="CBC",
+    )
+
+    order = create_laboratory_order(
+        db,
         context=context,
         encounter_id=encounter.id,
-        order_type=ClinicalOrderType.LABORATORY,
-        priority="ROUTINE",
-        details={
-            "test_code": "CBC",
-            "test_name": "Full Blood Count",
-        },
+        laboratory_test_id=laboratory_test.id,
     )
+
+    order_item = order.items[0]
 
     result_service = create_result_service(db)
 
     result = result_service.record_result(
         context=context,
         order_id=order.id,
+        order_item_id=order_item.id,
         result_type=ClinicalResultType.LABORATORY,
         result_data={
             "hemoglobin": 13.2,
@@ -263,6 +337,7 @@ def test_record_laboratory_result_completes_order_and_creates_event(
 
     assert result.id is not None
     assert result.order_id == order.id
+    assert result.order_item_id == order_item.id
     assert result.recorded_by == staff.id
     assert result.result_type == ClinicalResultType.LABORATORY
     assert result.result_data["hemoglobin"] == 13.2
@@ -325,15 +400,11 @@ def test_record_result_rejects_cancelled_order(
         hospital,
     )
 
-    order = create_order_service(db).create_order(
+    order = create_laboratory_order_by_code(
+        db,
         context=context,
         encounter_id=encounter.id,
-        order_type=ClinicalOrderType.LABORATORY,
-        priority="ROUTINE",
-        details={
-            "test_code": "CBC",
-            "test_name": "Full Blood Count",
-        },
+        code="CBC",
     )
 
     order.status = ClinicalOrderStatus.CANCELLED
@@ -345,6 +416,7 @@ def test_record_result_rejects_cancelled_order(
         create_result_service(db).record_result(
             context=context,
             order_id=order.id,
+            order_item_id=order.items[0].id,
             result_type=ClinicalResultType.LABORATORY,
             result_data={
                 "hemoglobin": 13.2,
@@ -361,15 +433,11 @@ def test_record_result_rejects_completed_order(
         hospital,
     )
 
-    order = create_order_service(db).create_order(
+    order = create_laboratory_order_by_code(
+        db,
         context=context,
         encounter_id=encounter.id,
-        order_type=ClinicalOrderType.LABORATORY,
-        priority="ROUTINE",
-        details={
-            "test_code": "CBC",
-            "test_name": "Full Blood Count",
-        },
+        code="CBC",
     )
 
     order.status = ClinicalOrderStatus.COMPLETED
@@ -381,6 +449,7 @@ def test_record_result_rejects_completed_order(
         create_result_service(db).record_result(
             context=context,
             order_id=order.id,
+            order_item_id=order.items[0].id,
             result_type=ClinicalResultType.LABORATORY,
             result_data={
                 "hemoglobin": 13.2,
@@ -424,24 +493,25 @@ def test_last_investigation_result_moves_episode_to_awaiting_review(
     db,
     hospital,
 ):
-    context, _, episode, encounter = create_test_encounter(
+    context, staff, episode, encounter = create_test_encounter(
         db,
         hospital,
     )
 
+    episode.managing_doctor_id = staff.id
+    db.commit()
+
     order_service = create_order_service(db)
     result_service = create_result_service(db)
 
-    first = order_service.create_order(
+    first = create_laboratory_order_by_code(
+        db,
         context=context,
         encounter_id=encounter.id,
-        order_type=ClinicalOrderType.LABORATORY,
-        priority="ROUTINE",
-        details={
-            "test_code": "CBC",
-            "test_name": "Full Blood Count",
-        },
+        code="CBC",
     )
+
+    first_item = first.items[0]
 
     second = order_service.create_order(
         context=context,
@@ -464,6 +534,7 @@ def test_last_investigation_result_moves_episode_to_awaiting_review(
     result_service.record_result(
         context=context,
         order_id=first.id,
+        order_item_id=first.items[0].id,
         result_type=ClinicalResultType.LABORATORY,
         result_data={
             "hemoglobin": 13.2,
@@ -501,16 +572,14 @@ def test_record_structured_laboratory_values(
 
     order_service = create_order_service(db)
 
-    order = order_service.create_order(
+    order = create_laboratory_order_by_code(
+        db,
         context=context,
         encounter_id=encounter.id,
-        order_type=ClinicalOrderType.LABORATORY,
-        priority="ROUTINE",
-        details={
-            "test_code": "CBC",
-            "test_name": "Full Blood Count",
-        },
+        code="CBC",
     )
+
+    order_item = order.items[0]
 
     laboratory_test = (
         db.query(LaboratoryTest)
@@ -531,6 +600,7 @@ def test_record_structured_laboratory_values(
     result = result_service.record_result(
         context=context,
         order_id=order.id,
+        order_item_id=order.items[0].id,
         result_type=ClinicalResultType.LABORATORY,
         values=[
             {
@@ -574,16 +644,14 @@ def test_record_result_rejects_unknown_laboratory_analyte(
 
     order_service = create_order_service(db)
 
-    order = order_service.create_order(
+    order = create_laboratory_order_by_code(
+        db,
         context=context,
         encounter_id=encounter.id,
-        order_type=ClinicalOrderType.LABORATORY,
-        priority="ROUTINE",
-        details={
-            "test_code": "CBC",
-            "test_name": "Full Blood Count",
-        },
+        code="CBC",
     )
+
+    order_item = order.items[0]
 
     laboratory_test = (
         db.query(LaboratoryTest)
@@ -608,6 +676,7 @@ def test_record_result_rejects_unknown_laboratory_analyte(
         result_service.record_result(
             context=context,
             order_id=order.id,
+            order_item_id=order.items[0].id,
             result_type=ClinicalResultType.LABORATORY,
             values=[
                 {
@@ -629,16 +698,14 @@ def test_record_result_rejects_invalid_laboratory_value_type(
 
     order_service = create_order_service(db)
 
-    order = order_service.create_order(
+    order = create_laboratory_order_by_code(
+        db,
         context=context,
         encounter_id=encounter.id,
-        order_type=ClinicalOrderType.LABORATORY,
-        priority="ROUTINE",
-        details={
-            "test_code": "CBC",
-            "test_name": "Full Blood Count",
-        },
+        code="CBC",
     )
+
+    order_item = order.items[0]
 
     laboratory_test = (
         db.query(LaboratoryTest)
@@ -663,6 +730,7 @@ def test_record_result_rejects_invalid_laboratory_value_type(
         result_service.record_result(
             context=context,
             order_id=order.id,
+            order_item_id=order.items[0].id,
             result_type=ClinicalResultType.LABORATORY,
             values=[
                 {
@@ -682,15 +750,11 @@ def test_record_result_rejects_duplicate_analyte(
         hospital,
     )
 
-    order = create_order_service(db).create_order(
+    order = create_laboratory_order_by_code(
+        db,
         context=context,
         encounter_id=encounter.id,
-        order_type=ClinicalOrderType.LABORATORY,
-        priority="ROUTINE",
-        details={
-            "test_code": "CBC",
-            "test_name": "Full Blood Count",
-        },
+        code="CBC",
     )
 
     laboratory_test = (
@@ -716,6 +780,7 @@ def test_record_result_rejects_duplicate_analyte(
         result_service.record_result(
             context=context,
             order_id=order.id,
+            order_item_id=order.items[0].id,
             result_type=ClinicalResultType.LABORATORY,
             values=[
                 {
@@ -739,15 +804,11 @@ def test_record_result_rejects_invalid_coded_value(
         hospital,
     )
 
-    order = create_order_service(db).create_order(
+    order = create_laboratory_order_by_code(
+        db,
         context=context,
         encounter_id=encounter.id,
-        order_type=ClinicalOrderType.LABORATORY,
-        priority="ROUTINE",
-        details={
-            "test_code": "MALARIA",
-            "test_name": "Malaria Test",
-        },
+        code="MALARIA",
     )
 
     laboratory_test = (
@@ -773,6 +834,7 @@ def test_record_result_rejects_invalid_coded_value(
         result_service.record_result(
             context=context,
             order_id=order.id,
+            order_item_id=order.items[0].id,
             result_type=ClinicalResultType.LABORATORY,
             values=[
                 {
@@ -792,15 +854,11 @@ def test_record_result_accepts_valid_coded_value(
         hospital,
     )
 
-    order = create_order_service(db).create_order(
+    order = create_laboratory_order_by_code(
+        db,
         context=context,
         encounter_id=encounter.id,
-        order_type=ClinicalOrderType.LABORATORY,
-        priority="ROUTINE",
-        details={
-            "test_code": "MALARIA",
-            "test_name": "Malaria Test",
-        },
+        code="MALARIA",
     )
 
     laboratory_test = (
@@ -823,6 +881,7 @@ def test_record_result_accepts_valid_coded_value(
     result = result_service.record_result(
         context=context,
         order_id=order.id,
+        order_item_id=order.items[0].id,
         result_type=ClinicalResultType.LABORATORY,
         values=[
             {
@@ -845,15 +904,11 @@ def test_record_draft_result_does_not_complete_order(
         hospital,
     )
 
-    order = create_order_service(db).create_order(
+    order = create_laboratory_order_by_code(
+        db,
         context=context,
         encounter_id=encounter.id,
-        order_type=ClinicalOrderType.LABORATORY,
-        priority="ROUTINE",
-        details={
-            "test_code": "CBC",
-            "test_name": "Full Blood Count",
-        },
+        code="CBC",
     )
 
     order.status = ClinicalOrderStatus.IN_PROGRESS
@@ -862,6 +917,7 @@ def test_record_draft_result_does_not_complete_order(
     result = create_result_service(db).record_result(
         context=context,
         order_id=order.id,
+        order_item_id=order.items[0].id,
         result_type=ClinicalResultType.LABORATORY,
         status=ClinicalResultStatus.DRAFT,
         result_data={
@@ -877,6 +933,177 @@ def test_record_draft_result_does_not_complete_order(
     assert order.completed_at is None
 
 
+def test_finalize_result_completes_only_completed_group_item(
+    db,
+    hospital,
+):
+    context, _, _, encounter = create_test_encounter(
+        db,
+        hospital,
+    )
+
+    order_service = create_order_service(db)
+
+    laboratory_tests = [
+        get_laboratory_test(
+            db,
+            hospital_id=hospital.id,
+            code=code,
+        )
+        for code in ("CBC", "EUCR", "LFT")
+    ]
+
+    order = order_service.create_order(
+        context=context,
+        encounter_id=encounter.id,
+        order_type=ClinicalOrderType.LABORATORY,
+        priority="ROUTINE",
+        details={},
+        items=[
+            {
+                "laboratory_test_id": laboratory_test.id,
+            }
+            for laboratory_test in laboratory_tests
+        ],
+    )
+
+    order.status = ClinicalOrderStatus.IN_PROGRESS
+
+    cbc_item = order.items[0]
+    eucr_item = order.items[1]
+    lft_item = order.items[2]
+
+    cbc_item.status = ClinicalOrderStatus.IN_PROGRESS
+
+    db.commit()
+
+    cbc_test = laboratory_tests[0]
+    hemoglobin = next(
+        analyte
+        for analyte in cbc_test.analytes
+        if analyte.code == "hemoglobin"
+    )
+
+    result_service = create_result_service(db)
+
+    result = result_service.record_result(
+        context=context,
+        order_id=order.id,
+        order_item_id=cbc_item.id,
+        result_type=ClinicalResultType.LABORATORY,
+        status=ClinicalResultStatus.DRAFT,
+        values=[
+            {
+                "analyte_id": hemoglobin.id,
+                "value_numeric": 13.2,
+            },
+        ],
+    )
+
+    db.refresh(order)
+    assert result.status == ClinicalResultStatus.DRAFT
+    assert order.status == ClinicalOrderStatus.IN_PROGRESS
+
+    result = result_service.finalize_result(
+        context=context,
+        result_id=result.id,
+    )
+
+    db.refresh(order)
+    db.refresh(cbc_item)
+    db.refresh(eucr_item)
+    db.refresh(lft_item)
+    db.refresh(result)
+
+    assert result.status == ClinicalResultStatus.FINAL
+    assert cbc_item.status == ClinicalOrderStatus.COMPLETED
+    assert eucr_item.status == ClinicalOrderStatus.REQUESTED
+    assert lft_item.status == ClinicalOrderStatus.REQUESTED
+
+    assert order.status == ClinicalOrderStatus.IN_PROGRESS
+    assert order.completed_at is None
+
+
+def test_record_final_result_completes_only_completed_group_item(
+    db,
+    hospital,
+):
+    context, _, _, encounter = create_test_encounter(
+        db,
+        hospital,
+    )
+
+    order_service = create_order_service(db)
+
+    laboratory_tests = [
+        get_laboratory_test(
+            db,
+            hospital_id=hospital.id,
+            code=code,
+        )
+        for code in ("CBC", "EUCR", "LFT")
+    ]
+
+    order = order_service.create_order(
+        context=context,
+        encounter_id=encounter.id,
+        order_type=ClinicalOrderType.LABORATORY,
+        priority="ROUTINE",
+        details={},
+        items=[
+            {
+                "laboratory_test_id": laboratory_test.id,
+            }
+            for laboratory_test in laboratory_tests
+        ],
+    )
+
+    order.status = ClinicalOrderStatus.IN_PROGRESS
+
+    cbc_item = order.items[0]
+    eucr_item = order.items[1]
+    lft_item = order.items[2]
+
+    cbc_item.status = ClinicalOrderStatus.IN_PROGRESS
+
+    db.commit()
+
+    cbc_test = laboratory_tests[0]
+    hemoglobin = next(
+        analyte
+        for analyte in cbc_test.analytes
+        if analyte.code == "hemoglobin"
+    )
+
+    result = create_result_service(db).record_result(
+        context=context,
+        order_id=order.id,
+        order_item_id=cbc_item.id,
+        result_type=ClinicalResultType.LABORATORY,
+        status=ClinicalResultStatus.FINAL,
+        values=[
+            {
+                "analyte_id": hemoglobin.id,
+                "value_numeric": 13.2,
+            },
+        ],
+    )
+
+    db.refresh(order)
+    db.refresh(cbc_item)
+    db.refresh(eucr_item)
+    db.refresh(lft_item)
+    db.refresh(result)
+
+    assert result.status == ClinicalResultStatus.FINAL
+    assert cbc_item.status == ClinicalOrderStatus.COMPLETED
+    assert eucr_item.status == ClinicalOrderStatus.REQUESTED
+    assert lft_item.status == ClinicalOrderStatus.REQUESTED
+
+    assert order.status == ClinicalOrderStatus.IN_PROGRESS
+    assert order.completed_at is None
+
+
 def test_record_final_result_completes_order(
     db,
     hospital,
@@ -886,15 +1113,11 @@ def test_record_final_result_completes_order(
         hospital,
     )
 
-    order = create_order_service(db).create_order(
+    order = create_laboratory_order_by_code(
+        db,
         context=context,
         encounter_id=encounter.id,
-        order_type=ClinicalOrderType.LABORATORY,
-        priority="ROUTINE",
-        details={
-            "test_code": "CBC",
-            "test_name": "Full Blood Count",
-        },
+        code="CBC",
     )
 
     # The result workflow normally reaches IN_PROGRESS before reporting.
@@ -904,6 +1127,7 @@ def test_record_final_result_completes_order(
     result = create_result_service(db).record_result(
         context=context,
         order_id=order.id,
+        order_item_id=order.items[0].id,
         result_type=ClinicalResultType.LABORATORY,
         status=ClinicalResultStatus.FINAL,
         result_data={
@@ -928,15 +1152,11 @@ def test_draft_laboratory_result_can_be_incomplete(
         hospital,
     )
 
-    order = create_order_service(db).create_order(
+    order = create_laboratory_order_by_code(
+        db,
         context=context,
         encounter_id=encounter.id,
-        order_type=ClinicalOrderType.LABORATORY,
-        priority="ROUTINE",
-        details={
-            "test_code": "CBC",
-            "test_name": "Full Blood Count",
-        },
+        code="CBC",
     )
 
     order.status = ClinicalOrderStatus.IN_PROGRESS
@@ -945,6 +1165,7 @@ def test_draft_laboratory_result_can_be_incomplete(
     result = create_result_service(db).record_result(
         context=context,
         order_id=order.id,
+        order_item_id=order.items[0].id,
         result_type=ClinicalResultType.LABORATORY,
         status=ClinicalResultStatus.DRAFT,
         values=[],
@@ -964,15 +1185,11 @@ def test_numeric_result_below_reference_range_is_flagged_low(
         hospital,
     )
 
-    order = create_order_service(db).create_order(
+    order = create_laboratory_order_by_code(
+        db,
         context=context,
         encounter_id=encounter.id,
-        order_type=ClinicalOrderType.LABORATORY,
-        priority="ROUTINE",
-        details={
-            "test_code": "CBC",
-            "test_name": "Full Blood Count",
-        },
+        code="CBC",
     )
 
     order.status = ClinicalOrderStatus.IN_PROGRESS
@@ -1000,6 +1217,7 @@ def test_numeric_result_below_reference_range_is_flagged_low(
     result = create_result_service(db).record_result(
         context=context,
         order_id=order.id,
+        order_item_id=order.items[0].id,
         result_type=ClinicalResultType.LABORATORY,
         status=ClinicalResultStatus.DRAFT,
         values=[
@@ -1022,15 +1240,11 @@ def test_numeric_result_above_reference_range_is_flagged_high(
         hospital,
     )
 
-    order = create_order_service(db).create_order(
+    order = create_laboratory_order_by_code(
+        db,
         context=context,
         encounter_id=encounter.id,
-        order_type=ClinicalOrderType.LABORATORY,
-        priority="ROUTINE",
-        details={
-            "test_code": "CBC",
-            "test_name": "Full Blood Count",
-        },
+        code="CBC",
     )
 
     order.status = ClinicalOrderStatus.IN_PROGRESS
@@ -1058,6 +1272,7 @@ def test_numeric_result_above_reference_range_is_flagged_high(
     result = create_result_service(db).record_result(
         context=context,
         order_id=order.id,
+        order_item_id=order.items[0].id,
         result_type=ClinicalResultType.LABORATORY,
         status=ClinicalResultStatus.DRAFT,
         values=[
@@ -1080,15 +1295,11 @@ def test_numeric_result_within_reference_range_has_no_abnormal_flag(
         hospital,
     )
 
-    order = create_order_service(db).create_order(
+    order = create_laboratory_order_by_code(
+        db,
         context=context,
         encounter_id=encounter.id,
-        order_type=ClinicalOrderType.LABORATORY,
-        priority="ROUTINE",
-        details={
-            "test_code": "CBC",
-            "test_name": "Full Blood Count",
-        },
+        code="CBC",
     )
 
     order.status = ClinicalOrderStatus.IN_PROGRESS
@@ -1116,6 +1327,7 @@ def test_numeric_result_within_reference_range_has_no_abnormal_flag(
     result = create_result_service(db).record_result(
         context=context,
         order_id=order.id,
+        order_item_id=order.items[0].id,
         result_type=ClinicalResultType.LABORATORY,
         status=ClinicalResultStatus.DRAFT,
         values=[

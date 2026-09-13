@@ -136,8 +136,8 @@ const [prescriptionDirections, setPrescriptionDirections] =
 const [prescriptionIndication, setPrescriptionIndication] =
   useState('')
 
-const [selectedLaboratoryTestId, setSelectedLaboratoryTestId] =
-  useState('')
+const [selectedLaboratoryTestIds, setSelectedLaboratoryTestIds] =
+  useState<string[]>([])
 
 const [selectedDiagnosticInvestigationId, setSelectedDiagnosticInvestigationId] =
   useState('')
@@ -178,28 +178,24 @@ async function cancelOrder(
 function handleLaboratoryTestChange(
   testId: string,
 ) {
-  setSelectedLaboratoryTestId(testId)
+  setSelectedLaboratoryTestIds(
+    current =>
+      current.includes(testId)
+        ? current.filter(id => id !== testId)
+        : [...current, testId],
+  )
 
-  if (!testId) {
-    setOrderTestCode('')
-    setOrderTestName('')
-    return
-  }
+  const nextIds = selectedLaboratoryTestIds.includes(testId)
+    ? selectedLaboratoryTestIds.filter(id => id !== testId)
+    : [...selectedLaboratoryTestIds, testId]
 
-  const test =
+  const firstTest =
     laboratoryTests.find(
-      candidate =>
-        candidate.id === testId,
+      test => test.id === nextIds[0],
     )
 
-  if (!test) {
-    setOrderTestCode('')
-    setOrderTestName('')
-    return
-  }
-
-  setOrderTestCode(test.code)
-  setOrderTestName(test.name)
+  setOrderTestCode(firstTest?.code ?? '')
+  setOrderTestName(firstTest?.name ?? '')
 }
 
 
@@ -353,34 +349,73 @@ async function saveOrder() {
     let details: Record<string, unknown>
 
     if (orderType === 'LABORATORY') {
-      if (!selectedLaboratoryTestId) {
+      if (selectedLaboratoryTestIds.length === 0) {
         onError?.(
-          'Select a laboratory investigation from the catalogue.',
+          'Select at least one laboratory investigation from the catalogue.',
         )
         return
       }
 
-      const selectedTest =
-        laboratoryTests.find(
-          test =>
-            test.id ===
-            selectedLaboratoryTestId,
+      const selectedTests =
+        selectedLaboratoryTestIds.map(testId =>
+          laboratoryTests.find(
+            test => test.id === testId,
+          ),
         )
 
-      if (!selectedTest) {
+      if (selectedTests.some(test => !test)) {
         onError?.(
-          'Selected laboratory investigation could not be found.',
+          'One or more selected laboratory investigations could not be found.',
         )
         return
       }
 
-      details = {
-        test_code:
-          selectedTest.code,
+      await createClinicalOrder(
+        accessToken,
+        {
+          encounter_id:
+            selectedEncounter.id,
 
-        test_name:
-          selectedTest.name,
-      }
+          order_type:
+            orderType,
+
+          priority:
+            orderPriority,
+
+          details: {},
+
+          items:
+            selectedTests
+              .filter(
+                (
+                  selectedTest,
+                ): selectedTest is LaboratoryTest =>
+                  selectedTest !== undefined,
+              )
+              .map(
+                selectedTest => ({
+                  laboratory_test_id:
+                    selectedTest.id,
+                }),
+              ),
+        },
+      )
+
+      await refreshEncounterContext(
+        selectedEncounter.id,
+      )
+
+      setOrderTestCode('')
+      setOrderTestName('')
+      setSelectedLaboratoryTestIds([])
+
+      onSuccess?.(
+        selectedTests.length === 1
+          ? 'Clinical order created.'
+          : `Clinical order created with ${selectedTests.length} investigations.`,
+      )
+
+      return
     } else if (orderType === 'DIAGNOSTIC') {
       if (!selectedDiagnosticInvestigationId) {
         onError?.(
@@ -464,8 +499,8 @@ async function saveOrder() {
     orderPriority,
     setOrderPriority,
 
-    selectedLaboratoryTestId,
-    setSelectedLaboratoryTestId,
+    selectedLaboratoryTestIds,
+    setSelectedLaboratoryTestIds,
     selectedDiagnosticInvestigationId,
     setSelectedDiagnosticInvestigationId,
 

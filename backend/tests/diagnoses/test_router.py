@@ -48,6 +48,9 @@ def seed_terminology_concept(
         system=TerminologySystem.ICD_10_CM,
         code=code,
         display_name=display_name,
+        release_version="2026 Jan",
+        is_leaf=True,
+        is_residual=False,
         active=True,
     )
 

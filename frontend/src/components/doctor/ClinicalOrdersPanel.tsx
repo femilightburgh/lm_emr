@@ -33,13 +33,11 @@ interface Props {
   orderPriority: string
 
   laboratoryTests: LaboratoryTest[]
-  selectedLaboratoryTestId: string
+  selectedLaboratoryTestIds: string[]
 
   diagnosticInvestigations: DiagnosticInvestigation[]
   selectedDiagnosticInvestigationId: string
 
-  orderTestCode: string
-  orderTestName: string
   orderMedicationId: string
   orderDose: string
 
@@ -151,8 +149,24 @@ function getOrderLabel(
   order: ClinicalOrder,
 ): string {
   if (order.order_type === 'LABORATORY') {
-    const testName = order.details.test_name
-    const testCode = order.details.test_code
+    const laboratoryItems =
+      order.items.filter(
+        item =>
+          item.item_type === 'LABORATORY',
+      )
+
+    if (laboratoryItems.length > 1) {
+      return `${laboratoryItems.length} laboratory investigations`
+    }
+
+    const item =
+      laboratoryItems[0]
+
+    const testName =
+      item?.details.test_name
+
+    const testCode =
+      item?.details.test_code
 
     if (
       typeof testName === 'string' &&
@@ -166,6 +180,26 @@ function getOrderLabel(
       testCode.trim()
     ) {
       return testCode
+    }
+
+    const legacyTestName =
+      order.details.test_name
+
+    const legacyTestCode =
+      order.details.test_code
+
+    if (
+      typeof legacyTestName === 'string' &&
+      legacyTestName.trim()
+    ) {
+      return legacyTestName
+    }
+
+    if (
+      typeof legacyTestCode === 'string' &&
+      legacyTestCode.trim()
+    ) {
+      return legacyTestCode
     }
 
     return 'Laboratory investigation'
@@ -219,11 +253,59 @@ function getOrderDetail(
   order: ClinicalOrder,
 ): string {
   if (order.order_type === 'LABORATORY') {
-    const code = order.details.test_code
+    const laboratoryItems =
+      order.items.filter(
+        item =>
+          item.item_type === 'LABORATORY',
+      )
 
-    return typeof code === 'string' &&
+    if (laboratoryItems.length > 1) {
+      return laboratoryItems
+        .map(item => {
+          const code =
+            item.details.test_code
+
+          const name =
+            item.details.test_name
+
+          if (
+            typeof code === 'string' &&
+            code.trim()
+          ) {
+            return code
+          }
+
+          if (
+            typeof name === 'string' &&
+            name.trim()
+          ) {
+            return name
+          }
+
+          return 'Laboratory investigation'
+        })
+        .join(', ')
+    }
+
+    const item =
+      laboratoryItems[0]
+
+    const code =
+      item?.details.test_code
+
+    if (
+      typeof code === 'string' &&
       code.trim()
-      ? code
+    ) {
+      return code
+    }
+
+    const legacyCode =
+      order.details.test_code
+
+    return typeof legacyCode === 'string' &&
+      legacyCode.trim()
+      ? legacyCode
       : 'Laboratory'
   }
 
@@ -300,13 +382,11 @@ export default function ClinicalOrdersPanel({
   orderPriority,
 
   laboratoryTests,
-  selectedLaboratoryTestId,
+  selectedLaboratoryTestIds,
 
 
   diagnosticInvestigations,
   selectedDiagnosticInvestigationId,
-  orderTestCode,
-  orderTestName,
   orderDose,
 
   prescriptionMedicine,
@@ -354,10 +434,7 @@ export default function ClinicalOrdersPanel({
     !saving &&
     (
       orderType === 'LABORATORY'
-        ? (
-            orderTestCode.trim() &&
-            orderTestName.trim()
-          )
+        ? selectedLaboratoryTestIds.length > 0
         : orderType === 'DIAGNOSTIC'
           ? selectedDiagnosticInvestigationId
           : (
@@ -481,48 +558,59 @@ export default function ClinicalOrdersPanel({
                 Laboratory investigation
               </span>
 
-              <select
-                disabled={
-                  encounterClosed
-                }
-                value={
-                  selectedLaboratoryTestId
-                }
-                onChange={event =>
-                  onLaboratoryTestChange(
-                    event.target.value,
-                  )
-                }
-              >
-                <option value="">
-                  Select laboratory investigation
-                </option>
-
+              <div className="doctor-laboratory-test-list">
                 {laboratoryTests.map(test => (
-                  <option
+                  <label
                     key={test.id}
-                    value={test.id}
+                    className="doctor-laboratory-test-option"
                   >
-                    {test.code}
-                    {' — '}
-                    {test.name}
-                  </option>
+                    <input
+                      type="checkbox"
+                      disabled={encounterClosed}
+                      checked={
+                        selectedLaboratoryTestIds.includes(
+                          test.id,
+                        )
+                      }
+                      onChange={() =>
+                        onLaboratoryTestChange(
+                          test.id,
+                        )
+                      }
+                    />
+
+                    <span>
+                      {test.code}
+                      {' — '}
+                      {test.name}
+                    </span>
+                  </label>
                 ))}
-              </select>
+              </div>
             </label>
 
-            {selectedLaboratoryTestId && (
+            {selectedLaboratoryTestIds.length > 0 && (
               <div className="doctor-selected-order-preview">
                 <span>
-                  Selected investigation
+                  Selected investigations
                 </span>
 
                 <strong>
-                  {orderTestName}
+                  {selectedLaboratoryTestIds.length}{' '}
+                  {selectedLaboratoryTestIds.length === 1
+                    ? 'investigation'
+                    : 'investigations'}
                 </strong>
 
                 <small>
-                  {orderTestCode}
+                  {selectedLaboratoryTestIds
+                    .map(testId =>
+                      laboratoryTests.find(
+                        test => test.id === testId,
+                      )?.name,
+                    )
+                    .filter(Boolean)
+                    .join(', ')}
                 </small>
               </div>
             )}

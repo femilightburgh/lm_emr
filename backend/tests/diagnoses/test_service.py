@@ -73,6 +73,9 @@ def test_create_diagnosis_creates_diagnosis_and_event(
         system=TerminologySystem.ICD_10_CM,
         code=terminology_code,
         display_name="Essential (primary) hypertension",
+        release_version="2026 Jan",
+        is_leaf=True,
+        is_residual=False,
         active=True,
     )
 
@@ -285,6 +288,9 @@ def test_create_diagnosis_accepts_valid_terminology_concept(
         system=TerminologySystem.ICD_10_CM,
         code=f"TEST-I10-{uuid4().hex[:8]}",
         display_name="Essential (primary) hypertension",
+        release_version="2026 Jan",
+        is_leaf=True,
+        is_residual=False,
         active=True,
     )
 
@@ -351,6 +357,9 @@ def test_create_diagnosis_rejects_inactive_terminology_concept(
         system=TerminologySystem.ICD_10_CM,
         code=f"TEST-I10-{uuid4().hex[:8]}",
         display_name="Essential (primary) hypertension",
+        release_version="2026 Jan",
+        is_leaf=True,
+        is_residual=False,
         active=False,
     )
 

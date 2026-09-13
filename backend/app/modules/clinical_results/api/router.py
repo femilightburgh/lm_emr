@@ -18,6 +18,9 @@ from app.core.context import (
 from app.core.security.authorization import require_permission
 from app.db.session import get_db
 
+from app.modules.clinical_results.enums import (
+    ClinicalResultStatus,
+)
 from app.modules.clinical_results.exceptions import (
     ClinicalResultAlreadyFinalError,
     ClinicalResultDuplicateAnalyteError,
@@ -47,11 +50,14 @@ from app.modules.clinical_results.services import (
 from app.modules.clinical_orders.repositories import (
     ClinicalOrderRepository,
 )
-from app.modules.laboratory.repositories import (
-    LaboratoryTestRepository,
-)
 from app.modules.episode.repositories.episode_repository import (
     EpisodeRepository,
+)
+from app.modules.encounter.repositories.encounter_repository import (
+    EncounterRepository,
+)
+from app.modules.encounter.services.encounter_service import (
+    EncounterService,
 )
 from app.modules.events.repositories import (
     ClinicalEventRepository,
@@ -72,15 +78,24 @@ router = APIRouter(
 def get_clinical_result_service(
     db: Session = Depends(get_db),
 ) -> ClinicalResultService:
+    episode_repository = EpisodeRepository(db)
+    staff_repository = StaffRepository(db)
+
+    encounter_service = EncounterService(
+        repository=EncounterRepository(db),
+        episode_repository=episode_repository,
+        staff_repository=staff_repository,
+    )
+
     return ClinicalResultService(
         repository=ClinicalResultRepository(db),
         clinical_order_repository=ClinicalOrderRepository(db),
-        episode_repository=EpisodeRepository(db),
-        laboratory_test_repository=LaboratoryTestRepository(db),
+        episode_repository=episode_repository,
+        encounter_service=encounter_service,
         event_service=ClinicalEventService(
             repository=ClinicalEventRepository(db),
         ),
-        staff_repository=StaffRepository(db),
+        staff_repository=staff_repository,
     )
 
 
@@ -115,6 +130,7 @@ def record_clinical_result(
         result = service.record_result(
             context=context,
             order_id=request.order_id,
+            order_item_id=request.order_item_id,
             result_type=request.result_type,
             status=request.status,
             result_data=request.result_data,

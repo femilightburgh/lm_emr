@@ -39,11 +39,19 @@ from app.modules.clinical_orders.exceptions import (
 )
 from app.modules.clinical_orders.models import (
     ClinicalOrder,
+    ClinicalOrderItem,
+    ClinicalOrderItemType,
     Prescription,
 )
 from app.modules.clinical_orders.repositories import (
     ClinicalOrderRepository,
     PrescriptionRepository,
+)
+from app.modules.diagnostics.repositories.diagnostic_repository import (
+    DiagnosticRepository,
+)
+from app.modules.laboratory.repositories.laboratory_test_repository import (
+    LaboratoryTestRepository,
 )
 from app.modules.clinical_orders.services.medication_treatment_service import (
     InpatientMedicationService,
@@ -85,6 +93,8 @@ class ClinicalOrderService:
         episode_repository: EpisodeRepository,
         staff_repository: StaffRepository,
         prescription_repository: PrescriptionRepository,
+        laboratory_test_repository: LaboratoryTestRepository,
+        diagnostic_repository: DiagnosticRepository,
         inpatient_medication_service: InpatientMedicationService | None = None,
     ) -> None:
         self.repository = repository
@@ -93,6 +103,8 @@ class ClinicalOrderService:
         self.episode_repository = episode_repository
         self.staff_repository = staff_repository
         self.prescription_repository = prescription_repository
+        self.laboratory_test_repository = laboratory_test_repository
+        self.diagnostic_repository = diagnostic_repository
         self.inpatient_medication_service = (
             inpatient_medication_service
         )
@@ -171,6 +183,7 @@ class ClinicalOrderService:
         order_type: ClinicalOrderType,
         priority: str,
         details: dict,
+        items: list[dict] | None = None,
         start_at: datetime | None = None,
         first_dose_at: datetime | None = None,
     ) -> ClinicalOrder:
@@ -233,45 +246,148 @@ class ClinicalOrderService:
         )
 
         try:
-            if order_type == ClinicalOrderType.DIAGNOSTIC:
-                from app.modules.diagnostics.repositories import (
-                    DiagnosticRepository,
-                )
+            order_items = items or []
 
-                investigation_id = details.get(
-                    "investigation_id",
-                )
-
-                if not investigation_id:
+            if order_type == ClinicalOrderType.LABORATORY:
+                if not order_items:
                     raise ValueError(
-                        "Diagnostic orders require an investigation_id."
+                        "Laboratory orders require at least one laboratory test."
                     )
 
-                diagnostic_repository = DiagnosticRepository(
-                    self.repository.db,
-                )
-
-                investigation = diagnostic_repository.get_investigation(
-                    hospital_id=context.hospital_id,
-                    investigation_id=investigation_id,
-                )
-
-                if investigation is None:
+            elif order_type == ClinicalOrderType.DIAGNOSTIC:
+                if not order_items:
                     raise ValueError(
-                        "Diagnostic investigation not found."
+                        "Diagnostic orders require at least one investigation."
                     )
 
-                details = {
-                    **details,
-                    "investigation_id": str(
-                        investigation.id,
-                    ),
-                    "investigation_code": investigation.code,
-                    "investigation_name": investigation.name,
-                    "diagnostic_category": investigation.category.value,
-                }
+            elif order_type == ClinicalOrderType.MEDICATION:
+                if order_items:
+                    raise ValueError(
+                        "Medication orders cannot contain investigation items."
+                    )
 
-                order.details = details
+            elif order_type == ClinicalOrderType.RADIOLOGY:
+                if order_items:
+                    raise ValueError(
+                        "Radiology orders do not support investigation items yet."
+                    )
+
+            clinical_order_items: list[ClinicalOrderItem] = []
+
+            for display_order, item in enumerate(order_items):
+                laboratory_test_id = item.get(
+                    "laboratory_test_id",
+                )
+                diagnostic_investigation_id = item.get(
+                    "diagnostic_investigation_id",
+                )
+
+                if (
+                    laboratory_test_id is not None
+                    and diagnostic_investigation_id is not None
+                ):
+                    raise ValueError(
+                        "A Clinical Order item cannot reference both "
+                        "a laboratory test and a diagnostic investigation."
+                    )
+
+                if (
+                    laboratory_test_id is None
+                    and diagnostic_investigation_id is None
+                ):
+                    raise ValueError(
+                        "A Clinical Order item must reference either "
+                        "a laboratory test or a diagnostic investigation."
+                    )
+
+                if order_type == ClinicalOrderType.LABORATORY:
+                    if diagnostic_investigation_id is not None:
+                        raise ValueError(
+                            "Laboratory orders can only contain laboratory tests."
+                        )
+
+                    laboratory_test = (
+                        self.laboratory_test_repository.get_by_id(
+                            hospital_id=context.hospital_id,
+                            test_id=laboratory_test_id,
+                        )
+                    )
+
+                    if laboratory_test is None:
+                        raise ValueError(
+                            "Laboratory test not found."
+                        )
+
+                    if any(
+                        existing.laboratory_test_id
+                        == laboratory_test.id
+                        for existing in clinical_order_items
+                    ):
+                        raise ValueError(
+                            "A laboratory test cannot be added twice "
+                            "to the same Clinical Order."
+                        )
+
+                    clinical_order_items.append(
+                        ClinicalOrderItem(
+                            item_type=ClinicalOrderItemType.LABORATORY,
+                            status=ClinicalOrderStatus.REQUESTED,
+                            laboratory_test_id=laboratory_test.id,
+                            diagnostic_investigation_id=None,
+                            display_order=display_order,
+                            details={
+                                "test_code": laboratory_test.code,
+                                "test_name": laboratory_test.name,
+                            },
+                        )
+                    )
+
+                elif order_type == ClinicalOrderType.DIAGNOSTIC:
+                    if laboratory_test_id is not None:
+                        raise ValueError(
+                            "Diagnostic orders can only contain "
+                            "diagnostic investigations."
+                        )
+
+                    investigation = self.diagnostic_repository.get_investigation(
+                        hospital_id=context.hospital_id,
+                        investigation_id=diagnostic_investigation_id,
+                    )
+
+                    if investigation is None:
+                        raise ValueError(
+                            "Diagnostic investigation not found."
+                        )
+
+                    if any(
+                        existing.diagnostic_investigation_id
+                        == investigation.id
+                        for existing in clinical_order_items
+                    ):
+                        raise ValueError(
+                            "A diagnostic investigation cannot be added twice "
+                            "to the same Clinical Order."
+                        )
+
+                    clinical_order_items.append(
+                        ClinicalOrderItem(
+                            item_type=ClinicalOrderItemType.DIAGNOSTIC,
+                            status=ClinicalOrderStatus.REQUESTED,
+                            laboratory_test_id=None,
+                            diagnostic_investigation_id=investigation.id,
+                            display_order=display_order,
+                            details={
+                                "investigation_code": investigation.code,
+                                "investigation_name": investigation.name,
+                                "diagnostic_category": (
+                                    investigation.category.value
+                                ),
+                            },
+                        )
+                    )
+
+            if clinical_order_items:
+                order.items.extend(clinical_order_items)
 
             self.repository.create(
                 order=order,
@@ -402,6 +518,34 @@ class ClinicalOrderService:
     # Retrieve
     # ------------------------------------------------------------------
 
+    def _get_order_for_item(
+        self,
+        *,
+        context: RequestContext,
+        order_item_id: UUID,
+    ) -> ClinicalOrder:
+        """
+        Retrieve the parent Clinical Order for an item while enforcing
+        hospital isolation.
+        """
+
+        order = self.repository.get_by_item_id(
+            hospital_id=context.hospital_id,
+            order_item_id=order_item_id,
+        )
+
+        if order is None:
+            from app.modules.clinical_orders.exceptions import (
+                ClinicalOrderItemNotFoundError,
+            )
+
+            raise ClinicalOrderItemNotFoundError(
+                "Clinical Order Item not found.",
+            )
+
+        return order
+
+
     def get_order(
         self,
         *,
@@ -492,6 +636,36 @@ class ClinicalOrderService:
             hospital_id=context.hospital_id,
             encounter_id=encounter.id,
         )
+
+    # ------------------------------------------------------------------
+    # List Episode Orders
+    # ------------------------------------------------------------------
+
+    def list_episode_orders(
+        self,
+        *,
+        context: RequestContext,
+        episode_id: UUID,
+    ) -> list[ClinicalOrder]:
+        """
+        Return all Clinical Orders belonging to an Episode.
+
+        Orders remain owned by their original Encounter. This method
+        provides an Episode-level clinical view for workflows such as
+        Doctor Review, where investigation results from earlier
+        encounters must remain visible.
+        """
+
+        episode = self._get_episode(
+            context=context,
+            episode_id=episode_id,
+        )
+
+        return self.repository.list_by_episode(
+            hospital_id=context.hospital_id,
+            episode_id=episode.id,
+        )
+
 
     # ------------------------------------------------------------------
     # Receive
@@ -613,6 +787,158 @@ class ClinicalOrderService:
         self.repository.refresh(order)
 
         return order
+
+    # ------------------------------------------------------------------
+    # Receive Clinical Order Item
+    # ------------------------------------------------------------------
+
+    def receive_order_item(
+        self,
+        *,
+        context: RequestContext,
+        order_item_id: UUID,
+    ) -> ClinicalOrder:
+        """
+        Move a Clinical Order Item from REQUESTED to RECEIVED.
+
+        The parent Clinical Order is returned so callers receive the
+        complete aggregate with all item statuses.
+        """
+
+        from app.modules.clinical_orders.exceptions import (
+            ClinicalOrderItemAlreadyReceivedError,
+            ClinicalOrderItemCannotReceiveError,
+            ClinicalOrderItemNotFoundError,
+        )
+
+        order = self._get_order_for_item(
+            context=context,
+            order_item_id=order_item_id,
+        )
+
+        order_item = next(
+            (
+                item
+                for item in order.items
+                if item.id == order_item_id
+            ),
+            None,
+        )
+
+        if order_item is None:
+            raise ClinicalOrderItemNotFoundError(
+                "Clinical Order Item not found.",
+            )
+
+        if order_item.status == ClinicalOrderStatus.RECEIVED:
+            raise ClinicalOrderItemAlreadyReceivedError(
+                "Clinical Order Item has already been received.",
+            )
+
+        if order_item.status in (
+            ClinicalOrderStatus.IN_PROGRESS,
+            ClinicalOrderStatus.COMPLETED,
+            ClinicalOrderStatus.CANCELLED,
+        ):
+            raise ClinicalOrderItemCannotReceiveError(
+                "Clinical Order Item cannot be received from its current status.",
+            )
+
+        self._get_authenticated_staff(
+            context=context,
+        )
+
+        order_item.status = ClinicalOrderStatus.RECEIVED
+
+
+        try:
+            self.repository.db.commit()
+        except Exception:
+            self.repository.db.rollback()
+            raise
+
+        self.repository.refresh(order)
+
+        return order
+
+
+    # ------------------------------------------------------------------
+    # Start Clinical Order Item
+    # ------------------------------------------------------------------
+
+    def start_order_item(
+        self,
+        *,
+        context: RequestContext,
+        order_item_id: UUID,
+    ) -> ClinicalOrder:
+        """
+        Move a Clinical Order Item from RECEIVED to IN_PROGRESS.
+        """
+
+        from app.modules.clinical_orders.exceptions import (
+            ClinicalOrderItemAlreadyCompletedError,
+            ClinicalOrderItemAlreadyInProgressError,
+            ClinicalOrderItemCannotStartError,
+            ClinicalOrderItemNotFoundError,
+        )
+
+        order = self._get_order_for_item(
+            context=context,
+            order_item_id=order_item_id,
+        )
+
+        order_item = next(
+            (
+                item
+                for item in order.items
+                if item.id == order_item_id
+            ),
+            None,
+        )
+
+        if order_item is None:
+            raise ClinicalOrderItemNotFoundError(
+                "Clinical Order Item not found.",
+            )
+
+        if order_item.status == ClinicalOrderStatus.REQUESTED:
+            raise ClinicalOrderItemCannotStartError(
+                "Clinical Order Item must be received before it can be started.",
+            )
+
+        if order_item.status == ClinicalOrderStatus.IN_PROGRESS:
+            raise ClinicalOrderItemAlreadyInProgressError(
+                "Clinical Order Item is already in progress.",
+            )
+
+        if order_item.status == ClinicalOrderStatus.COMPLETED:
+            raise ClinicalOrderItemAlreadyCompletedError(
+                "Completed Clinical Order Items cannot be started.",
+            )
+
+        if order_item.status == ClinicalOrderStatus.CANCELLED:
+            raise ClinicalOrderItemCannotStartError(
+                "Cancelled Clinical Order Items cannot be started.",
+            )
+
+        self._get_authenticated_staff(
+            context=context,
+        )
+
+        order_item.status = ClinicalOrderStatus.IN_PROGRESS
+
+
+        try:
+            self.repository.db.commit()
+        except Exception:
+            self.repository.db.rollback()
+            raise
+
+        self.repository.refresh(order)
+
+        return order
+
 
     # ------------------------------------------------------------------
     # Cancel

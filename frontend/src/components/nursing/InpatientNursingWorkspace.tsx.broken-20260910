@@ -1,0 +1,781 @@
+/*
+==============================================================================
+LIGHTBURGH EMR
+
+Inpatient Nursing Clinical Cockpit
+
+Presentation/workflow layer for admitted patients.
+
+Clinical data and API behavior remain owned by the existing nursing hooks and
+child components.
+==============================================================================
+*/
+
+import {
+  useState,
+} from 'react'
+
+import type {
+  Episode,
+} from '../../api/episodes'
+
+import type {
+  Encounter,
+} from '../../api/encounters'
+
+import type {
+  MedicationAdministrationStatus,
+  MedicationNursingSummary,
+} from '../../api/medicationDoses'
+
+import NursingMedicationSection from './NursingMedicationSection'
+import NursingVitalsForm from './NursingVitalsForm'
+
+import type {
+  VitalsFormState,
+} from './nursing/types'
+
+import {
+  INITIAL_VITALS_FORM,
+} from './nursing/constants'
+
+
+interface PatientLike {
+  first_name: string
+  middle_name?: string | null
+  last_name: string
+  hospital_number: string
+  sex: string
+  date_of_birth: string
+  blood_group?: string | null
+  genotype?: string | null
+}
+
+
+interface Props {
+  accessToken: string
+
+  episode: Episode
+  encounter: Encounter
+
+  patient: PatientLike | null
+
+  patientNames: Record<string, string>
+
+  medicationSummary: MedicationNursingSummary | null
+  loadingMedications: boolean
+  savingMedicationDoseId: string | null
+
+  recordedVitals: Array<{
+    id: string
+    occurred_at: string
+    payload: Record<string, any>
+  }>
+
+  loadingVitals: boolean
+  savingVitals: boolean
+
+  onBack: () => void
+
+  onAdministerMedication: (
+    doseId: string,
+    status: MedicationAdministrationStatus,
+    reason?: string,
+  ) => void
+
+  onSaveVitals: (
+    vitals: VitalsFormState,
+  ) => Promise<boolean>
+}
+
+
+function fullName(
+  patient: PatientLike | null,
+): string {
+  if (!patient) {
+    return 'Patient'
+  }
+
+  return [
+    patient.first_name,
+    patient.middle_name,
+    patient.last_name,
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
+
+function ageFromDob(
+  value: string | null | undefined,
+): string {
+  if (!value) {
+    return '—'
+  }
+
+  const dob = new Date(value)
+  const today = new Date()
+
+  let age =
+    today.getFullYear() -
+    dob.getFullYear()
+
+  const month =
+    today.getMonth() -
+    dob.getMonth()
+
+  if (
+    month < 0 ||
+    (
+      month === 0 &&
+      today.getDate() <
+        dob.getDate()
+    )
+  ) {
+    age--
+  }
+
+  return `${age} years`
+}
+
+
+function formatDateTime(
+  value: string,
+): string {
+  return new Date(
+    value,
+  ).toLocaleString(
+    [],
+    {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    },
+  )
+}
+
+
+export default function InpatientNursingWorkspace({
+  episode,
+  encounter,
+  patient,
+
+  medicationSummary,
+  loadingMedications,
+  savingMedicationDoseId,
+
+  recordedVitals,
+  loadingVitals,
+  savingVitals,
+
+  onBack,
+
+  onAdministerMedication,
+  onSaveVitals,
+}: Props) {
+
+  const [
+    vitals,
+    setVitals,
+  ] = useState<VitalsFormState>(
+    INITIAL_VITALS_FORM,
+  )
+
+
+  const latestVitals =
+    recordedVitals.length > 0
+      ? recordedVitals[
+          recordedVitals.length - 1
+        ]
+      : null
+
+
+  const patientName =
+    fullName(patient)
+
+
+  function updateVitals(
+    field: keyof VitalsFormState,
+    value: string,
+  ) {
+    setVitals(current => ({
+      ...current,
+      [field]: value,
+    }))
+  }
+
+
+  async function handleSaveVitals() {
+    const saved =
+      await onSaveVitals(
+        vitals,
+      )
+
+    if (saved) {
+      setVitals(
+        INITIAL_VITALS_FORM,
+      )
+    }
+  }
+
+
+  return (
+    <section className="nursing-inpatient-cockpit">
+
+      {/* ================================================================ */}
+      {/* Patient command header                                           */}
+      {/* ================================================================ */}
+
+      <header className="nursing-inpatient-header">
+
+        <div className="nursing-inpatient-identity">
+
+          <div className="nursing-inpatient-avatar">
+            {patientName
+              .split(' ')
+              .map(
+                part =>
+                  part.charAt(0),
+              )
+              .slice(0, 2)
+              .join('')}
+          </div>
+
+          <div>
+
+            <p className="eyebrow">
+              INPATIENT NURSING
+            </p>
+
+            <h1>
+              {patientName}
+            </h1>
+
+            <p className="nursing-inpatient-meta">
+              {patient?.hospital_number ?? 'MRN —'}
+              {' · '}
+              {patient?.sex ?? 'Sex —'}
+              {' · '}
+              {ageFromDob(
+                patient?.date_of_birth,
+              )}
+            </p>
+
+          </div>
+
+        </div>
+
+
+        <div className="nursing-inpatient-episode">
+
+          <span className="nursing-inpatient-status">
+            ADMITTED
+          </span>
+
+          <div>
+            <small>
+              EPISODE
+            </small>
+
+            <strong>
+              {episode.episode_number}
+            </strong>
+          </div>
+
+          <div>
+            <small>
+              ENCOUNTER
+            </small>
+
+            <strong>
+              {encounter.title}
+            </strong>
+          </div>
+
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onBack}
+          >
+            Back to queue
+          </button>
+
+        </div>
+
+      </header>
+
+
+      {/* ================================================================ */}
+      {/* Patient clinical context                                         */}
+      {/* ================================================================ */}
+
+      <section className="nursing-inpatient-context">
+
+        <div>
+
+          <span>
+            Blood group
+          </span>
+
+          <strong>
+            {patient?.blood_group ?? 'Not recorded'}
+          </strong>
+
+        </div>
+
+
+        <div>
+
+          <span>
+            Genotype
+          </span>
+
+          <strong>
+            {patient?.genotype ?? 'Not recorded'}
+          </strong>
+
+        </div>
+
+
+        <div>
+
+          <span>
+            Episode started
+          </span>
+
+          <strong>
+            {formatDateTime(
+              encounter.started_at,
+            )}
+          </strong>
+
+        </div>
+
+
+        <div>
+
+          <span>
+            Care status
+          </span>
+
+          <strong>
+            Active admission
+          </strong>
+
+        </div>
+
+      </section>
+
+
+      {/* ================================================================ */}
+      {/* Current shift command centre                                     */}
+      {/* ================================================================ */}
+
+      <section className="nursing-shift-overview">
+
+        <div className="nursing-section-title">
+
+          <div>
+            <p className="eyebrow">
+              CURRENT SHIFT
+            </p>
+
+            <h2>
+              Nursing work
+            </h2>
+          </div>
+
+          <span>
+            Patient overview
+          </span>
+
+        </div>
+
+
+        <div className="nursing-shift-grid">
+
+          <article className="nursing-shift-card">
+
+            <div>
+
+              <span>
+                MEDICATIONS
+              </span>
+
+              <strong>
+                {medicationSummary?.active_prescriptions?.length ?? 0}
+              </strong>
+
+              <small>
+                active prescriptions
+              </small>
+
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                document
+                  .getElementById(
+                    'nursing-medication-rounds',
+                  )
+                  ?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start',
+                  })
+              }}
+            >
+              View rounds
+            </button>
+
+          </article>
+
+
+          <article className="nursing-shift-card">
+
+            <div>
+
+              <span>
+                OBSERVATIONS
+              </span>
+
+              <strong>
+                {latestVitals
+                  ? 'Recorded'
+                  : 'Pending'}
+              </strong>
+
+              <small>
+                {latestVitals
+                  ? formatDateTime(
+                      latestVitals.occurred_at,
+                    )
+                  : 'No observation recorded'}
+              </small>
+
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                document
+                  .getElementById(
+                    'nursing-vitals-entry',
+                  )
+                  ?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start',
+                  })
+              }}
+            >
+              Record vitals
+            </button>
+
+          </article>
+
+
+          <article className="nursing-shift-card">
+
+            <div>
+
+              <span>
+                ADMISSION
+              </span>
+
+              <strong>
+                Active
+              </strong>
+
+              <small>
+                {episode.title}
+              </small>
+
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                document
+                  .getElementById(
+                    'nursing-patient-context',
+                  )
+                  ?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start',
+                  })
+              }}
+            >
+              View context
+            </button>
+
+          </article>
+
+        </div>
+
+      </section>
+
+
+      {/* ================================================================ */}
+      {/* Medication rounds                                                */}
+      {/* ================================================================ */}
+
+      <section
+        id="nursing-medication-rounds"
+        className="nursing-inpatient-section"
+      >
+
+        <div className="nursing-section-title">
+
+          <div>
+
+            <p className="eyebrow">
+              MEDICATION ADMINISTRATION
+            </p>
+
+            <h2>
+              Medication rounds
+            </h2>
+
+          </div>
+
+          <span>
+            {loadingMedications
+              ? 'Loading'
+              : 'Active orders'}
+          </span>
+
+        </div>
+
+
+        <NursingMedicationSection
+          accessToken={accessToken}
+          summary={medicationSummary}
+          loading={loadingMedications}
+          savingDoseId={
+            savingMedicationDoseId
+          }
+          onAdminister={
+            onAdministerMedication
+          }
+        />
+
+      </section>
+
+
+      {/* ================================================================ */}
+      {/* Latest observations                                              */}
+      {/* ================================================================ */}
+
+      <section className="nursing-inpatient-section">
+
+        <div className="nursing-section-title">
+
+          <div>
+
+            <p className="eyebrow">
+              CLINICAL OBSERVATIONS
+            </p>
+
+            <h2>
+              Latest vital signs
+            </h2>
+
+          </div>
+
+          {latestVitals && (
+            <span>
+              {formatDateTime(
+                latestVitals.occurred_at,
+              )}
+            </span>
+          )}
+
+        </div>
+
+
+        {loadingVitals && (
+          <div className="nursing-cockpit-empty">
+            Loading recorded vital signs...
+          </div>
+        )}
+
+
+        {!loadingVitals &&
+          !latestVitals && (
+            <div className="nursing-cockpit-empty">
+              <strong>
+                No observations recorded
+              </strong>
+
+              <span>
+                Record the patient's current vital signs below.
+              </span>
+            </div>
+          )}
+
+
+        {!loadingVitals &&
+          latestVitals && (
+            <div className="nursing-cockpit-vitals">
+
+              <div>
+                <span>
+                  Temperature
+                </span>
+
+                <strong>
+                  {latestVitals.payload.temperature != null
+                    ? `${latestVitals.payload.temperature} °C`
+                    : '—'}
+                </strong>
+              </div>
+
+
+              <div>
+                <span>
+                  Heart rate
+                </span>
+
+                <strong>
+                  {latestVitals.payload.heart_rate != null
+                    ? `${latestVitals.payload.heart_rate} bpm`
+                    : '—'}
+                </strong>
+              </div>
+
+
+              <div>
+                <span>
+                  Respiratory rate
+                </span>
+
+                <strong>
+                  {latestVitals.payload.respiratory_rate != null
+                    ? `${latestVitals.payload.respiratory_rate} /min`
+                    : '—'}
+                </strong>
+              </div>
+
+
+              <div>
+                <span>
+                  Blood pressure
+                </span>
+
+                <strong>
+                  {latestVitals.payload.systolic_bp != null &&
+                  latestVitals.payload.diastolic_bp != null
+                    ? `${latestVitals.payload.systolic_bp}/${latestVitals.payload.diastolic_bp}`
+                    : '—'}
+                </strong>
+
+                <small>
+                  mmHg
+                </small>
+              </div>
+
+
+              <div>
+                <span>
+                  SpO₂
+                </span>
+
+                <strong>
+                  {latestVitals.payload.spo2 != null
+                    ? `${latestVitals.payload.spo2}%`
+                    : '—'}
+                </strong>
+              </div>
+
+
+              <div>
+                <span>
+                  Weight
+                </span>
+
+                <strong>
+                  {latestVitals.payload.weight != null
+                    ? `${latestVitals.payload.weight} kg`
+                    : '—'}
+                </strong>
+              </div>
+
+            </div>
+          )}
+
+      </section>
+
+
+      {/* ================================================================ */}
+      {/* Record observations                                               */}
+      {/* ================================================================ */}
+
+      <section
+        id="nursing-vitals-entry"
+        className="nursing-inpatient-section nursing-vitals-workspace"
+      >
+
+        <div className="nursing-section-title">
+
+          <div>
+
+            <p className="eyebrow">
+              OBSERVATIONS
+            </p>
+
+            <h2>
+              Record new vital signs
+            </h2>
+
+          </div>
+
+          <span>
+            Current patient
+          </span>
+
+        </div>
+
+
+        <NursingVitalsForm
+          vitals={vitals}
+          disabled={false}
+          saving={savingVitals}
+          onChange={updateVitals}
+          onSave={() =>
+            void handleSaveVitals()
+          }
+        />
+
+      </section>
+
+
+      {/* ================================================================ */}
+      {/* Clinical context anchor                                           */}
+      {/* ================================================================ */}
+
+      <div
+        id="nursing-patient-context"
+        className="nursing-inpatient-footer-context"
+      >
+        <span>
+          Patient
+        </span>
+
+        <strong>
+          {patientName}
+        </strong>
+
+        <span>
+          {patient?.hospital_number ?? 'MRN —'}
+        </span>
+
+        <span>
+          {episode.episode_number}
+        </span>
+      </div>
+
+    </section>
+  )
+}

@@ -17,6 +17,7 @@ import {
   completeConsultation,
   completeDoctorReview,
   getEpisode,
+  startDoctorConsultation,
   type DoctorQueueItem,
   type Episode,
 } from '../../api/episodes'
@@ -250,13 +251,9 @@ export default function DoctorWorkspace({
     orderPriority,
     setOrderPriority,
 
-    selectedLaboratoryTestId,
+    selectedLaboratoryTestIds,
     selectedDiagnosticInvestigationId,
 
-    orderTestCode,
-    setOrderTestCode,
-    orderTestName,
-    setOrderTestName,
     orderMedicationId,
     setOrderMedicationId,
     orderDose,
@@ -689,6 +686,26 @@ export default function DoctorWorkspace({
 
 
 
+  function handleBackToDoctorQueue() {
+    setError(null)
+    setSuccess(null)
+
+    setSelectedEncounter(null)
+    setSelectedEpisode(null)
+
+    setPatient(null)
+    setPreviousEpisodes([])
+    setCurrentEpisodeEncounters([])
+
+    resetNursingHandoff()
+    closeHistoricalViewer()
+    resetEncounterContext()
+
+    documentation.resetProgressNote()
+    documentation.resetInitialClerking()
+  }
+
+
   async function openDoctorQueueItem(
     item: DoctorQueueItem,
     mode: 'CLINIC' | 'WARD',
@@ -746,29 +763,61 @@ export default function DoctorWorkspace({
             ? 'Doctor Review'
             : 'Doctor Consultation'
 
-      let encounter =
-        encounters.find(
-          candidate =>
-            candidate.status === 'OPEN' &&
-            candidate.title === preferredTitle,
-        ) ?? null
+      let encounter: Encounter | null = null
 
-      if (!encounter) {
-        if (!currentStaffId) {
+      if (preferredTitle === 'Doctor Consultation') {
+        await startDoctorConsultation(
+          accessToken,
+          episode.id,
+        )
+
+        const refreshedEncounters =
+          await listEpisodeEncounters(
+            accessToken,
+            episode.id,
+          )
+
+        encounter =
+          refreshedEncounters.find(
+            candidate =>
+              candidate.status === 'OPEN' &&
+              candidate.title === 'Doctor Consultation',
+          ) ?? null
+
+        if (!encounter) {
           throw new Error(
-            'Authenticated user does not have a Staff profile.',
+            'Doctor Consultation was started, but the encounter could not be loaded.',
           )
         }
 
+        setCurrentEpisodeEncounters(
+          refreshedEncounters,
+        )
+      } else {
         encounter =
-          await createEncounter(
-            accessToken,
-            {
-              episode_id: episode.id,
-              staff_id: currentStaffId,
-              title: preferredTitle,
-            },
-          )
+          encounters.find(
+            candidate =>
+              candidate.status === 'OPEN' &&
+              candidate.title === preferredTitle,
+          ) ?? null
+
+        if (!encounter) {
+          if (!currentStaffId) {
+            throw new Error(
+              'Authenticated user does not have a Staff profile.',
+            )
+          }
+
+          encounter =
+            await createEncounter(
+              accessToken,
+              {
+                episode_id: episode.id,
+                staff_id: currentStaffId,
+                title: preferredTitle,
+              },
+            )
+        }
       }
 
       await openEncounterView(
@@ -1236,6 +1285,7 @@ Vitals: ${formatted}`
           selectedEncounter={selectedEncounter}
           selectedEpisode={selectedEpisode}
           accessToken={accessToken}
+          onBackToQueue={handleBackToDoctorQueue}
           patient={patient}
           loadingPatientContext={loadingPatientContext}
           previousEpisodes={previousEpisodes}
@@ -1368,11 +1418,9 @@ Vitals: ${formatted}`
           orderType={orderType}
           orderPriority={orderPriority}
           laboratoryTests={laboratoryTests}
-          selectedLaboratoryTestId={selectedLaboratoryTestId}
+          selectedLaboratoryTestIds={selectedLaboratoryTestIds}
           diagnosticInvestigations={diagnosticInvestigations}
           selectedDiagnosticInvestigationId={selectedDiagnosticInvestigationId}
-          orderTestCode={orderTestCode}
-          orderTestName={orderTestName}
           orderMedicationId={orderMedicationId}
           orderDose={orderDose}
           prescriptionMedicine={prescriptionMedicine}
@@ -1391,8 +1439,6 @@ Vitals: ${formatted}`
           setOrderPriority={setOrderPriority}
           handleLaboratoryTestChange={handleLaboratoryTestChange}
           handleDiagnosticInvestigationChange={handleDiagnosticInvestigationChange}
-          setOrderTestCode={setOrderTestCode}
-          setOrderTestName={setOrderTestName}
           setOrderMedicationId={setOrderMedicationId}
           setOrderDose={setOrderDose}
           setPrescriptionMedicine={setPrescriptionMedicine}

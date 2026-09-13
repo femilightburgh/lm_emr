@@ -9,9 +9,12 @@ Clinical Order Repository
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
-from app.modules.clinical_orders.models import ClinicalOrder
+from app.modules.clinical_orders.models import (
+    ClinicalOrder,
+    ClinicalOrderItem,
+)
 from app.modules.encounter.models import Encounter
 from app.modules.episode.models import Episode
 
@@ -51,6 +54,9 @@ class ClinicalOrderRepository:
     ) -> ClinicalOrder | None:
         statement = (
             select(ClinicalOrder)
+            .options(
+                selectinload(ClinicalOrder.items),
+            )
             .join(
                 Encounter,
                 ClinicalOrder.encounter_id == Encounter.id,
@@ -67,9 +73,78 @@ class ClinicalOrderRepository:
 
         return self.db.scalar(statement)
 
+
+    def get_by_item_id(
+        self,
+        *,
+        hospital_id: UUID,
+        order_item_id: UUID,
+    ) -> ClinicalOrder | None:
+        statement = (
+            select(ClinicalOrder)
+            .options(
+                selectinload(ClinicalOrder.items),
+            )
+            .join(
+                ClinicalOrderItem,
+                ClinicalOrderItem.clinical_order_id
+                == ClinicalOrder.id,
+            )
+            .join(
+                Encounter,
+                ClinicalOrder.encounter_id == Encounter.id,
+            )
+            .join(
+                Episode,
+                Encounter.episode_id == Episode.id,
+            )
+            .where(
+                ClinicalOrderItem.id == order_item_id,
+                Episode.hospital_id == hospital_id,
+            )
+        )
+
+        return self.db.scalar(statement)
+
     # ------------------------------------------------------------------
     # Encounter Orders
     # ------------------------------------------------------------------
+
+    def list_by_episode(
+        self,
+        *,
+        hospital_id: UUID,
+        episode_id: UUID,
+    ) -> list[ClinicalOrder]:
+        """
+        Return all Clinical Orders belonging to an Episode.
+
+        Clinical Orders remain attached to the Encounter in which
+        they were created, but an Episode-level view is required
+        by downstream clinical workflows such as Doctor Review.
+        """
+
+        statement = (
+            select(ClinicalOrder)
+            .join(
+                Encounter,
+                ClinicalOrder.encounter_id == Encounter.id,
+            )
+            .join(
+                Episode,
+                Encounter.episode_id == Episode.id,
+            )
+            .where(
+                Episode.id == episode_id,
+                Episode.hospital_id == hospital_id,
+            )
+            .order_by(
+                ClinicalOrder.ordered_at.asc(),
+            )
+        )
+
+        return list(self.db.scalars(statement))
+
 
     def list_by_encounter(
         self,
@@ -127,6 +202,9 @@ class ClinicalOrderRepository:
 
         statement = (
             select(ClinicalOrder)
+            .options(
+                selectinload(ClinicalOrder.items),
+            )
             .join(
                 Encounter,
                 ClinicalOrder.encounter_id == Encounter.id,
@@ -182,6 +260,9 @@ class ClinicalOrderRepository:
 
         statement = (
             select(ClinicalOrder)
+            .options(
+                selectinload(ClinicalOrder.items),
+            )
             .join(
                 Encounter,
                 ClinicalOrder.encounter_id == Encounter.id,
@@ -281,8 +362,8 @@ class ClinicalOrderRepository:
         """
         Return outstanding laboratory/radiology orders for an Episode.
 
-        REQUESTED and IN_PROGRESS investigation orders are considered
-        outstanding. COMPLETED and CANCELLED orders are terminal.
+        REQUESTED, RECEIVED, and IN_PROGRESS investigation orders are
+        considered outstanding. COMPLETED and CANCELLED orders are terminal.
         """
 
         from app.modules.clinical_orders.enums import (
@@ -313,6 +394,62 @@ class ClinicalOrderRepository:
                 ClinicalOrder.status.in_(
                     (
                         ClinicalOrderStatus.REQUESTED,
+                        ClinicalOrderStatus.RECEIVED,
+                        ClinicalOrderStatus.IN_PROGRESS,
+                    ),
+                ),
+            )
+            .order_by(
+                ClinicalOrder.ordered_at.asc(),
+            )
+        )
+
+        return list(
+            self.db.scalars(statement),
+        )
+
+    # ------------------------------------------------------------------
+    # Episode Outstanding Medication Orders
+    # ------------------------------------------------------------------
+
+    def list_outstanding_medication_orders_for_episode(
+        self,
+        *,
+        hospital_id: UUID,
+        episode_id: UUID,
+    ) -> list[ClinicalOrder]:
+        """
+        Return outstanding medication orders for an Episode.
+
+        REQUESTED, RECEIVED, and IN_PROGRESS medication orders are
+        considered outstanding. COMPLETED and CANCELLED orders are
+        terminal.
+        """
+
+        from app.modules.clinical_orders.enums import (
+            ClinicalOrderStatus,
+            ClinicalOrderType,
+        )
+
+        statement = (
+            select(ClinicalOrder)
+            .join(
+                Encounter,
+                ClinicalOrder.encounter_id == Encounter.id,
+            )
+            .join(
+                Episode,
+                Encounter.episode_id == Episode.id,
+            )
+            .where(
+                Episode.id == episode_id,
+                Episode.hospital_id == hospital_id,
+                ClinicalOrder.order_type
+                == ClinicalOrderType.MEDICATION,
+                ClinicalOrder.status.in_(
+                    (
+                        ClinicalOrderStatus.REQUESTED,
+                        ClinicalOrderStatus.RECEIVED,
                         ClinicalOrderStatus.IN_PROGRESS,
                     ),
                 ),

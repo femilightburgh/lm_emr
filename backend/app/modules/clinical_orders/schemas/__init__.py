@@ -7,6 +7,7 @@ from app.modules.clinical_orders.schemas.request import (
 from app.modules.clinical_orders.schemas.response import (
     PrescriptionResponse,
     ClinicalOrderResponse,
+    ClinicalOrderItemResponse,
     LaboratoryQueueItemResponse,
     DiagnosticQueueItemResponse,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "CreateMedicationTreatmentRequest",
     "CreateMedicationAdministrationRequest",
     "ClinicalOrderResponse",
+    "ClinicalOrderItemResponse",
     "LaboratoryQueueItemResponse",
     "DiagnosticQueueItemResponse",
     "MedicationDoseResponse",

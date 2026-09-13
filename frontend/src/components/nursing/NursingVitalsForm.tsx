@@ -25,7 +25,6 @@ interface VitalFieldProps {
   label: string
   unit?: string
   value: string
-  type?: 'number'
   step?: string
   placeholder?: string
   disabled: boolean
@@ -39,7 +38,6 @@ function VitalField({
   label,
   unit,
   value,
-  type = 'number',
   step,
   placeholder,
   disabled,
@@ -49,17 +47,21 @@ function VitalField({
     <label className="nursing-vital-input">
 
       <span className="nursing-vital-input-label">
-        {label}
+
+        <span>
+          {label}
+        </span>
 
         {unit && (
           <small>
             {unit}
           </small>
         )}
+
       </span>
 
       <input
-        type={type}
+        type="number"
         step={step}
         value={value}
         placeholder={placeholder}
@@ -85,7 +87,8 @@ export default function NursingVitalsForm({
 }: Props) {
   return (
     <details
-      className="nursing-section nursing-vitals-entry"
+      open
+      className="nursing-section nursing-vitals-entry nursing-inpatient-vitals-form"
     >
 
       <summary className="nursing-vitals-entry-summary">
@@ -97,12 +100,11 @@ export default function NursingVitalsForm({
           </p>
 
           <h3>
-            Record new vital signs
+            Enter current measurements
           </h3>
 
           <p>
-            Enter the patient's current
-            measurements.
+            Record the patient's current vital signs.
           </p>
 
         </div>
@@ -118,182 +120,188 @@ export default function NursingVitalsForm({
 
         <div className="nursing-vitals-entry-grid">
 
-        <VitalField
-          label="Temperature"
-          unit="°C"
-          value={
-            vitals.temperature
-          }
-          step="0.1"
-          placeholder="e.g. 36.8"
-          disabled={disabled}
-          onChange={value =>
-            onChange(
-              'temperature',
-              value,
-            )
-          }
-        />
+          <VitalField
+            label="Temperature"
+            unit="°C"
+            value={
+              vitals.temperature
+            }
+            step="0.1"
+            placeholder="36.8"
+            disabled={disabled}
+            onChange={value =>
+              onChange(
+                'temperature',
+                value,
+              )
+            }
+          />
 
 
-        <VitalField
-          label="Heart rate"
-          unit="bpm"
-          value={
-            vitals.heart_rate
-          }
-          placeholder="e.g. 78"
-          disabled={disabled}
-          onChange={value =>
-            onChange(
-              'heart_rate',
-              value,
-            )
-          }
-        />
+          <VitalField
+            label="Heart rate"
+            unit="bpm"
+            value={
+              vitals.heart_rate
+            }
+            placeholder="78"
+            disabled={disabled}
+            onChange={value =>
+              onChange(
+                'heart_rate',
+                value,
+              )
+            }
+          />
 
 
-        <VitalField
-          label="Respiratory rate"
-          unit="/min"
-          value={
-            vitals.respiratory_rate
-          }
-          placeholder="e.g. 18"
-          disabled={disabled}
-          onChange={value =>
-            onChange(
-              'respiratory_rate',
-              value,
-            )
-          }
-        />
+          <VitalField
+            label="Respiratory rate"
+            unit="/min"
+            value={
+              vitals.respiratory_rate
+            }
+            placeholder="18"
+            disabled={disabled}
+            onChange={value =>
+              onChange(
+                'respiratory_rate',
+                value,
+              )
+            }
+          />
 
 
-        <div className="nursing-bp-field">
+          <div className="nursing-bp-field">
 
-          <div className="nursing-vital-input-label">
-            <span>
-              Blood pressure
-            </span>
+            <div className="nursing-vital-input-label">
 
-            <small>
-              mmHg
-            </small>
+              <span>
+                Blood pressure
+              </span>
+
+              <small>
+                mmHg
+              </small>
+
+            </div>
+
+
+            <div className="nursing-bp-inputs">
+
+              <label>
+
+                <span>
+                  Systolic
+                </span>
+
+                <input
+                  type="number"
+                  value={
+                    vitals.systolic_bp
+                  }
+                  placeholder="120"
+                  onChange={event =>
+                    onChange(
+                      'systolic_bp',
+                      event.target.value,
+                    )
+                  }
+                  disabled={disabled}
+                />
+
+              </label>
+
+
+              <span className="nursing-bp-separator">
+                /
+              </span>
+
+
+              <label>
+
+                <span>
+                  Diastolic
+                </span>
+
+                <input
+                  type="number"
+                  value={
+                    vitals.diastolic_bp
+                  }
+                  placeholder="80"
+                  onChange={event =>
+                    onChange(
+                      'diastolic_bp',
+                      event.target.value,
+                    )
+                  }
+                  disabled={disabled}
+                />
+
+              </label>
+
+            </div>
+
           </div>
 
 
-          <div className="nursing-bp-inputs">
-
-            <label>
-              <span>
-                Systolic
-              </span>
-
-              <input
-                type="number"
-                value={
-                  vitals.systolic_bp
-                }
-                placeholder="120"
-                onChange={event =>
-                  onChange(
-                    'systolic_bp',
-                    event.target.value,
-                  )
-                }
-                disabled={disabled}
-              />
-            </label>
+          <VitalField
+            label="SpO₂"
+            unit="%"
+            value={
+              vitals.spo2
+            }
+            placeholder="98"
+            disabled={disabled}
+            onChange={value =>
+              onChange(
+                'spo2',
+                value,
+              )
+            }
+          />
 
 
-            <span className="nursing-bp-separator">
-              /
-            </span>
-
-
-            <label>
-              <span>
-                Diastolic
-              </span>
-
-              <input
-                type="number"
-                value={
-                  vitals.diastolic_bp
-                }
-                placeholder="80"
-                onChange={event =>
-                  onChange(
-                    'diastolic_bp',
-                    event.target.value,
-                  )
-                }
-                disabled={disabled}
-              />
-            </label>
-
-          </div>
+          <VitalField
+            label="Weight"
+            unit="kg"
+            value={
+              vitals.weight
+            }
+            step="0.1"
+            placeholder="72.5"
+            disabled={disabled}
+            onChange={value =>
+              onChange(
+                'weight',
+                value,
+              )
+            }
+          />
 
         </div>
 
 
-        <VitalField
-          label="SpO₂"
-          unit="%"
-          value={
-            vitals.spo2
-          }
-          placeholder="e.g. 98"
-          disabled={disabled}
-          onChange={value =>
-            onChange(
-              'spo2',
-              value,
-            )
-          }
-        />
+        <div className="nursing-vitals-entry-actions">
 
+          <button
+            type="button"
+            className="primary-button nursing-inpatient-record-button"
+            onClick={onSave}
+            disabled={
+              disabled ||
+              saving
+            }
+          >
+            {saving
+              ? 'Recording...'
+              : 'Record vital signs'}
+          </button>
 
-        <VitalField
-          label="Weight"
-          unit="kg"
-          value={
-            vitals.weight
-          }
-          step="0.1"
-          placeholder="e.g. 72.5"
-          disabled={disabled}
-          onChange={value =>
-            onChange(
-              'weight',
-              value,
-            )
-          }
-        />
+        </div>
 
       </div>
-
-
-      <div className="nursing-vitals-entry-actions">
-
-        <button
-          type="button"
-          className="primary-button"
-          onClick={onSave}
-          disabled={
-            disabled ||
-            saving
-          }
-        >
-          {saving
-            ? 'Recording...'
-            : 'Record vitals'}
-        </button>
-
-      </div>
-
-    </div>
 
     </details>
   )

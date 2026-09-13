@@ -297,34 +297,16 @@ export default function AdministratorWorkspace({
   async function handleCreateStaff(
     payload: CreateStaffPayload,
   ) {
-    console.log(
-      'PARENT HANDLE CREATE STAFF CALLED',
-      payload,
-    )
-
     setError(null)
 
     try {
-      console.log(
-        'ABOUT TO CALL createStaff()',
-      )
-
       await createStaff(
         accessToken,
         payload,
       )
 
-      console.log(
-        'createStaff() COMPLETED',
-      )
-
       await loadStaff()
     } catch (err) {
-      console.error(
-        'CREATE STAFF ERROR',
-        err,
-      )
-
       showError(
         err,
         'Unable to create staff profile.',
@@ -728,7 +710,7 @@ export default function AdministratorWorkspace({
   // ==========================================================================
 
   return (
-    <section className="admin-workspace">
+    <section className="workspace-content admin-workspace">
 
       {/* ==================================================================== */}
       {/* Header                                                               */}

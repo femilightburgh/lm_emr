@@ -51,7 +51,12 @@ class CreateClinicalResultRequest(BaseModel):
 
     order_id: UUID = Field(
         ...,
-        description="Clinical Order for which the result is being recorded.",
+        description="Parent Clinical Order for the result.",
+    )
+
+    order_item_id: UUID | None = Field(
+        default=None,
+        description="Specific Clinical Order Item for the result.",
     )
 
     result_type: ClinicalResultType = Field(

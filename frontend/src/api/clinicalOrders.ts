@@ -17,6 +17,20 @@ export type ClinicalOrderStatus =
   | 'CANCELLED'
 
 
+export interface ClinicalOrderItem {
+  id: string
+  clinical_order_id: string
+  item_type: 'LABORATORY' | 'DIAGNOSTIC'
+  status: ClinicalOrderStatus
+  laboratory_test_id: string | null
+  diagnostic_investigation_id: string | null
+  display_order: number
+  details: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+
 export interface ClinicalOrder {
   id: string
   encounter_id: string
@@ -25,6 +39,7 @@ export interface ClinicalOrder {
   status: ClinicalOrderStatus
   priority: string
   details: Record<string, unknown>
+  items: ClinicalOrderItem[]
   ordered_at: string
   started_at: string | null
   completed_at: string | null
@@ -34,11 +49,17 @@ export interface ClinicalOrder {
 }
 
 
+export interface CreateClinicalOrderItemRequest {
+  laboratory_test_id?: string
+  diagnostic_investigation_id?: string
+}
+
 export interface CreateClinicalOrderRequest {
   encounter_id: string
   order_type: ClinicalOrderType
   priority?: string
   details: Record<string, unknown>
+  items?: CreateClinicalOrderItemRequest[]
 }
 
 
@@ -68,6 +89,18 @@ export async function listEncounterClinicalOrders(
   )
 }
 
+
+
+export async function listEpisodeClinicalOrders(
+  accessToken: string,
+  episodeId: string,
+): Promise<ClinicalOrder[]> {
+  return apiRequest<ClinicalOrder[]>(
+    `/clinical-orders/episodes/${episodeId}`,
+    {},
+    accessToken,
+  )
+}
 
 export async function getClinicalOrder(
   accessToken: string,

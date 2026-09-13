@@ -2,6 +2,7 @@ from app.modules.episode.schemas.request import (
     ConsultationDisposition,
     CreateEpisodeRequest,
     CompleteConsultationRequest,
+    CompleteDoctorReviewRequest,
     WardReviewDisposition,
     CompleteWardReviewRequest,
 )
@@ -15,6 +16,7 @@ __all__ = [
     "ConsultationDisposition",
     "CreateEpisodeRequest",
     "CompleteConsultationRequest",
+    "CompleteDoctorReviewRequest",
     "WardReviewDisposition",
     "CompleteWardReviewRequest",
     "EpisodeResponse",

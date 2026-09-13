@@ -215,6 +215,25 @@ export async function startNursing(
 
 
 // ============================================================================
+  // Start Doctor Consultation
+  // ============================================================================
+
+
+export async function startDoctorConsultation(
+  accessToken: string,
+  episodeId: string,
+): Promise<Episode> {
+  return apiRequest<Episode>(
+    `/episodes/${episodeId}/start-doctor-consultation`,
+    {
+      method: 'POST',
+    },
+    accessToken,
+  )
+}
+
+
+// ============================================================================
 // Route Episode
 // ============================================================================
 

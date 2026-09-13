@@ -18,6 +18,22 @@ from app.modules.clinical_orders.enums import (
 )
 
 
+class CreateClinicalOrderItemRequest(BaseModel):
+    """
+    One investigation item within a Clinical Order.
+    """
+
+    laboratory_test_id: UUID | None = Field(
+        default=None,
+        description="Laboratory catalogue test included in the order.",
+    )
+
+    diagnostic_investigation_id: UUID | None = Field(
+        default=None,
+        description="Diagnostic catalogue investigation included in the order.",
+    )
+
+
 class CreateClinicalOrderRequest(BaseModel):
     """
     Request to create a Clinical Order.
@@ -41,8 +57,13 @@ class CreateClinicalOrderRequest(BaseModel):
     )
 
     details: dict[str, Any] = Field(
-        ...,
+        default_factory=dict,
         description="Type-specific order details.",
+    )
+
+    items: list[CreateClinicalOrderItemRequest] = Field(
+        default_factory=list,
+        description="Investigation items included in the Clinical Order.",
     )
 
 

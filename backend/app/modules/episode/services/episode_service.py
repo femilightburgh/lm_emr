@@ -744,6 +744,123 @@ class EpisodeService:
             raise
 
     # =========================================================================
+    # Start Doctor Consultation
+    # =========================================================================
+
+    def start_doctor_consultation(
+        self,
+        *,
+        context: RequestContext,
+        episode_id: UUID,
+    ) -> Episode:
+        """
+        Start an outpatient Doctor Consultation.
+
+        The authenticated Doctor becomes the managing doctor of the
+        Episode and owns the Doctor Consultation Encounter.
+
+        The Episode ownership and Encounter creation are committed
+        atomically as one transaction.
+        """
+
+        episode = self._get_episode(
+            context=context,
+            episode_id=episode_id,
+        )
+
+        if episode.status == EpisodeStatus.CLOSED:
+            raise EpisodeAlreadyClosedError()
+
+        if episode.status == EpisodeStatus.CANCELLED:
+            raise EpisodeAlreadyCancelledError()
+
+        if episode.status != EpisodeStatus.OPEN:
+            raise EpisodeNotOpenError()
+
+        if episode.flow_status == EpisodeFlowStatus.AWAITING_REVIEW:
+            raise InvalidConsultationDispositionError(
+                "Episode is awaiting Doctor Review and cannot start "
+                "a new Doctor Consultation.",
+            )
+
+        staff = self._get_authenticated_staff(
+            context=context,
+        )
+
+        employment = self.staff_repository.get_active_employment(
+            staff.id,
+        )
+
+        if employment is None:
+            raise StaffNotDoctorError(
+                "Authenticated clinician has no active employment.",
+            )
+
+        if employment.profession != Profession.DOCTOR:
+            raise StaffNotDoctorError(
+                "Only a doctor can start a Doctor Consultation.",
+            )
+
+        encounters = self.encounter_service.list_episode_encounters(
+            context=context,
+            episode_id=episode.id,
+        )
+
+        doctor_consultation = next(
+            (
+                encounter
+                for encounter in encounters
+                if encounter.title == "Doctor Consultation"
+                and encounter.status == EncounterStatus.OPEN
+            ),
+            None,
+        )
+
+        if (
+            episode.managing_doctor_id is not None
+            and episode.managing_doctor_id != staff.id
+        ):
+            raise InvalidConsultationDispositionError(
+                "Episode is already managed by another doctor.",
+            )
+
+        if (
+            doctor_consultation is not None
+            and doctor_consultation.staff_id != staff.id
+        ):
+            raise InvalidConsultationDispositionError(
+                "Doctor Consultation is already assigned to another doctor.",
+            )
+
+        started_at = datetime.now(UTC)
+
+        try:
+            episode.managing_doctor_id = staff.id
+
+            if doctor_consultation is None:
+                self.encounter_service.create_encounter(
+                    context=context,
+                    episode_id=episode.id,
+                    staff_id=staff.id,
+                    title="Doctor Consultation",
+                    commit=False,
+                )
+
+            self.repository.db.flush()
+            self.repository.db.commit()
+
+        except Exception:
+            self.repository.db.rollback()
+            raise
+
+        self.repository.refresh(
+            episode,
+        )
+
+        return episode
+
+
+    # =========================================================================
     # Complete Doctor Consultation
     # =========================================================================
 
@@ -758,12 +875,23 @@ class EpisodeService:
         """
         Complete an outpatient Doctor Consultation.
 
-        Supported disposition:
+        Supported dispositions:
 
             COMPLETE
+            DISCHARGE
 
-        Completing the consultation closes the Doctor Consultation
-        encounter while keeping the Episode OPEN.
+        The consultation encounter is closed in both cases.
+
+        COMPLETE keeps the Episode open when downstream clinical
+        work remains:
+
+            investigations -> AWAITING_INVESTIGATIONS
+            medication -> AWAITING_PHARMACY
+
+        If no downstream work remains, the Episode is closed.
+
+        DISCHARGE follows the same downstream-work rules but refuses
+        discharge while investigations are still outstanding.
         """
 
         episode = self._get_episode(
@@ -774,7 +902,10 @@ class EpisodeService:
         if episode.status != EpisodeStatus.OPEN:
             raise EpisodeNotOpenError()
 
-        if disposition != "COMPLETE":
+        if disposition not in {
+            "COMPLETE",
+            "DISCHARGE",
+        }:
             raise InvalidConsultationDispositionError(
                 "Unsupported consultation disposition.",
             )
@@ -828,6 +959,23 @@ class EpisodeService:
             )
         )
 
+        outstanding_medications = (
+            self.clinical_order_repository
+            .list_outstanding_medication_orders_for_episode(
+                hospital_id=context.hospital_id,
+                episode_id=episode.id,
+            )
+        )
+
+        if (
+            disposition == "DISCHARGE"
+            and outstanding_investigations
+        ):
+            raise InvalidConsultationDispositionError(
+                "The Episode cannot be discharged while "
+                "investigations are still outstanding.",
+            )
+
         completed_at = datetime.now(UTC)
 
         try:
@@ -838,6 +986,15 @@ class EpisodeService:
                 episode.flow_status = (
                     EpisodeFlowStatus.AWAITING_INVESTIGATIONS
                 )
+
+            elif outstanding_medications:
+                episode.flow_status = (
+                    EpisodeFlowStatus.AWAITING_PHARMACY
+                )
+
+            else:
+                episode.status = EpisodeStatus.CLOSED
+                episode.closed_at = completed_at
 
             self.repository.db.flush()
             self.repository.db.commit()
@@ -867,8 +1024,17 @@ class EpisodeService:
         """
         Complete an outpatient Doctor Review.
 
-        The Doctor Review Encounter is closed while the Episode remains
-        OPEN and returns to ROUTED for any subsequent clinical action.
+        The Doctor Review Encounter and the Episode are completed
+        atomically.
+
+        Completing the Doctor Review:
+        • Closes the Doctor Review Encounter.
+        • Changes the Episode from OPEN to CLOSED.
+        • Records the Episode closed_at timestamp.
+
+        A completed outpatient Doctor Review represents the end of
+        the current Episode of Care. A new future clinical problem
+        should be represented by a new Episode.
         """
 
         episode = self._get_episode(
@@ -913,12 +1079,41 @@ class EpisodeService:
         if encounter.status != EncounterStatus.OPEN:
             raise EncounterNotOpenError()
 
+        outstanding_investigations = (
+            self.clinical_order_repository
+            .list_outstanding_investigation_orders_for_episode(
+                hospital_id=context.hospital_id,
+                episode_id=episode.id,
+            )
+        )
+
+        if outstanding_investigations:
+            raise InvalidConsultationDispositionError(
+                "Doctor Review cannot be completed while "
+                "investigations are still outstanding.",
+            )
+
+        outstanding_medications = (
+            self.clinical_order_repository
+            .list_outstanding_medication_orders_for_episode(
+                hospital_id=context.hospital_id,
+                episode_id=episode.id,
+            )
+        )
+
         completed_at = datetime.now(UTC)
 
         try:
             encounter.status = EncounterStatus.CLOSED
             encounter.ended_at = completed_at
-            episode.flow_status = EpisodeFlowStatus.ROUTED
+
+            if outstanding_medications:
+                episode.flow_status = (
+                    EpisodeFlowStatus.AWAITING_PHARMACY
+                )
+            else:
+                episode.status = EpisodeStatus.CLOSED
+                episode.closed_at = completed_at
 
             self.repository.db.flush()
             self.repository.db.commit()
@@ -1013,6 +1208,14 @@ class EpisodeService:
             context=context,
         )
 
+        outstanding_medications = (
+            self.clinical_order_repository
+            .list_outstanding_medication_orders_for_episode(
+                hospital_id=context.hospital_id,
+                episode_id=episode.id,
+            )
+        )
+
         completed_at = datetime.now(UTC)
 
         record = EpisodeDisposition(
@@ -1037,8 +1240,13 @@ class EpisodeService:
             )
 
             if disposition == EpisodeDispositionType.DISCHARGE:
-                episode.status = EpisodeStatus.CLOSED
-                episode.closed_at = completed_at
+                if outstanding_medications:
+                    episode.flow_status = (
+                        EpisodeFlowStatus.AWAITING_PHARMACY
+                    )
+                else:
+                    episode.status = EpisodeStatus.CLOSED
+                    episode.closed_at = completed_at
 
             self.repository.db.flush()
             self.repository.db.commit()

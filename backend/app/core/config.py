@@ -21,8 +21,24 @@ directly.
 ========================================================================
 """
 
-from pydantic import Field
+import os
+import re
+import logging
+
+from dotenv import dotenv_values
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Optionally load secrets from AWS Secrets Manager early so Settings can pick them up
+if os.environ.get("USE_AWS_SECRETS"):
+    try:
+        from app.core.secrets import load_aws_secrets_to_env
+
+        secret_name = os.environ.get("AWS_SECRET_NAME")
+        logging.getLogger(__name__).info("Loading secrets from AWS Secrets Manager: %s", secret_name)
+        load_aws_secrets_to_env(secret_name)
+    except Exception:
+        logging.getLogger(__name__).exception("Failed to load AWS secrets")
 
 
 class Settings(BaseSettings):
@@ -44,6 +60,31 @@ class Settings(BaseSettings):
     app_env: str = "development"
 
     debug: bool = True
+
+    allowed_origins: str = Field(
+        default="http://localhost:5173,http://localhost:5174,https://localhost:5173,https://localhost:5174",
+        validation_alias="ALLOWED_ORIGINS",
+    )
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def set_debug_from_app_env(cls, value, info):
+        app_env = info.data.get("app_env") if info.data else None
+        if app_env is not None and app_env.lower() == "production":
+            return False
+        if app_env is not None and app_env.lower() in {"development", "staging"}:
+            return True
+        return value
+
+    @field_validator("jwt_secret_key")
+    @classmethod
+    def validate_jwt_secret_key(cls, value, info):
+        app_env = info.data.get("app_env") if info.data else None
+        if app_env and app_env.lower() == "production" and len(value) < 32:
+            raise ValueError(
+                "JWT_SECRET_KEY must be at least 32 characters long in production."
+            )
+        return value
 
     # ----------------------------------------------------------
     # Database
@@ -102,6 +143,40 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def expand_database_url(cls, value):
+        """Expand environment-style variables in the database URL.
+
+        Supports $VAR, ${VAR} and {VAR} placeholder formats. This makes
+        it convenient to use templates in `.env` like
+        `postgresql+psycopg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@localhost:5432/{POSTGRES_DB}`.
+        """
+
+        if not value or not isinstance(value, str):
+            return value
+
+        # expand $VAR and ${VAR}
+        expanded = os.path.expandvars(value)
+
+        # Pydantic reads .env values for Settings, but does not add them to
+        # os.environ. Load that file here too so a DATABASE_URL template can
+        # reliably reference POSTGRES_* values declared alongside it.
+        env_file_values = dotenv_values(".env")
+
+        # replace {VAR} with environment or .env value if present
+        def _repl(match):
+            name = match.group(1)
+            return (
+                os.environ.get(name)
+                or env_file_values.get(name)
+                or match.group(0)
+            )
+
+        expanded = re.sub(r"\{([A-Za-z0-9_]+)\}", _repl, expanded)
+
+        return expanded
 
 
 # Singleton settings instance

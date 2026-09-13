@@ -16,6 +16,7 @@ from app.modules.clinical_orders.enums import (
     ClinicalOrderStatus,
     ClinicalOrderType,
 )
+from app.modules.clinical_orders.models import ClinicalOrderItemType
 
 
 class PrescriptionResponse(BaseModel):
@@ -44,6 +45,36 @@ class PrescriptionResponse(BaseModel):
     updated_at: datetime
 
 
+class ClinicalOrderItemResponse(BaseModel):
+    """
+    Investigation item contained within a Clinical Order.
+    """
+
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
+
+    id: UUID
+
+    clinical_order_id: UUID
+
+    item_type: ClinicalOrderItemType
+
+    status: ClinicalOrderStatus
+
+    laboratory_test_id: UUID | None
+
+    diagnostic_investigation_id: UUID | None
+
+    display_order: int
+
+    details: dict[str, Any]
+
+    created_at: datetime
+
+    updated_at: datetime
+
+
 class ClinicalOrderResponse(BaseModel):
     """
     Clinical Order response.
@@ -66,6 +97,8 @@ class ClinicalOrderResponse(BaseModel):
     priority: str
 
     details: dict[str, Any]
+
+    items: list[ClinicalOrderItemResponse]
 
     ordered_at: datetime
 
@@ -111,6 +144,8 @@ class LaboratoryQueueItemResponse(BaseModel):
 
     details: dict[str, Any]
 
+    items: list[ClinicalOrderItemResponse]
+
     ordered_at: datetime
 
     started_at: datetime | None
@@ -136,5 +171,6 @@ class DiagnosticQueueItemResponse(BaseModel):
     status: ClinicalOrderStatus
     priority: str
     details: dict[str, Any]
+    items: list[ClinicalOrderItemResponse]
     ordered_at: datetime
     started_at: datetime | None

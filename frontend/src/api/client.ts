@@ -1,5 +1,5 @@
 const API_BASE_URL =
-  'http://localhost:8000/api/v1'
+  (import.meta.env.VITE_API_BASE as string) || `${window.location.origin}/api/v1`
 
 
 const ACCESS_TOKEN_KEY =
@@ -72,6 +72,13 @@ async function refreshAccessToken(): Promise<string | null> {
         sessionStorage.setItem(
           REFRESH_TOKEN_KEY,
           tokens.refresh_token,
+        )
+
+        window.dispatchEvent(
+          new CustomEvent(
+            'lightburgh:session-refreshed',
+            { detail: tokens },
+          ),
         )
 
         return tokens.access_token

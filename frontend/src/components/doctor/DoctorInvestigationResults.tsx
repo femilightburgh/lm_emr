@@ -19,11 +19,28 @@ interface Props {
 }
 
 function getInvestigationLabel(
-  order: ClinicalOrder,
+  order: ClinicalOrder | undefined,
+  orderItemId: string | null,
 ): string {
+  if (!order) {
+    return 'Laboratory investigation'
+  }
+
   if (order.order_type === 'LABORATORY') {
-    const testName = order.details.test_name
-    const testCode = order.details.test_code
+    const item =
+      orderItemId
+        ? order.items.find(
+            candidate =>
+              candidate.id === orderItemId &&
+              candidate.item_type === 'LABORATORY',
+          )
+        : undefined
+
+    const testName =
+      item?.details.test_name
+
+    const testCode =
+      item?.details.test_code
 
     if (
       typeof testName === 'string' &&
@@ -37,6 +54,26 @@ function getInvestigationLabel(
       testCode.trim()
     ) {
       return testCode
+    }
+
+    const legacyTestName =
+      order.details.test_name
+
+    const legacyTestCode =
+      order.details.test_code
+
+    if (
+      typeof legacyTestName === 'string' &&
+      legacyTestName.trim()
+    ) {
+      return legacyTestName
+    }
+
+    if (
+      typeof legacyTestCode === 'string' &&
+      legacyTestCode.trim()
+    ) {
+      return legacyTestCode
     }
 
     return 'Laboratory investigation'
@@ -90,493 +127,338 @@ export default function DoctorInvestigationResults({
 
   return (
     <section className="workspace-panel">
-  <div className="panel-header">
-    <div>
-      <h2>
-        Investigation Results
-      </h2>
+      <div className="panel-header">
+        <div>
+          <h2>
+            Investigation Results
+          </h2>
 
-      <p>
-        Results available for clinical review.
-      </p>
-    </div>
-  </div>
+          <p>
+            Results available for clinical review.
+          </p>
+        </div>
+      </div>
 
-  {loadingClinicalResults && (
-    <p>
-      Loading investigation results...
-    </p>
-  )}
+      {loadingClinicalResults && (
+        <p>
+          Loading investigation results...
+        </p>
+      )}
 
-  {!loadingClinicalResults &&
-    clinicalResults.length === 0 &&
-    diagnosticReports.length === 0 && (
-      <p>
-        No investigation results recorded.
-      </p>
-    )}
+      {!loadingClinicalResults &&
+        clinicalResults.length === 0 &&
+        diagnosticReports.length === 0 && (
+          <p>
+            No investigation results recorded.
+          </p>
+        )}
 
-  {!loadingClinicalResults &&
-    clinicalResults.map(
-      result => {
-        const order =
-          orders.find(
-            candidate =>
-              candidate.id ===
-              result.order_id,
-          )
+      {!loadingClinicalResults &&
+        clinicalResults.map(
+          result => {
+            const order =
+              orders.find(
+                candidate =>
+                  candidate.id ===
+                  result.order_id,
+              )
 
-        if (!order) {
-          return null
-        }
+            return (
+              <article
+                key={result.id}
+                className="workspace-panel clinical-result-report"
+              >
+                <div className="clinical-result-report-header">
+                  <div>
+                    <strong>
+                      {getInvestigationLabel(
+                        order,
+                        result.order_item_id,
+                      )}
+                    </strong>
 
-        return (
-          <article
-            key={result.id}
-            className="workspace-panel clinical-result-report"
-          >
-            <div className="clinical-result-report-header">
-              <div>
-                <strong>
-                  {getInvestigationLabel(
-                    order,
-                  )}
-                </strong>
-
-                <span>
-                  {order.order_type}
-                  {' · '}
-                  {order.priority}
-                </span>
-
-                <span>
-                  Recorded{' '}
-                  {new Date(
-                    result.recorded_at,
-                  ).toLocaleString()}
-                </span>
-              </div>
-
-              <span className={
-                result.status === 'FINAL'
-                  ? 'clinical-result-status final'
-                  : 'clinical-result-status draft'
-              }>
-                {result.status}
-              </span>
-            </div>
-
-            <div className="clinical-result-report-meta">
-              <div>
-                <span>
-                  Specimen
-                </span>
-
-                <strong>
-                  {result.specimen ??
-                    'Not recorded'}
-                </strong>
-              </div>
-
-              <div>
-                <span>
-                  Collected
-                </span>
-
-                <strong>
-                  {result.collected_at
-                    ? new Date(
-                        result.collected_at,
-                      ).toLocaleString()
-                    : 'Not recorded'}
-                </strong>
-              </div>
-
-              <div>
-                <span>
-                  Reported
-                </span>
-
-                <strong>
-                  {result.reported_at
-                    ? new Date(
-                        result.reported_at,
-                      ).toLocaleString()
-                    : 'Not recorded'}
-                </strong>
-              </div>
-            </div>
-
-            <div className="clinical-result-table">
-              <div className="clinical-result-table-header">
-                <span>
-                  Analyte
-                </span>
-
-                <span>
-                  Result
-                </span>
-
-                <span>
-                  Unit
-                </span>
-
-                <span>
-                  Reference
-                </span>
-
-                <span>
-                  Flag
-                </span>
-              </div>
-
-              {result.values.length === 0 ? (
-                <p>
-                  No structured result values recorded.
-                </p>
-              ) : (
-                result.values.map(
-                  value => (
-                    <div
-                      key={value.id}
-                      className="clinical-result-table-row"
-                    >
-                      <span>
-                        <strong>
-                          {value.analyte_name}
-                        </strong>
-
-                        <small>
-                          {value.analyte_code}
-                        </small>
-                      </span>
-
-                      <strong>
-                        {formatResultValue(
-                          value.value,
-                        )}
-                      </strong>
-
-                      <span>
-                        {value.unit ??
-                          '—'}
-                      </span>
-
-                      <span>
-                        {value.reference_text ??
-                          (
-                            value.reference_low !== null &&
-                            value.reference_high !== null
-                              ? `${value.reference_low}–${value.reference_high}`
-                              : value.reference_low !== null
-                                ? `≥ ${value.reference_low}`
-                                : value.reference_high !== null
-                                  ? `≤ ${value.reference_high}`
-                                  : '—'
-                          )}
-                      </span>
-
-                      <span>
-                        {value.abnormal_flag ??
-                          '—'}
-                      </span>
-                    </div>
-                  ),
-                )
-              )}
-            </div>
-
-            <div className="clinical-result-interpretation">
-              <span>
-                Interpretation
-              </span>
-
-              <p>
-                {result.interpretation ??
-                  'No interpretation recorded.'}
-              </p>
-            </div>
-          </article>
-        )
-      },
-    )}
-
-  {diagnosticReports.length === 0 ? (
-    <p>
-      No finalized diagnostic reports recorded.
-    </p>
-  ) : (
-    diagnosticReports.map(
-      report => {
-        const order =
-          orders.find(
-            candidate =>
-              candidate.id ===
-              report.order_id,
-          )
-
-        const investigationName =
-          typeof order?.details
-            .investigation_name ===
-          'string'
-            ? order.details
-                .investigation_name
-            : typeof order?.details
-                .investigation_code ===
-              'string'
-              ? order.details
-                  .investigation_code
-              : 'Diagnostic investigation'
-
-        return (
-          <article
-            key={report.id}
-            className="workspace-panel clinical-result-report diagnostic-result-report"
-          >
-            <details className="doctor-diagnostic-report-details">
-              <summary className="clinical-result-report-header doctor-diagnostic-report-summary">
-                <div>
-                  <strong>
-                    {investigationName}
-                  </strong>
-
-                  <span>
-                    DIAGNOSTIC
-                    {' · '}
-                    {order?.priority ??
-                      'ROUTINE'}
-                  </span>
-
-                  <span>
-                    Reported{' '}
-                    {report.reported_at
-                      ? new Date(
-                          report.reported_at,
-                        ).toLocaleString()
-                      : 'Not recorded'}
-                  </span>
-                </div>
-
-                <span className="clinical-result-status final">
-                  FINAL
-                </span>
-              </summary>
-
-            <div className="clinical-result-report-meta">
-              <div>
-                <span>
-                  Category
-                </span>
-
-                <strong>
-                  {report.category}
-                </strong>
-              </div>
-
-              <div>
-                <span>
-                  Recorded
-                </span>
-
-                <strong>
-                  {report.recorded_at
-                    ? new Date(
-                        report.recorded_at,
-                      ).toLocaleString()
-                    : 'Not recorded'}
-                </strong>
-              </div>
-            </div>
-
-            {report.findings?.trim() && (
-              <div className="clinical-result-interpretation">
-                <span>
-                  Findings
-                </span>
-
-                <p>
-                  {report.findings}
-                </p>
-              </div>
-            )}
-
-            {report.impression?.trim() && (
-              <div className="clinical-result-interpretation">
-                <span>
-                  Impression
-                </span>
-
-                <p>
-                  {report.impression}
-                </p>
-              </div>
-            )}
-
-            {report.interpretation?.trim() && (
-              <div className="clinical-result-interpretation">
-                <span>
-                  Interpretation
-                </span>
-
-                <p>
-                  {report.interpretation}
-                </p>
-              </div>
-            )}
-
-            {report.recommendations?.trim() && (
-              <div className="clinical-result-interpretation">
-                <span>
-                  Recommendations
-                </span>
-
-                <p>
-                  {report.recommendations}
-                </p>
-              </div>
-            )}
-
-            {report.measurements &&
-              Object.keys(
-                report.measurements,
-              ).length > 0 && (
-                <div className="clinical-result-report-meta diagnostic-measurement-grid">
-                  {Object.entries(
-                    report.measurements,
-                  ).map(
-                    ([key, value]) => (
-                      <div key={key}>
+                    {order && (
+                      <>
                         <span>
-                          {key.replace(
-                            /_/g,
-                            ' ',
-                          )}
+                          {order.order_type}
+                          {' · '}
+                          {order.priority}
                         </span>
 
-                        <strong>
-                          {value === null ||
-                          value === undefined
-                            ? '—'
-                            : typeof value ===
-                                'object'
-                              ? JSON.stringify(
-                                  value,
-                                )
-                              : String(
-                                  value,
-                                )}
-                        </strong>
-                      </div>
-                    ),
-                  )}
-                </div>
-              )}
+                        <span>
+                          Ordered{' '}
+                          {new Date(
+                            order.ordered_at,
+                          ).toLocaleString()}
+                        </span>
+                      </>
+                    )}
 
-            {diagnosticAttachments[report.id]
-              ?.length > 0 && (
-              <div className="diagnostic-doctor-attachments">
-                <div>
-                  <span className="diagnostic-doctor-section-label">
-                    Attachments
+                    <span>
+                      Recorded{' '}
+                      {new Date(
+                        result.recorded_at,
+                      ).toLocaleString()}
+                    </span>
+                  </div>
+
+                  <span
+                    className={
+                      result.status === 'FINAL'
+                        ? 'clinical-result-status final'
+                        : 'clinical-result-status draft'
+                    }
+                  >
+                    {result.status}
                   </span>
-
-                  <p className="diagnostic-doctor-attachments-help">
-                    Supporting diagnostic images and documents.
-                  </p>
                 </div>
 
-                <div className="diagnostic-doctor-attachment-list">
-                  {diagnosticAttachments[
-                    report.id
-                  ].map(
-                    attachment => {
-                      const isImage =
-                        attachment.content_type.startsWith(
-                          'image/',
-                        )
+                <div className="clinical-result-report-meta">
+                  <div>
+                    <span>
+                      Specimen
+                    </span>
 
-                      const isPdf =
-                        attachment.content_type ===
-                        'application/pdf'
+                    <strong>
+                      {result.specimen ??
+                        'Not recorded'}
+                    </strong>
+                  </div>
 
-                      return (
+                  <div>
+                    <span>
+                      Collected
+                    </span>
+
+                    <strong>
+                      {result.collected_at
+                        ? new Date(
+                            result.collected_at,
+                          ).toLocaleString()
+                        : 'Not recorded'}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      Reported
+                    </span>
+
+                    <strong>
+                      {result.reported_at
+                        ? new Date(
+                            result.reported_at,
+                          ).toLocaleString()
+                        : 'Not recorded'}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="clinical-result-table">
+                  <div className="clinical-result-table-header">
+                    <span>
+                      Analyte
+                    </span>
+
+                    <span>
+                      Result
+                    </span>
+
+                    <span>
+                      Unit
+                    </span>
+
+                    <span>
+                      Reference
+                    </span>
+
+                    <span>
+                      Flag
+                    </span>
+                  </div>
+
+                  {result.values.length === 0 ? (
+                    <p>
+                      No structured result values recorded.
+                    </p>
+                  ) : (
+                    result.values.map(
+                      value => (
                         <div
-                          key={
-                            attachment.id
-                          }
-                          className="diagnostic-doctor-attachment"
+                          key={value.id}
+                          className="clinical-result-table-row"
                         >
-                          {isImage ? (
-                            <a
-                              href={
-                                attachment.url
-                              }
-                              target="_blank"
-                              rel="noreferrer"
-                              className="diagnostic-doctor-image-link"
-                            >
-                              <img
-                                src={
-                                  attachment.url
-                                }
-                                alt={
-                                  attachment.description ??
-                                  attachment.file_name
-                                }
-                                className="diagnostic-doctor-image"
-                              />
-                            </a>
-                          ) : (
-                            <div className="diagnostic-doctor-file">
-                              <strong>
-                                {
-                                  attachment.file_name
-                                }
-                              </strong>
+                          <span>
+                            <strong>
+                              {value.analyte_name}
+                            </strong>
+                          </span>
 
-                              {attachment.description && (
-                                <span>
-                                  {
-                                    attachment.description
-                                  }
-                                </span>
-                              )}
-
-                              {isPdf && (
-                                <a
-                                  href={
-                                    attachment.url
-                                  }
-                                  target="_blank"
-                                  rel="noreferrer"
-                                >
-                                  Open PDF
-                                </a>
-                              )}
-                            </div>
-                          )}
-
-                          {isImage &&
-                            attachment.description && (
-                              <span>
-                                {
-                                  attachment.description
-                                }
-                              </span>
+                          <span>
+                            {formatResultValue(
+                              value.value,
                             )}
+                          </span>
+
+                          <span>
+                            {value.unit ?? '—'}
+                          </span>
+
+                          <span>
+                            {value.reference_text ??
+                              (
+                                value.reference_low !== null &&
+                                value.reference_high !== null
+                                  ? `${value.reference_low}–${value.reference_high}`
+                                  : '—'
+                              )}
+                          </span>
+
+                          <span>
+                            {value.abnormal_flag ??
+                              '—'}
+                          </span>
                         </div>
-                      )
-                    },
+                      ),
+                    )
                   )}
                 </div>
-              </div>
-            )}
-            </details>
-          </article>
-        )
-      },
-    )
-  )}
-</section>
+
+                {result.interpretation && (
+                  <div className="clinical-result-interpretation">
+                    <span>
+                      Interpretation
+                    </span>
+
+                    <p>
+                      {result.interpretation}
+                    </p>
+                  </div>
+                )}
+              </article>
+            )
+          },
+        )}
+
+      {diagnosticReports.length > 0 && (
+        <div className="clinical-diagnostic-reports">
+          <h3>
+            Diagnostic Reports
+          </h3>
+
+          {diagnosticReports.map(
+            report => {
+              const order =
+                orders.find(
+                  candidate =>
+                    candidate.id ===
+                    report.order_id,
+                )
+
+              const attachments =
+                diagnosticAttachments[
+                  report.id
+                ] ?? []
+
+              return (
+                <article
+                  key={report.id}
+                  className="workspace-panel clinical-result-report"
+                >
+                  <div className="clinical-result-report-header">
+                    <div>
+                      <strong>
+                        {order
+                          ? getInvestigationLabel(
+                              order,
+                              null,
+                            )
+                          : 'Diagnostic investigation'}
+                      </strong>
+
+                      {order && (
+                        <span>
+                          {order.order_type}
+                          {' · '}
+                          {order.priority}
+                        </span>
+                      )}
+
+                      <span>
+                        Reported{' '}
+                        {report.reported_at
+                          ? new Date(
+                              report.reported_at,
+                            ).toLocaleString()
+                          : 'Not recorded'}
+                      </span>
+                    </div>
+
+                    <span className="clinical-result-status final">
+                      FINAL
+                    </span>
+                  </div>
+
+                  <div className="clinical-result-interpretation">
+                    <span>
+                      Report
+                    </span>
+
+                    {report.findings && (
+                      <p>
+                        <strong>Findings:</strong>{' '}
+                        {report.findings}
+                      </p>
+                    )}
+
+                    {report.impression && (
+                      <p>
+                        <strong>Impression:</strong>{' '}
+                        {report.impression}
+                      </p>
+                    )}
+
+                    {report.interpretation && (
+                      <p>
+                        <strong>Interpretation:</strong>{' '}
+                        {report.interpretation}
+                      </p>
+                    )}
+
+                    {report.recommendations && (
+                      <p>
+                        <strong>Recommendations:</strong>{' '}
+                        {report.recommendations}
+                      </p>
+                    )}
+                  </div>
+
+                  {attachments.length > 0 && (
+                    <div className="clinical-diagnostic-attachments">
+                      <strong>
+                        Attachments
+                      </strong>
+
+                      {attachments.map(
+                        attachment => (
+                          <a
+                            key={attachment.id}
+                            href={attachment.url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {attachment.file_name}
+                          </a>
+                        ),
+                      )}
+                    </div>
+                  )}
+                </article>
+              )
+            },
+          )}
+        </div>
+      )}
+    </section>
   )
 }

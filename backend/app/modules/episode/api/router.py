@@ -661,6 +661,84 @@ def route_episode(
 
 
 # ============================================================================
+# Start Doctor Consultation
+# ============================================================================
+
+
+@router.post(
+    "/{episode_id}/start-doctor-consultation",
+    response_model=EpisodeResponse,
+    summary="Start an outpatient Doctor Consultation",
+)
+def start_doctor_consultation(
+    episode_id: UUID,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: EpisodeService = Depends(
+        get_episode_service,
+    ),
+):
+    """
+    Start an outpatient Doctor Consultation.
+
+    The authenticated Doctor becomes the managing doctor of the Episode.
+    """
+
+    try:
+        episode = service.start_doctor_consultation(
+            context=context,
+            episode_id=episode_id,
+        )
+
+        return EpisodeResponse.model_validate(
+            episode,
+        )
+
+    except EpisodeNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Episode not found.",
+        ) from exc
+
+    except EpisodeAlreadyClosedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Closed episodes cannot start a consultation.",
+        ) from exc
+
+    except EpisodeAlreadyCancelledError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cancelled episodes cannot start a consultation.",
+        ) from exc
+
+    except EpisodeNotOpenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Episode is not open.",
+        ) from exc
+
+    except InvalidConsultationDispositionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    except StaffNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Authenticated user does not have a Staff profile.",
+        ) from exc
+
+    except StaffNotDoctorError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+
+
+# ============================================================================
 # Complete Doctor Consultation
 # ============================================================================
 

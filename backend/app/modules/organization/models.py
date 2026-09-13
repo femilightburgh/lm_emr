@@ -41,11 +41,13 @@ from app.modules.organization.enums import (
     HospitalType,
 )
 from app.modules.episode.models import Episode
+from app.modules.patients.models import Patient
 
 if TYPE_CHECKING:
     from app.modules.identity.models import Role, UserAccount
     from app.modules.patients.models import Patient
     from app.modules.staff.models import Staff
+    from app.modules.laboratory.models import LaboratoryTest
 
 
 class Hospital(BaseEntity):
@@ -185,6 +187,11 @@ class Hospital(BaseEntity):
     )
 
     departments: Mapped[list["Department"]] = relationship(
+        back_populates="hospital",
+        cascade="all, delete-orphan",
+    )
+
+    laboratory_tests: Mapped[list["LaboratoryTest"]] = relationship(
         back_populates="hospital",
         cascade="all, delete-orphan",
     )

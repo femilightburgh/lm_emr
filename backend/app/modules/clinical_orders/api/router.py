@@ -41,6 +41,12 @@ from app.modules.clinical_orders.exceptions import (
     ClinicalOrderStaffNotFoundError,
     ClinicalOrderAlreadyReceivedError,
     ClinicalOrderCannotReceiveError,
+    ClinicalOrderItemAlreadyReceivedError,
+    ClinicalOrderItemCannotReceiveError,
+    ClinicalOrderItemNotFoundError,
+    ClinicalOrderItemAlreadyInProgressError,
+    ClinicalOrderItemAlreadyCompletedError,
+    ClinicalOrderItemCannotStartError,
 )
 from app.modules.clinical_orders.repositories import (
     ClinicalOrderRepository,
@@ -48,11 +54,18 @@ from app.modules.clinical_orders.repositories import (
     MedicationTreatmentRepository,
     PrescriptionRepository,
 )
+from app.modules.diagnostics.repositories.diagnostic_repository import (
+    DiagnosticRepository,
+)
+from app.modules.laboratory.repositories.laboratory_test_repository import (
+    LaboratoryTestRepository,
+)
 from app.modules.clinical_orders.schemas import (
     CreateClinicalOrderRequest,
     CreateMedicationAdministrationRequest,
     CreateMedicationTreatmentRequest,
     ClinicalOrderResponse,
+    ClinicalOrderItemResponse,
     LaboratoryQueueItemResponse,
     DiagnosticQueueItemResponse,
     MedicationAdministrationResponse,
@@ -165,6 +178,8 @@ def get_clinical_order_service(
         episode_repository=EpisodeRepository(db),
         staff_repository=StaffRepository(db),
         prescription_repository=PrescriptionRepository(db),
+        laboratory_test_repository=LaboratoryTestRepository(db),
+        diagnostic_repository=DiagnosticRepository(db),
         inpatient_medication_service=InpatientMedicationService(
             db=db,
             episode_repository=EpisodeRepository(db),
@@ -211,6 +226,10 @@ def create_clinical_order(
             order_type=request.order_type,
             priority=request.priority,
             details=request.details,
+            items=[
+                item.model_dump()
+                for item in request.items
+            ],
         )
 
         return ClinicalOrderResponse.model_validate(
@@ -673,6 +692,44 @@ def get_clinical_order(
 
 
 @router.get(
+    "/episodes/{episode_id}",
+    response_model=list[ClinicalOrderResponse],
+    summary="List Episode Clinical Orders",
+    dependencies=[
+        Depends(
+            require_permission(
+                Permissions.CLINICAL_ORDER_READ,
+            ),
+        ),
+    ],
+)
+def list_episode_clinical_orders(
+    episode_id: UUID,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: ClinicalOrderService = Depends(
+        get_clinical_order_service,
+    ),
+):
+    """
+    Return all Clinical Orders belonging to an Episode.
+
+    Orders remain attached to their original Encounters. This endpoint
+    exposes the complete Episode investigation history for clinical
+    workflows such as Doctor Review.
+    """
+
+    return [
+        ClinicalOrderResponse.model_validate(order)
+        for order in service.list_episode_orders(
+            context=context,
+            episode_id=episode_id,
+        )
+    ]
+
+
+@router.get(
     "/encounters/{encounter_id}",
     response_model=list[ClinicalOrderResponse],
     summary="List Encounter Clinical Orders",
@@ -758,6 +815,10 @@ def list_laboratory_queue(
             status=order.status,
             priority=order.priority,
             details=order.details,
+            items=[
+                ClinicalOrderItemResponse.model_validate(item)
+                for item in order.items
+            ],
             ordered_at=order.ordered_at,
             started_at=order.started_at,
         )
@@ -819,6 +880,10 @@ def list_diagnostic_queue(
             status=order.status,
             priority=order.priority,
             details=order.details,
+            items=[
+                ClinicalOrderItemResponse.model_validate(item)
+                for item in order.items
+            ],
             ordered_at=order.ordered_at,
             started_at=order.started_at,
         )
@@ -827,6 +892,122 @@ def list_diagnostic_queue(
         )
     ]
 
+
+
+# ============================================================================
+# Receive Clinical Order Item
+# ============================================================================
+
+
+@router.post(
+    "/items/{item_id}/receive",
+    response_model=ClinicalOrderResponse,
+    summary="Receive Clinical Order Item",
+    dependencies=[
+        Depends(
+            require_permission(
+                Permissions.CLINICAL_ORDER_READ,
+            ),
+        ),
+    ],
+)
+def receive_clinical_order_item(
+    item_id: UUID,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: ClinicalOrderService = Depends(
+        get_clinical_order_service,
+    ),
+):
+    try:
+        order = service.receive_order_item(
+            context=context,
+            order_item_id=item_id,
+        )
+
+        return ClinicalOrderResponse.model_validate(
+            order,
+        )
+
+    except ClinicalOrderItemNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Clinical Order Item not found.",
+        ) from exc
+
+    except ClinicalOrderItemAlreadyReceivedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    except ClinicalOrderItemCannotReceiveError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+
+# ============================================================================
+# Start Clinical Order Item
+# ============================================================================
+
+
+@router.post(
+    "/items/{item_id}/start",
+    response_model=ClinicalOrderResponse,
+    summary="Start Clinical Order Item",
+    dependencies=[
+        Depends(
+            require_permission(
+                Permissions.CLINICAL_ORDER_READ,
+            ),
+        ),
+    ],
+)
+def start_clinical_order_item(
+    item_id: UUID,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: ClinicalOrderService = Depends(
+        get_clinical_order_service,
+    ),
+):
+    try:
+        order = service.start_order_item(
+            context=context,
+            order_item_id=item_id,
+        )
+
+        return ClinicalOrderResponse.model_validate(
+            order,
+        )
+
+    except ClinicalOrderItemNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Clinical Order Item not found.",
+        ) from exc
+
+    except ClinicalOrderItemAlreadyInProgressError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    except ClinicalOrderItemAlreadyCompletedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    except ClinicalOrderItemCannotStartError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
 
 # ============================================================================

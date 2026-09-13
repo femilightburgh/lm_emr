@@ -4,6 +4,7 @@ import {
 
 import type {
   ClinicalOrder,
+  ClinicalOrderItem,
 } from './clinicalOrders'
 
 
@@ -59,6 +60,7 @@ export interface LaboratoryQueueItem {
   details: Record<string, unknown>
   ordered_at: string
   started_at: string | null
+  items: ClinicalOrderItem[]
 }
 
 
@@ -191,6 +193,34 @@ export async function startLaboratoryOrder(
 ): Promise<ClinicalOrder> {
   return apiRequest<ClinicalOrder>(
     `/clinical-orders/${orderId}/start`,
+    {
+      method: 'POST',
+    },
+    accessToken,
+  )
+}
+
+
+export async function receiveLaboratoryOrderItem(
+  accessToken: string,
+  orderItemId: string,
+): Promise<ClinicalOrder> {
+  return apiRequest<ClinicalOrder>(
+    `/clinical-orders/items/${orderItemId}/receive`,
+    {
+      method: 'POST',
+    },
+    accessToken,
+  )
+}
+
+
+export async function startLaboratoryOrderItem(
+  accessToken: string,
+  orderItemId: string,
+): Promise<ClinicalOrder> {
+  return apiRequest<ClinicalOrder>(
+    `/clinical-orders/items/${orderItemId}/start`,
     {
       method: 'POST',
     },

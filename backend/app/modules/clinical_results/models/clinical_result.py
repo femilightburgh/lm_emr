@@ -27,7 +27,10 @@ from app.modules.clinical_results.enums import (
 )
 
 if TYPE_CHECKING:
-    from app.modules.clinical_orders.models import ClinicalOrder
+    from app.modules.clinical_orders.models import (
+        ClinicalOrder,
+        ClinicalOrderItem,
+    )
     from app.modules.staff.models import Staff
 
 
@@ -41,6 +44,12 @@ class ClinicalResult(BaseEntity):
     order_id: Mapped[UUID] = mapped_column(
         ForeignKey("clinical_orders.id"),
         nullable=False,
+        index=True,
+    )
+
+    order_item_id: Mapped[UUID] = mapped_column(
+        ForeignKey("clinical_order_items.id"),
+        nullable=True,
         index=True,
     )
 
@@ -102,6 +111,8 @@ class ClinicalResult(BaseEntity):
     )
 
     order: Mapped["ClinicalOrder"] = relationship()
+
+    order_item: Mapped["ClinicalOrderItem"] = relationship()
 
     recording_staff: Mapped["Staff"] = relationship(
         foreign_keys=[recorded_by],

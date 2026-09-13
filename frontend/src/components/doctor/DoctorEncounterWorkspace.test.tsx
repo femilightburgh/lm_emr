@@ -136,6 +136,7 @@ function createProps(
     selectedEncounter: createEncounter(title, status),
     selectedEpisode: createEpisode(),
     accessToken: 'test-token',
+    onBackToQueue: noop,
     patient: {
       first_name: 'Test',
       middle_name: null,
@@ -290,11 +291,9 @@ function createProps(
     orderType: 'LABORATORY',
     orderPriority: 'ROUTINE',
     laboratoryTests: [],
-    selectedLaboratoryTestId: '',
+    selectedLaboratoryTestIds: [],
     diagnosticInvestigations: [],
     selectedDiagnosticInvestigationId: '',
-    orderTestCode: '',
-    orderTestName: '',
     orderMedicationId: '',
     orderDose: '',
     prescriptionMedicine: '',
@@ -313,8 +312,6 @@ function createProps(
     setOrderPriority: noop,
     handleLaboratoryTestChange: noop,
     handleDiagnosticInvestigationChange: noop,
-    setOrderTestCode: noop,
-    setOrderTestName: noop,
     setOrderMedicationId: noop,
     setOrderDose: noop,
     setPrescriptionMedicine: noop,
@@ -343,7 +340,7 @@ function createProps(
 }
 
 describe('DoctorEncounterWorkspace orchestration', () => {
-  it('renders the consultation workflow sections in the non-ward branch', () => {
+  it('renders the consultation workflow sections in the non-ward branch', async () => {
     render(
       <DoctorEncounterWorkspace
         {...createProps('Doctor Consultation')}
@@ -351,15 +348,7 @@ describe('DoctorEncounterWorkspace orchestration', () => {
     )
 
     expect(
-      screen.getByTestId('patient-history-panel'),
-    ).toBeInTheDocument()
-
-    expect(
       screen.getByTestId('vitals-panel'),
-    ).toBeInTheDocument()
-
-    expect(
-      screen.getByTestId('progress-note-panel'),
     ).toBeInTheDocument()
 
     expect(
@@ -367,11 +356,7 @@ describe('DoctorEncounterWorkspace orchestration', () => {
     ).toHaveTextContent('Initial Assessment')
 
     expect(
-      screen.getByTestId('clinical-orders-panel'),
-    ).toBeInTheDocument()
-
-    expect(
-      screen.getByTestId('investigation-results'),
+      screen.getByText('Timeline'),
     ).toBeInTheDocument()
 
     expect(
@@ -381,9 +366,51 @@ describe('DoctorEncounterWorkspace orchestration', () => {
     expect(
       screen.queryByTestId('medication-treatment-review'),
     ).not.toBeInTheDocument()
+
+    const user = userEvent.setup()
+
+    await user.click(
+      screen.getByRole('tab', {
+        name: 'Notes',
+      }),
+    )
+
+    expect(
+      screen.getByTestId('progress-note-panel'),
+    ).toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole('tab', {
+        name: 'Orders',
+      }),
+    )
+
+    expect(
+      screen.getByTestId('clinical-orders-panel'),
+    ).toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole('tab', {
+        name: 'Results',
+      }),
+    )
+
+    expect(
+      screen.getByTestId('investigation-results'),
+    ).toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole('tab', {
+        name: 'History',
+      }),
+    )
+
+    expect(
+      screen.getByTestId('patient-history-panel'),
+    ).toBeInTheDocument()
   })
 
-  it('renders the complete ward review clinical composition', () => {
+  it('renders the complete ward review clinical composition', async () => {
     render(
       <DoctorEncounterWorkspace
         {...createProps('Ward Review')}
@@ -403,19 +430,39 @@ describe('DoctorEncounterWorkspace orchestration', () => {
     ).toBeInTheDocument()
 
     expect(
-      screen.getByTestId('investigation-results'),
-    ).toBeInTheDocument()
-
-    expect(
       screen.getByText('Timeline'),
     ).toBeInTheDocument()
+
+    const user = userEvent.setup()
+
+    await user.click(
+      screen.getByRole('tab', {
+        name: 'Notes',
+      }),
+    )
 
     expect(
       screen.getByTestId('progress-note-panel'),
     ).toBeInTheDocument()
 
+    await user.click(
+      screen.getByRole('tab', {
+        name: 'Orders',
+      }),
+    )
+
     expect(
       screen.getByTestId('clinical-orders-panel'),
+    ).toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole('tab', {
+        name: 'Results',
+      }),
+    )
+
+    expect(
+      screen.getByTestId('investigation-results'),
     ).toBeInTheDocument()
   })
 
@@ -551,7 +598,7 @@ describe('DoctorEncounterWorkspace orchestration', () => {
     ).toHaveBeenCalledTimes(1)
   })
 
-  it('uses Initial Clerking documentation when the documentation hook selects it', () => {
+  it('uses Initial Clerking documentation when the documentation hook selects it', async () => {
     const props = createProps('Doctor Consultation')
 
     props.documentation =
@@ -559,6 +606,14 @@ describe('DoctorEncounterWorkspace orchestration', () => {
 
     render(
       <DoctorEncounterWorkspace {...props} />,
+    )
+
+    const user = userEvent.setup()
+
+    await user.click(
+      screen.getByRole('tab', {
+        name: 'Notes',
+      }),
     )
 
     expect(

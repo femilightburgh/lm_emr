@@ -135,6 +135,32 @@ function App() {
     restoreSession()
   }, [])
 
+  useEffect(() => {
+    function handleSessionRefresh(
+      event: Event,
+    ) {
+      const refreshed = (
+        event as CustomEvent<LoginResponse>
+      ).detail
+
+      if (refreshed) {
+        setSession(refreshed)
+      }
+    }
+
+    window.addEventListener(
+      'lightburgh:session-refreshed',
+      handleSessionRefresh,
+    )
+
+    return () => {
+      window.removeEventListener(
+        'lightburgh:session-refreshed',
+        handleSessionRefresh,
+      )
+    }
+  }, [])
+
 
   // ==========================================================================
   // Login
@@ -376,6 +402,43 @@ const isDiagnosticsUser =
   user.roles?.includes('Radiographer') === true ||
   user.roles?.includes('Laboratory Scientist') === true
 
+const dashboardAction = isReceptionist
+  ? {
+      label: 'Open reception',
+      onClick: openReception,
+    }
+  : isNurse
+    ? {
+        label: 'Open nursing',
+        onClick: () => setView('nursing'),
+      }
+    : isDoctor
+      ? {
+          label: 'Open doctor workspace',
+          onClick: () => setView('doctor'),
+        }
+      : isLaboratoryScientist
+        ? {
+            label: 'Open laboratory',
+            onClick: () => setView('laboratory'),
+          }
+        : isPharmacist
+          ? {
+              label: 'Open pharmacy',
+              onClick: () => setView('pharmacy'),
+            }
+          : isAdministrator
+            ? {
+                label: 'Open administration',
+                onClick: () => setView('administrator'),
+              }
+            : isDiagnosticsUser
+              ? {
+                  label: 'Open diagnostics',
+                  onClick: () => setView('diagnostics'),
+                }
+              : null
+
 return (
   <AppShell
     user={user}
@@ -420,23 +483,27 @@ return (
             </p>
 
             <h2>
-              Welcome to reception.
+              {isReceptionist
+                ? 'Welcome to reception.'
+                : 'Welcome to LIGHTBURGH.'}
             </h2>
 
             <p>
-              Search for an existing patient or
-              register a new patient to begin
-              their journey through LIGHTBURGH.
+              {isReceptionist
+                ? 'Search for an existing patient or register a new patient to begin their journey through LIGHTBURGH.'
+                : 'Choose your workspace to continue with today’s clinical work.'}
             </p>
           </div>
 
-          <button
-            type="button"
-            className="primary-button dashboard-action"
-            onClick={openReception}
-          >
-            Open reception
-          </button>
+          {dashboardAction && (
+            <button
+              type="button"
+              className="primary-button dashboard-action"
+              onClick={dashboardAction.onClick}
+            >
+              {dashboardAction.label}
+            </button>
+          )}
 
         </div>
 

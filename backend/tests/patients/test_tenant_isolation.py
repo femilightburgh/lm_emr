@@ -143,6 +143,32 @@ def hospital_a_client(
     app.dependency_overrides.clear()
 
 
+def test_create_patient_request_accepts_common_lowercase_enum_values():
+    """
+    Accept common lowercase enum values from forms and client payloads.
+    """
+
+    request = CreatePatientRequest.model_validate(
+        {
+            "hospital_number": "PT-10002",
+            "first_name": "Ada",
+            "last_name": "Lovelace",
+            "sex": "female",
+            "date_of_birth": "1815-12-10",
+            "marital_status": "single",
+            "blood_group": "o+",
+            "genotype": "aa",
+            "next_of_kin_relationship": "father",
+        }
+    )
+
+    assert request.sex == "Female"
+    assert request.marital_status == "Single"
+    assert request.blood_group == "O+"
+    assert request.genotype == "AA"
+    assert request.next_of_kin_relationship == "Father"
+
+
 def create_patient_for_hospital(
     db: Session,
     hospital_id,

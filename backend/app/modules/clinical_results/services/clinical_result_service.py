@@ -14,7 +14,11 @@ from app.modules.clinical_orders.enums import (
     ClinicalOrderStatus,
     ClinicalOrderType,
 )
-from app.modules.clinical_orders.models import ClinicalOrder
+from app.modules.clinical_orders.models import (
+    ClinicalOrder,
+    ClinicalOrderItem,
+    ClinicalOrderItemType,
+)
 from app.modules.clinical_orders.repositories import (
     ClinicalOrderRepository,
 )
@@ -51,11 +55,17 @@ from app.modules.episode.models import (
 from app.modules.episode.repositories.episode_repository import (
     EpisodeRepository,
 )
+from app.modules.encounter.models import (
+    EncounterStatus,
+)
+from app.modules.encounter.repositories.encounter_repository import (
+    EncounterRepository,
+)
+from app.modules.encounter.services.encounter_service import (
+    EncounterService,
+)
 from app.modules.laboratory.enums import (
     LaboratoryAnalyteDataType,
-)
-from app.modules.laboratory.repositories import (
-    LaboratoryTestRepository,
 )
 from app.modules.events.enums import EventType
 from app.modules.events.services.event_service import (
@@ -75,16 +85,41 @@ class ClinicalResultService:
         repository: ClinicalResultRepository,
         clinical_order_repository: ClinicalOrderRepository,
         episode_repository: EpisodeRepository,
-        laboratory_test_repository: LaboratoryTestRepository,
-        event_service: ClinicalEventService,
-        staff_repository: StaffRepository,
+        encounter_service: EncounterService | None = None,
+        event_service: ClinicalEventService | None = None,
+        staff_repository: StaffRepository | None = None,
     ) -> None:
         self.repository = repository
         self.clinical_order_repository = (
             clinical_order_repository
         )
         self.episode_repository = episode_repository
-        self.laboratory_test_repository = laboratory_test_repository
+
+        if encounter_service is None:
+            encounter_service = EncounterService(
+                repository=EncounterRepository(
+                    episode_repository.db,
+                ),
+                episode_repository=episode_repository,
+                staff_repository=(
+                    staff_repository
+                    if staff_repository is not None
+                    else StaffRepository(episode_repository.db)
+                ),
+            )
+
+        self.encounter_service = encounter_service
+
+        if event_service is None:
+            raise ValueError(
+                "ClinicalResultService requires event_service."
+            )
+
+        if staff_repository is None:
+            raise ValueError(
+                "ClinicalResultService requires staff_repository."
+            )
+
         self.event_service = event_service
         self.staff_repository = staff_repository
 
@@ -146,32 +181,64 @@ class ClinicalResultService:
 
         return order
 
-    def _get_laboratory_test_for_order(
+    def _get_laboratory_order_item(
         self,
         *,
-        context: RequestContext,
         order: ClinicalOrder,
-    ):
-        details = order.details or {}
-
-        test_code = details.get("test_code")
-
-        if not isinstance(test_code, str) or not test_code.strip():
+        order_item_id: UUID | None,
+    ) -> ClinicalOrderItem:
+        if order_item_id is None:
             raise ClinicalResultLaboratoryTestNotFoundError(
-                "Laboratory Order does not reference a laboratory test code.",
+                "Laboratory Clinical Result requires a Clinical Order Item.",
             )
 
-        test = self.laboratory_test_repository.get_by_code(
-            hospital_id=context.hospital_id,
-            code=test_code.strip(),
+        for item in order.items:
+            if item.id == order_item_id:
+                if item.item_type != ClinicalOrderItemType.LABORATORY:
+                    raise ClinicalResultLaboratoryTestNotFoundError(
+                        "Clinical Order Item is not a laboratory item.",
+                    )
+
+                if item.laboratory_test is None:
+                    raise ClinicalResultLaboratoryTestNotFoundError(
+                        "Laboratory Clinical Order Item has no laboratory test.",
+                    )
+
+                return item
+
+        raise ClinicalResultLaboratoryTestNotFoundError(
+            "Clinical Order Item does not belong to this Clinical Order.",
         )
 
-        if test is None:
-            raise ClinicalResultLaboratoryTestNotFoundError(
-                f"Laboratory test '{test_code}' not found.",
-            )
+    def _complete_order_item_and_update_order(
+        self,
+        *,
+        order: ClinicalOrder,
+        order_item: ClinicalOrderItem | None,
+        completed_at: datetime,
+    ) -> None:
+        """
+        Complete the specific investigation item and complete the parent
+        Clinical Order only when all investigation items are complete.
 
-        return test
+        Orders without an item retain the legacy parent-level completion
+        behavior.
+        """
+
+        if order_item is None:
+            order.status = ClinicalOrderStatus.COMPLETED
+            order.completed_at = completed_at
+            return
+
+        order_item.status = ClinicalOrderStatus.COMPLETED
+
+        if all(
+            item.status == ClinicalOrderStatus.COMPLETED
+            for item in order.items
+        ):
+            order.status = ClinicalOrderStatus.COMPLETED
+            order.completed_at = completed_at
+
 
     @staticmethod
     def _validate_value_shape(
@@ -454,11 +521,69 @@ class ClinicalResultService:
 
         return normalized_values
 
+    def _queue_doctor_review_if_ready(
+        self,
+        *,
+        context: RequestContext,
+        episode,
+    ) -> None:
+        """
+        Move an Episode to AWAITING_REVIEW and create its open
+        Doctor Review Encounter once all investigations are complete.
+
+        The caller owns the surrounding database transaction.
+        """
+
+        if episode.flow_status != EpisodeFlowStatus.AWAITING_INVESTIGATIONS:
+            return
+
+        outstanding_orders = (
+            self.clinical_order_repository
+            .list_outstanding_investigation_orders_for_episode(
+                hospital_id=context.hospital_id,
+                episode_id=episode.id,
+            )
+        )
+
+        if outstanding_orders:
+            return
+
+        if episode.managing_doctor_id is None:
+            raise ClinicalResultOrderNotFoundError(
+                "Episode has no managing doctor assigned for Doctor Review.",
+            )
+
+        existing_encounters = (
+            self.encounter_service.list_episode_encounters(
+                context=context,
+                episode_id=episode.id,
+            )
+        )
+
+        has_open_doctor_review = any(
+            encounter.title == "Doctor Review"
+            and encounter.status == EncounterStatus.OPEN
+            for encounter in existing_encounters
+        )
+
+        if not has_open_doctor_review:
+            self.encounter_service.create_encounter(
+                context=context,
+                episode_id=episode.id,
+                staff_id=episode.managing_doctor_id,
+                title="Doctor Review",
+                commit=False,
+            )
+
+        episode.flow_status = EpisodeFlowStatus.AWAITING_REVIEW
+
+
     def record_result(
         self,
         *,
         context: RequestContext,
         order_id: UUID,
+        order_item_id: UUID | None = None,
         result_type: ClinicalResultType,
         status: ClinicalResultStatus = ClinicalResultStatus.FINAL,
         result_data: dict | None = None,
@@ -512,15 +637,6 @@ class ClinicalResultService:
                 "Clinical Order is already completed.",
             )
 
-        if (
-            status == ClinicalResultStatus.DRAFT
-            and order.status != ClinicalOrderStatus.IN_PROGRESS
-        ):
-            raise ClinicalResultOrderNotInProgressError(
-                "A draft result can only be recorded while "
-                "the Clinical Order is in progress.",
-            )
-
         staff = self._get_authenticated_staff(
             context=context,
         )
@@ -529,11 +645,21 @@ class ClinicalResultService:
 
         structured_values = []
 
+        laboratory_order_item = None
+
         if order.order_type == ClinicalOrderType.LABORATORY:
-            laboratory_test = self._get_laboratory_test_for_order(
-                context=context,
+            laboratory_order_item = self._get_laboratory_order_item(
                 order=order,
+                order_item_id=order_item_id,
             )
+
+            if laboratory_order_item.status != ClinicalOrderStatus.IN_PROGRESS:
+                raise ClinicalResultOrderNotInProgressError(
+                    "A laboratory result can only be recorded while "
+                    "the Clinical Order Item is in progress.",
+                )
+
+            laboratory_test = laboratory_order_item.laboratory_test
 
             structured_values = self._build_structured_result_values(
                 laboratory_test=laboratory_test,
@@ -556,6 +682,11 @@ class ClinicalResultService:
 
         result = ClinicalResult(
             order_id=order.id,
+            order_item_id=(
+                laboratory_order_item.id
+                if laboratory_order_item is not None
+                else None
+            ),
             result_type=result_type,
             status=status,
             result_data=result_data or {},
@@ -597,8 +728,11 @@ class ClinicalResultService:
             self.repository.db.flush()
 
             if status == ClinicalResultStatus.FINAL:
-                order.status = ClinicalOrderStatus.COMPLETED
-                order.completed_at = recorded_at
+                self._complete_order_item_and_update_order(
+                    order=order,
+                    order_item=laboratory_order_item,
+                    completed_at=recorded_at,
+                )
 
             self.event_service.create_event(
                 context=context,
@@ -615,22 +749,10 @@ class ClinicalResultService:
             )
 
             if status == ClinicalResultStatus.FINAL:
-                outstanding_orders = (
-                    self.clinical_order_repository
-                    .list_outstanding_investigation_orders_for_episode(
-                        hospital_id=context.hospital_id,
-                        episode_id=episode.id,
-                    )
+                self._queue_doctor_review_if_ready(
+                    context=context,
+                    episode=episode,
                 )
-
-                if (
-                    episode.flow_status
-                    == EpisodeFlowStatus.AWAITING_INVESTIGATIONS
-                    and not outstanding_orders
-                ):
-                    episode.flow_status = (
-                        EpisodeFlowStatus.AWAITING_REVIEW
-                    )
 
             self.repository.db.commit()
 
@@ -694,10 +816,16 @@ class ClinicalResultService:
         laboratory_test = None
 
         if result.result_type == ClinicalResultType.LABORATORY:
-            laboratory_test = self._get_laboratory_test_for_order(
-                context=context,
+            if result.order_item_id is None:
+                raise ClinicalResultLaboratoryTestNotFoundError(
+                    "Laboratory Clinical Result has no Clinical Order Item.",
+                )
+
+            laboratory_order_item = self._get_laboratory_order_item(
                 order=order,
+                order_item_id=result.order_item_id,
             )
+            laboratory_test = laboratory_order_item.laboratory_test
 
             structured_values = self._build_structured_result_values(
                 laboratory_test=laboratory_test,
@@ -780,12 +908,32 @@ class ClinicalResultService:
             order_id=result.order_id,
         )
 
+        laboratory_order_item = None
+
+        if result.result_type == ClinicalResultType.LABORATORY:
+            laboratory_order_item = self._get_laboratory_order_item(
+                order=order,
+                order_item_id=result.order_item_id,
+            )
+
         if order.status == ClinicalOrderStatus.CANCELLED:
             raise ClinicalResultOrderCancelledError(
                 "Cancelled Clinical Orders cannot be finalized.",
             )
 
-        if order.status != ClinicalOrderStatus.IN_PROGRESS:
+        if (
+            laboratory_order_item is not None
+            and laboratory_order_item.status != ClinicalOrderStatus.IN_PROGRESS
+        ):
+            raise ClinicalResultOrderNotInProgressError(
+                "A laboratory result can only be finalized while "
+                "the Clinical Order Item is in progress.",
+            )
+
+        if (
+            laboratory_order_item is None
+            and order.status != ClinicalOrderStatus.IN_PROGRESS
+        ):
             raise ClinicalResultOrderNotInProgressError(
                 "Clinical Order must be in progress before "
                 "its result can be finalized.",
@@ -808,8 +956,11 @@ class ClinicalResultService:
                 result.reported_at or finalized_at
             )
 
-            order.status = ClinicalOrderStatus.COMPLETED
-            order.completed_at = finalized_at
+            self._complete_order_item_and_update_order(
+                order=order,
+                order_item=laboratory_order_item,
+                completed_at=finalized_at,
+            )
 
             self.event_service.create_event(
                 context=context,
@@ -826,22 +977,10 @@ class ClinicalResultService:
                 commit=False,
             )
 
-            outstanding_orders = (
-                self.clinical_order_repository
-                .list_outstanding_investigation_orders_for_episode(
-                    hospital_id=context.hospital_id,
-                    episode_id=episode.id,
-                )
+            self._queue_doctor_review_if_ready(
+                context=context,
+                episode=episode,
             )
-
-            if (
-                episode.flow_status
-                == EpisodeFlowStatus.AWAITING_INVESTIGATIONS
-                and not outstanding_orders
-            ):
-                episode.flow_status = (
-                    EpisodeFlowStatus.AWAITING_REVIEW
-                )
 
             self.repository.db.commit()
 

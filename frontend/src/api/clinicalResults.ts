@@ -32,6 +32,7 @@ export interface ClinicalResultValue {
 export interface ClinicalResult {
   id: string
   order_id: string
+  order_item_id: string | null
   result_type: ClinicalResultType
   status: 'DRAFT' | 'FINAL'
   specimen: string | null
@@ -60,6 +61,7 @@ export interface CreateClinicalResultValueRequest {
 
 export interface CreateClinicalResultRequest {
   order_id: string
+  order_item_id?: string
   result_type: ClinicalResultType
   specimen?: string
   collected_at?: string

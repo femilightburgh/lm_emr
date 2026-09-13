@@ -47,6 +47,19 @@ engine = create_engine(
     pool_pre_ping=True,
 )
 
+# When using SQLite for tests/local dev, ensure Python uuid.UUID objects can be
+# adapted to strings for parameter binding.
+if _database_url.startswith("sqlite"):
+    try:
+        import sqlite3
+        import uuid
+
+        sqlite3.register_adapter(uuid.UUID, lambda u: str(u))
+    except Exception:
+        # non-blocking: if registration fails, tests may fail and surface the
+        # underlying issue.
+        pass
+
 
 # ----------------------------------------------------------------------
 # Session Factory
