@@ -1,11 +1,33 @@
 import {
+  lazy,
+  Suspense,
   useEffect,
   useState,
 } from 'react'
 import type { FormEvent } from 'react'
-import AdministratorWorkspace from './components/administration/AdministratorWorkspace'
-import ReceptionWorkspace from './components/reception/ReceptionWorkspace'
 import AppShell from './app/AppShell'
+
+const AdministratorWorkspace = lazy(
+  () => import('./components/administration/AdministratorWorkspace'),
+)
+const ReceptionWorkspace = lazy(
+  () => import('./components/reception/ReceptionWorkspace'),
+)
+const NursingWorkspace = lazy(
+  () => import('./components/nursing/NursingWorkspace'),
+)
+const DoctorWorkspace = lazy(
+  () => import('./components/doctor/DoctorWorkspace'),
+)
+const LaboratoryWorkspace = lazy(
+  () => import('./components/laboratory/LaboratoryWorkspace'),
+)
+const PharmacyWorkspace = lazy(
+  () => import('./components/pharmacy/PharmacyWorkspace'),
+)
+const DiagnosticsWorkspace = lazy(
+  () => import('./components/diagnostics/DiagnosticsWorkspace'),
+)
 
 import {
   getCurrentUser,
@@ -28,11 +50,6 @@ import type {
 
 import './App.css'
 import ActivateAccount from './components/auth/ActivateAccount'
-import NursingWorkspace from './components/nursing/NursingWorkspace'
-import DoctorWorkspace from './components/doctor/DoctorWorkspace'
-import LaboratoryWorkspace from './components/laboratory/LaboratoryWorkspace'
-import PharmacyWorkspace from './components/pharmacy/PharmacyWorkspace'
-import DiagnosticsWorkspace from './components/diagnostics/DiagnosticsWorkspace'
 
 function App() {
   // ==========================================================================
@@ -472,6 +489,15 @@ return (
     }
     onSignOut={handleSignOut}
   >
+    <Suspense
+      fallback={
+        <section className="workspace-content">
+          <div className="welcome-panel">
+            <p>Loading workspace...</p>
+          </div>
+        </section>
+      }
+    >
     {view === 'dashboard' && (
       <section className="workspace-content">
 
@@ -560,6 +586,7 @@ return (
         accessToken={session.access_token}
       />
     )}
+    </Suspense>
     </AppShell>
   )
 }

@@ -242,6 +242,10 @@ def create_diagnostic_order(
         ClinicalOrderRepository,
         PrescriptionRepository,
     )
+    from app.modules.diagnostics.repositories import DiagnosticRepository
+    from app.modules.laboratory.repositories.laboratory_test_repository import (
+        LaboratoryTestRepository,
+    )
     from app.modules.clinical_orders.services import ClinicalOrderService
     from app.modules.encounter.repositories.encounter_repository import (
         EncounterRepository,
@@ -277,6 +281,8 @@ def create_diagnostic_order(
         episode_repository=EpisodeRepository(db),
         staff_repository=StaffRepository(db),
         prescription_repository=PrescriptionRepository(db),
+        laboratory_test_repository=LaboratoryTestRepository(db),
+        diagnostic_repository=DiagnosticRepository(db),
     )
 
     return service.create_order(
@@ -287,6 +293,11 @@ def create_diagnostic_order(
         details={
             "investigation_id": str(investigation.id),
         },
+        items=[
+            {
+                "diagnostic_investigation_id": investigation.id,
+            }
+        ],
     )
 
 

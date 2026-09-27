@@ -85,3 +85,20 @@ export async function listEncounterVitals(
     accessToken,
   )
 }
+
+
+// ============================================================================
+// List Episode Vitals
+// ============================================================================
+
+
+export async function listEpisodeVitals(
+  accessToken: string,
+  episodeId: string,
+): Promise<Vitals[]> {
+  return apiRequest<Vitals[]>(
+    `/vitals/episodes/${episodeId}`,
+    {},
+    accessToken,
+  )
+}

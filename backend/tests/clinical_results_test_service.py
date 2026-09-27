@@ -633,6 +633,223 @@ def test_record_structured_laboratory_values(
     assert saved["white_cell_count"].value_numeric == 8.4
 
 
+
+def test_record_custom_laboratory_result(
+    db,
+    hospital,
+):
+    context, _, _, encounter = create_test_encounter(
+        db,
+        hospital,
+    )
+
+    order = create_laboratory_order_by_code(
+        db,
+        context=context,
+        encounter_id=encounter.id,
+        code="CBC",
+    )
+
+    result = create_result_service(db).record_result(
+        context=context,
+        order_id=order.id,
+        order_item_id=order.items[0].id,
+        result_type=ClinicalResultType.LABORATORY,
+        values=[
+            {
+                "custom_analyte_name": "Reticulocyte Count",
+                "custom_analyte_code": "RETIC-CUSTOM",
+                "custom_unit": "%",
+                "custom_reference_low": 0.5,
+                "custom_reference_high": 2.5,
+                "custom_reference_text": "0.5-2.5%",
+                "value_numeric": 3.1,
+                "abnormal_flag": "HIGH",
+                "comment": "Manual custom analyte.",
+            },
+        ],
+    )
+
+    db.refresh(result)
+
+    assert len(result.values) == 1
+
+    value = result.values[0]
+
+    assert value.analyte_id is None
+    assert value.custom_analyte_name == "Reticulocyte Count"
+    assert value.custom_analyte_code == "RETIC-CUSTOM"
+    assert value.custom_unit == "%"
+    assert value.custom_reference_low == 0.5
+    assert value.custom_reference_high == 2.5
+    assert value.custom_reference_text == "0.5-2.5%"
+    assert value.value_numeric == 3.1
+    assert value.abnormal_flag == "HIGH"
+
+    assert value.analyte_name == "Reticulocyte Count"
+    assert value.analyte_code == "RETIC-CUSTOM"
+    assert value.unit == "%"
+    assert value.reference_low == 0.5
+    assert value.reference_high == 2.5
+    assert value.reference_text == "0.5-2.5%"
+
+
+def test_record_result_rejects_value_with_catalogue_and_custom_analyte(
+    db,
+    hospital,
+):
+    context, _, _, encounter = create_test_encounter(
+        db,
+        hospital,
+    )
+
+    order = create_laboratory_order_by_code(
+        db,
+        context=context,
+        encounter_id=encounter.id,
+        code="CBC",
+    )
+
+    laboratory_test = get_laboratory_test(
+        db,
+        hospital_id=hospital.id,
+        code="CBC",
+    )
+
+    hemoglobin = next(
+        analyte
+        for analyte in laboratory_test.analytes
+        if analyte.code == "hemoglobin"
+    )
+
+    with pytest.raises(ClinicalResultInvalidValueError):
+        create_result_service(db).record_result(
+            context=context,
+            order_id=order.id,
+            order_item_id=order.items[0].id,
+            result_type=ClinicalResultType.LABORATORY,
+            values=[
+                {
+                    "analyte_id": hemoglobin.id,
+                    "custom_analyte_name": "Custom Haemoglobin",
+                    "value_numeric": 13.0,
+                },
+            ],
+        )
+
+
+def test_record_result_rejects_value_without_analyte(
+    db,
+    hospital,
+):
+    context, _, _, encounter = create_test_encounter(
+        db,
+        hospital,
+    )
+
+    order = create_laboratory_order_by_code(
+        db,
+        context=context,
+        encounter_id=encounter.id,
+        code="CBC",
+    )
+
+    with pytest.raises(ClinicalResultInvalidValueError):
+        create_result_service(db).record_result(
+            context=context,
+            order_id=order.id,
+            order_item_id=order.items[0].id,
+            result_type=ClinicalResultType.LABORATORY,
+            values=[
+                {
+                    "value_numeric": 13.0,
+                },
+            ],
+        )
+
+
+def test_record_result_rejects_invalid_custom_reference_range(
+    db,
+    hospital,
+):
+    context, _, _, encounter = create_test_encounter(
+        db,
+        hospital,
+    )
+
+    order = create_laboratory_order_by_code(
+        db,
+        context=context,
+        encounter_id=encounter.id,
+        code="CBC",
+    )
+
+    with pytest.raises(ClinicalResultInvalidValueError):
+        create_result_service(db).record_result(
+            context=context,
+            order_id=order.id,
+            order_item_id=order.items[0].id,
+            result_type=ClinicalResultType.LABORATORY,
+            values=[
+                {
+                    "custom_analyte_name": "Custom Test",
+                    "custom_reference_low": 10,
+                    "custom_reference_high": 5,
+                    "value_numeric": 7,
+                },
+            ],
+        )
+
+
+def test_catalogue_laboratory_result_still_uses_analyte_metadata(
+    db,
+    hospital,
+):
+    context, _, _, encounter = create_test_encounter(
+        db,
+        hospital,
+    )
+
+    order = create_laboratory_order_by_code(
+        db,
+        context=context,
+        encounter_id=encounter.id,
+        code="CBC",
+    )
+
+    laboratory_test = get_laboratory_test(
+        db,
+        hospital_id=hospital.id,
+        code="CBC",
+    )
+
+    hemoglobin = next(
+        analyte
+        for analyte in laboratory_test.analytes
+        if analyte.code == "hemoglobin"
+    )
+
+    result = create_result_service(db).record_result(
+        context=context,
+        order_id=order.id,
+        order_item_id=order.items[0].id,
+        result_type=ClinicalResultType.LABORATORY,
+        values=[
+            {
+                "analyte_id": hemoglobin.id,
+                "value_numeric": 13.2,
+            },
+        ],
+    )
+
+    value = result.values[0]
+
+    assert value.analyte_id == hemoglobin.id
+    assert value.custom_analyte_name is None
+    assert value.analyte_name == hemoglobin.name
+    assert value.analyte_code == hemoglobin.code
+    assert value.unit == hemoglobin.unit
+
 def test_record_result_rejects_unknown_laboratory_analyte(
     db,
     hospital,

@@ -5,7 +5,7 @@ import {
 
 import {
   createVitals,
-  listEncounterVitals,
+  listEpisodeVitals,
   type Vitals,
 } from '../../../api/vitals'
 
@@ -49,15 +49,15 @@ export function useNursingVitals({
   const loadRecordedVitals =
     useCallback(
       async (
-        encounterId: string,
+        episodeId: string,
       ) => {
         setLoadingVitals(true)
 
         try {
           const response =
-            await listEncounterVitals(
+            await listEpisodeVitals(
               accessToken,
-              encounterId,
+              episodeId,
             )
 
           setRecordedVitals(
@@ -197,8 +197,19 @@ export function useNursingVitals({
   }
 
 
+  const latestVitals =
+    recordedVitals.length > 0
+      ? [...recordedVitals].sort(
+          (a, b) =>
+            new Date(b.occurred_at).getTime() -
+            new Date(a.occurred_at).getTime(),
+        )[0]
+      : null
+
+
   return {
     recordedVitals,
+    latestVitals,
     loadingVitals,
     savingVitals,
     loadRecordedVitals,

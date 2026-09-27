@@ -29,9 +29,22 @@ interface Props {
 }
 
 
+type CustomResultDataType =
+  | 'TEXT'
+  | 'NUMERIC'
+  | 'BOOLEAN'
+  | 'CODED'
+
 interface ResultValue {
-  analyteId: string
+  analyteId: string | null
   value: string
+  customAnalyteName?: string
+  customAnalyteCode?: string
+  customUnit?: string
+  customReferenceLow?: string
+  customReferenceHigh?: string
+  customReferenceText?: string
+  customDataType?: CustomResultDataType
 }
 
 
@@ -43,37 +56,22 @@ function getLaboratoryTestForItem(
     return null
   }
 
-  if (item.laboratory_test_id) {
-    const testById =
-      laboratoryTests.find(
-        test =>
-          test.id === item.laboratory_test_id,
-      )
-
-    if (testById) {
-      return testById
-    }
+  // A laboratory order is catalogue-backed only when the
+  // order item explicitly references a catalogue test.
+  //
+  // Do NOT infer catalogue status from test_name/test_code.
+  // Manual laboratory requests must remain manual even when
+  // their name happens to match a catalogue test.
+  if (!item.laboratory_test_id) {
+    return null
   }
-
-  const code =
-    typeof item.details.test_code === 'string'
-      ? item.details.test_code.trim().toUpperCase()
-      : ''
-
-  const name =
-    typeof item.details.test_name === 'string'
-      ? item.details.test_name.trim().toUpperCase()
-      : ''
 
   return (
     laboratoryTests.find(
-      test =>
-        test.code.toUpperCase() === code ||
-        test.name.toUpperCase() === name,
+      test => test.id === item.laboratory_test_id,
     ) ?? null
   )
 }
-
 
 function getLaboratoryStatusLabel(
   status: ClinicalOrderItem['status'],
@@ -300,6 +298,7 @@ export default function LaboratoryWorkspace({
   }, [accessToken])
 
 
+
   function resetResultForm(
     item?: ClinicalOrderItem | null,
   ) {
@@ -318,17 +317,31 @@ export default function LaboratoryWorkspace({
             analyteId: analyte.id,
             value: '',
           }))
-        : [],
+        : [
+            {
+              analyteId: null,
+              value: '',
+              customAnalyteName:
+                typeof item?.details.test_name === 'string'
+                  ? item.details.test_name.trim()
+                  : '',
+              customAnalyteCode:
+                typeof item?.details.test_code === 'string'
+                  ? item.details.test_code.trim()
+                  : '',
+              customUnit: '',
+              customReferenceLow: '',
+              customReferenceHigh: '',
+              customReferenceText: '',
+              customDataType: 'TEXT',
+            },
+          ],
     )
 
     setInterpretation('')
-    setSpecimen(
-      test?.specimen ?? '',
-    )
+    setSpecimen(test?.specimen ?? '')
     setCollectedAt('')
   }
-
-
 
   async function loadDraftForOrder(
     order: LaboratoryQueueItem,
@@ -373,14 +386,10 @@ export default function LaboratoryWorkspace({
           laboratoryTests,
         )
 
-      if (!test) {
-        return
-      }
-
       setDraftResultId(draft.id)
       setSpecimen(
         draft.specimen ??
-        test.specimen ??
+        test?.specimen ??
         '',
       )
 
@@ -399,31 +408,101 @@ export default function LaboratoryWorkspace({
         '',
       )
 
-      setResultValues(
-        test.analytes.map(
-          analyte => {
-            const saved =
-              draft.values.find(
-                value =>
-                  value.analyte_id ===
-                  analyte.id,
-              )
+      if (test) {
+        setResultValues(
+          test.analytes.map(
+            analyte => {
+              const saved =
+                draft.values.find(
+                  value =>
+                    value.analyte_id ===
+                    analyte.id,
+                )
 
-            const value =
-              saved?.value === null ||
-              saved?.value === undefined
-                ? ''
-                : String(
-                    saved.value,
-                  )
+              const value =
+                saved?.value === null ||
+                saved?.value === undefined
+                  ? ''
+                  : String(
+                      saved.value,
+                    )
 
-            return {
-              analyteId: analyte.id,
-              value,
-            }
-          },
-        ),
-      )
+              return {
+                analyteId: analyte.id,
+                value,
+              }
+            },
+          ),
+        )
+      } else {
+        setResultValues(
+          draft.values
+            .filter(
+              value =>
+                value.analyte_id === null ||
+                value.analyte_id === undefined,
+            )
+            .map((value, index) => {
+              const customValue =
+                value.value === null ||
+                value.value === undefined
+                  ? ''
+                  : String(value.value)
+
+              let customDataType: CustomResultDataType =
+                'TEXT'
+
+              if (
+                typeof value.value === 'number'
+              ) {
+                customDataType = 'NUMERIC'
+              } else if (
+                typeof value.value === 'boolean'
+              ) {
+                customDataType = 'BOOLEAN'
+              }
+
+              return {
+                analyteId: null,
+                value: customValue,
+                customAnalyteName:
+                  value.custom_analyte_name ??
+                  value.analyte_name ??
+                  `Analyte ${index + 1}`,
+                customAnalyteCode:
+                  value.custom_analyte_code ??
+                  '',
+                customUnit:
+                  value.custom_unit ??
+                  value.unit ??
+                  '',
+                customReferenceLow:
+                  value.custom_reference_low ===
+                  null ||
+                  value.custom_reference_low ===
+                  undefined
+                    ? ''
+                    : String(
+                        value.custom_reference_low,
+                      ),
+                customReferenceHigh:
+                  value.custom_reference_high ===
+                  null ||
+                  value.custom_reference_high ===
+                  undefined
+                    ? ''
+                    : String(
+                        value.custom_reference_high,
+                      ),
+                customReferenceText:
+                  value.custom_reference_text ??
+                  value.reference_text ??
+                  '',
+                customDataType,
+              }
+            }),
+        )
+      }
 
       setSuccess(
         'Draft result restored.',
@@ -442,6 +521,7 @@ export default function LaboratoryWorkspace({
       )
     }
   }
+
 
 
   function selectOrderItem(
@@ -502,6 +582,47 @@ export default function LaboratoryWorkspace({
           },
         ]
       },
+    )
+  }
+
+  function addCustomAnalyte() {
+    setResultValues(current => [
+      ...current,
+      {
+        analyteId: null,
+        value: '',
+        customAnalyteName: '',
+        customAnalyteCode: '',
+        customUnit: '',
+        customReferenceLow: '',
+        customReferenceHigh: '',
+        customReferenceText: '',
+        customDataType: 'TEXT',
+      },
+    ])
+  }
+
+  function updateCustomAnalyte(
+    index: number,
+    patch: Partial<ResultValue>,
+  ) {
+    setResultValues(current =>
+      current.map((item, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...item,
+              ...patch,
+            }
+          : item,
+      ),
+    )
+  }
+
+  function removeCustomAnalyte(index: number) {
+    setResultValues(current =>
+      current.filter((_, itemIndex) =>
+        itemIndex !== index,
+      ),
     )
   }
 
@@ -698,16 +819,10 @@ export default function LaboratoryWorkspace({
         laboratoryTests,
       )
 
-    if (!test) {
-      setError(
-        'Laboratory test definition could not be found.',
-      )
-      return
-    }
-
     const values = []
 
-    for (const analyte of test.analytes) {
+    if (test) {
+      for (const analyte of test.analytes) {
       const entry =
         resultValues.find(
           item =>
@@ -778,12 +893,130 @@ export default function LaboratoryWorkspace({
         continue
       }
 
-      values.push({
-        analyte_id:
-          analyte.id,
-        value_text:
-          rawValue,
-      })
+        values.push({
+          analyte_id:
+            analyte.id,
+          value_text:
+            rawValue,
+        })
+      }
+    } else {
+      for (const entry of resultValues) {
+        const name =
+          entry.customAnalyteName?.trim() ?? ''
+
+        const rawValue =
+          entry.value.trim()
+
+        if (!name) {
+          setError(
+            'Every custom analyte must have a name.',
+          )
+          return
+        }
+
+        if (!rawValue) {
+          continue
+        }
+
+        const customValue: Record<string, unknown> = {
+          custom_analyte_name: name,
+          custom_analyte_code:
+            entry.customAnalyteCode?.trim() ||
+            undefined,
+          custom_unit:
+            entry.customUnit?.trim() ||
+            undefined,
+          custom_reference_text:
+            entry.customReferenceText?.trim() ||
+            undefined,
+        }
+
+        const low =
+          entry.customReferenceLow?.trim() ?? ''
+        const high =
+          entry.customReferenceHigh?.trim() ?? ''
+
+        if (low) {
+          const numericLow = Number(low)
+          if (!Number.isFinite(numericLow)) {
+            setError(
+              `${name}: reference low must be a valid number.`,
+            )
+            return
+          }
+          customValue.custom_reference_low =
+            numericLow
+        }
+
+        if (high) {
+          const numericHigh = Number(high)
+          if (!Number.isFinite(numericHigh)) {
+            setError(
+              `${name}: reference high must be a valid number.`,
+            )
+            return
+          }
+          customValue.custom_reference_high =
+            numericHigh
+        }
+
+        if (
+          customValue.custom_reference_low !==
+            undefined &&
+          customValue.custom_reference_high !==
+            undefined &&
+          Number(
+            customValue.custom_reference_low,
+          ) >
+            Number(
+              customValue.custom_reference_high,
+            )
+        ) {
+          setError(
+            `${name}: reference low cannot be greater than reference high.`,
+          )
+          return
+        }
+
+        switch (
+          entry.customDataType ?? 'TEXT'
+        ) {
+          case 'NUMERIC': {
+            const numericValue =
+              Number(rawValue)
+
+            if (
+              !Number.isFinite(numericValue)
+            ) {
+              setError(
+                `${name} must be a valid number.`,
+              )
+              return
+            }
+
+            customValue.value_numeric =
+              numericValue
+            break
+          }
+
+          case 'BOOLEAN':
+            customValue.value_boolean =
+              rawValue === 'true'
+            break
+
+          case 'CODED':
+            customValue.value_code =
+              rawValue
+            break
+
+          default:
+            customValue.value_text =
+              rawValue
+        }
+
+        values.push(customValue)
+      }
     }
 
     setSavingResult(true)
@@ -806,7 +1039,7 @@ export default function LaboratoryWorkspace({
 
         specimen:
           specimen.trim() ||
-          test.specimen ||
+          test?.specimen ||
           undefined,
 
         collected_at:
@@ -1272,8 +1505,8 @@ export default function LaboratoryWorkspace({
                             const entry =
                               resultValues.find(
                                 item =>
-                                  item.analyteId ===
-                                  analyte.id,
+                                  String(item.analyteId) ===
+                                  String(analyte.id),
                               )
 
                             const value =
@@ -1320,6 +1553,61 @@ export default function LaboratoryWorkspace({
                             )
                           },
                         )}
+
+                        {resultValues
+                          .filter(
+                            entry =>
+                              entry.analyteId === null &&
+                              entry.customAnalyteName?.trim() &&
+                              entry.value.trim(),
+                          )
+                          .map(
+                            (entry, index) => {
+                              const low =
+                                entry.customReferenceLow?.trim() ?? ''
+                              const high =
+                                entry.customReferenceHigh?.trim() ?? ''
+                              const referenceText =
+                                entry.customReferenceText?.trim() ?? ''
+
+                              const reference =
+                                low && high
+                                  ? `${low}–${high}${referenceText ? ` · ${referenceText}` : ''}`
+                                  : low
+                                    ? `≥ ${low}${referenceText ? ` · ${referenceText}` : ''}`
+                                    : high
+                                      ? `≤ ${high}${referenceText ? ` · ${referenceText}` : ''}`
+                                      : referenceText || '—'
+
+                              return (
+                                <div
+                                  key={`custom-${index}`}
+                                  className="laboratory-result-review-row"
+                                >
+                                  <span>
+                                    {entry.customAnalyteName}
+                                    {entry.customAnalyteCode?.trim() && (
+                                      <small>
+                                        {entry.customAnalyteCode.trim()}
+                                      </small>
+                                    )}
+                                  </span>
+
+                                  <strong>
+                                    {entry.value.trim()}
+                                  </strong>
+
+                                  <span>
+                                    {entry.customUnit?.trim() || '—'}
+                                  </span>
+
+                                  <span>
+                                    {reference}
+                                  </span>
+                                </div>
+                              )
+                            },
+                          )}
                       </div>
 
                       <div className="laboratory-interpretation laboratory-result-review-interpretation">
@@ -1424,129 +1712,412 @@ export default function LaboratoryWorkspace({
                       </div>
 
                       <div className="laboratory-result-fields">
-                        {selectedLaboratoryTest?.analytes.map(
-                          analyte => {
-                            const entry =
-                              resultValues.find(
-                                item =>
-                                  item.analyteId ===
-                                  analyte.id,
-                              )
+                        {selectedLaboratoryTest ? (
+                          selectedLaboratoryTest.analytes.map(
+                            analyte => {
+                              const entry =
+                                resultValues.find(
+                                  item =>
+                                    item.analyteId ===
+                                    analyte.id,
+                                )
 
-                            const value =
-                              entry?.value ?? ''
+                              const value =
+                                entry?.value ?? ''
 
-                            return (
-                              <div
-                                key={analyte.id}
-                                className="laboratory-result-row"
-                              >
-                                <div className="laboratory-result-label">
-                                  <span>
-                                    {analyte.name}
-                                  </span>
-
-                                  {analyte.reference_text && (
-                                    <small>
-                                      Ref: {analyte.reference_text}
-                                    </small>
-                                  )}
-                                </div>
-
-                                <div className="laboratory-result-input">
-                                  {analyte.data_type ===
-                                  'CODED' ? (
-                                    <select
-                                      value={value}
-                                      onChange={event =>
-                                        updateResultValue(
-                                          analyte.id,
-                                          event.target.value,
-                                        )
-                                      }
-                                    >
-                                      <option value="">
-                                        Select result
-                                      </option>
-
-                                      {(
-                                        analyte.options ??
-                                        []
-                                      ).map(
-                                        (
-                                          option: string,
-                                        ) => (
-                                          <option
-                                            key={option}
-                                            value={option}
-                                          >
-                                            {option}
-                                          </option>
-                                        ),
-                                      )}
-                                    </select>
-                                  ) : analyte.data_type ===
-                                    'BOOLEAN' ? (
-                                    <select
-                                      value={value}
-                                      onChange={event =>
-                                        updateResultValue(
-                                          analyte.id,
-                                          event.target.value,
-                                        )
-                                      }
-                                    >
-                                      <option value="">
-                                        Select result
-                                      </option>
-
-                                      <option value="true">
-                                        Yes
-                                      </option>
-
-                                      <option value="false">
-                                        No
-                                      </option>
-                                    </select>
-                                  ) : (
-                                    <input
-                                      type={
-                                        analyte.data_type ===
-                                        'NUMERIC'
-                                          ? 'number'
-                                          : 'text'
-                                      }
-                                      inputMode={
-                                        analyte.data_type ===
-                                        'NUMERIC'
-                                          ? 'decimal'
-                                          : 'text'
-                                      }
-                                      value={value}
-                                      onChange={event =>
-                                        updateResultValue(
-                                          analyte.id,
-                                          event.target.value,
-                                        )
-                                      }
-                                      placeholder={
-                                        analyte.data_type ===
-                                        'NUMERIC'
-                                          ? 'Enter value'
-                                          : 'Enter result'
-                                      }
-                                    />
-                                  )}
-
-                                  {analyte.unit && (
+                              return (
+                                <div
+                                  key={analyte.id}
+                                  className="laboratory-result-row"
+                                >
+                                  <div className="laboratory-result-label">
                                     <span>
-                                      {analyte.unit}
+                                      {analyte.name}
                                     </span>
-                                  )}
+
+                                    {analyte.reference_text && (
+                                      <small>
+                                        Ref: {analyte.reference_text}
+                                      </small>
+                                    )}
+                                  </div>
+
+                                  <div className="laboratory-result-input">
+                                    {analyte.data_type ===
+                                    'CODED' ? (
+                                      <select
+                                        value={value}
+                                        onChange={event =>
+                                          updateResultValue(
+                                            analyte.id,
+                                            event.target.value,
+                                          )
+                                        }
+                                      >
+                                        <option value="">
+                                          Select result
+                                        </option>
+
+                                        {(
+                                          analyte.options ??
+                                          []
+                                        ).map(
+                                          (
+                                            option: string,
+                                          ) => (
+                                            <option
+                                              key={option}
+                                              value={option}
+                                            >
+                                              {option}
+                                            </option>
+                                          ),
+                                        )}
+                                      </select>
+                                    ) : analyte.data_type ===
+                                      'BOOLEAN' ? (
+                                      <select
+                                        value={value}
+                                        onChange={event =>
+                                          updateResultValue(
+                                            analyte.id,
+                                            event.target.value,
+                                          )
+                                        }
+                                      >
+                                        <option value="">
+                                          Select result
+                                        </option>
+
+                                        <option value="true">
+                                          Yes
+                                        </option>
+
+                                        <option value="false">
+                                          No
+                                        </option>
+                                      </select>
+                                    ) : (
+                                      <input
+                                        type={
+                                          analyte.data_type ===
+                                          'NUMERIC'
+                                            ? 'number'
+                                            : 'text'
+                                        }
+                                        inputMode={
+                                          analyte.data_type ===
+                                          'NUMERIC'
+                                            ? 'decimal'
+                                            : 'text'
+                                        }
+                                        value={value}
+                                        onChange={event =>
+                                          updateResultValue(
+                                            analyte.id,
+                                            event.target.value,
+                                          )
+                                        }
+                                        placeholder={
+                                          analyte.data_type ===
+                                          'NUMERIC'
+                                            ? 'Enter value'
+                                            : 'Enter result'
+                                        }
+                                      />
+                                    )}
+
+                                    {analyte.unit && (
+                                      <span>
+                                        {analyte.unit}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            )
-                          },
+                              )
+                            },
+                          )
+                        ) : (
+                          <>
+                            {resultValues.map(
+                              (entry, index) => {
+                                const dataType =
+                                  entry.customDataType ??
+                                  'TEXT'
+
+                                return (
+                                  <div
+                                    key={`custom-analyte-${index}`}
+                                    className="laboratory-custom-analyte"
+                                  >
+                                    <div className="laboratory-custom-analyte-header">
+                                      <strong>
+                                        Custom analyte {index + 1}
+                                      </strong>
+
+                                      <button
+                                        type="button"
+                                        className="secondary-button"
+                                        onClick={() =>
+                                          removeCustomAnalyte(
+                                            index,
+                                          )
+                                        }
+                                      >
+                                        Remove
+                                      </button>
+                                    </div>
+
+                                    <div className="laboratory-custom-analyte-grid">
+                                      <label>
+                                        <span>
+                                          Analyte name
+                                        </span>
+                                        <input
+                                          type="text"
+                                          value={
+                                            entry.customAnalyteName ??
+                                            ''
+                                          }
+                                          onChange={event =>
+                                            updateCustomAnalyte(
+                                              index,
+                                              {
+                                                customAnalyteName:
+                                                  event.target.value,
+                                              },
+                                            )
+                                          }
+                                          placeholder="e.g. Serum ferritin"
+                                        />
+                                      </label>
+
+                                      <label>
+                                        <span>
+                                          Code
+                                        </span>
+                                        <input
+                                          type="text"
+                                          value={
+                                            entry.customAnalyteCode ??
+                                            ''
+                                          }
+                                          onChange={event =>
+                                            updateCustomAnalyte(
+                                              index,
+                                              {
+                                                customAnalyteCode:
+                                                  event.target.value,
+                                              },
+                                            )
+                                          }
+                                          placeholder="Optional"
+                                        />
+                                      </label>
+
+                                      <label>
+                                        <span>
+                                          Unit
+                                        </span>
+                                        <input
+                                          type="text"
+                                          value={
+                                            entry.customUnit ??
+                                            ''
+                                          }
+                                          onChange={event =>
+                                            updateCustomAnalyte(
+                                              index,
+                                              {
+                                                customUnit:
+                                                  event.target.value,
+                                              },
+                                            )
+                                          }
+                                          placeholder="e.g. ng/mL"
+                                        />
+                                      </label>
+
+                                      <label>
+                                        <span>
+                                          Result type
+                                        </span>
+                                        <select
+                                          value={dataType}
+                                          onChange={event =>
+                                            updateCustomAnalyte(
+                                              index,
+                                              {
+                                                customDataType:
+                                                  event.target.value as CustomResultDataType,
+                                              },
+                                            )
+                                          }
+                                        >
+                                          <option value="TEXT">
+                                            Text
+                                          </option>
+                                          <option value="NUMERIC">
+                                            Numeric
+                                          </option>
+                                          <option value="BOOLEAN">
+                                            Yes / No
+                                          </option>
+                                          <option value="CODED">
+                                            Coded
+                                          </option>
+                                        </select>
+                                      </label>
+
+                                      <label>
+                                        <span>
+                                          Reference low
+                                        </span>
+                                        <input
+                                          type="number"
+                                          value={
+                                            entry.customReferenceLow ??
+                                            ''
+                                          }
+                                          onChange={event =>
+                                            updateCustomAnalyte(
+                                              index,
+                                              {
+                                                customReferenceLow:
+                                                  event.target.value,
+                                              },
+                                            )
+                                          }
+                                          placeholder="Optional"
+                                        />
+                                      </label>
+
+                                      <label>
+                                        <span>
+                                          Reference high
+                                        </span>
+                                        <input
+                                          type="number"
+                                          value={
+                                            entry.customReferenceHigh ??
+                                            ''
+                                          }
+                                          onChange={event =>
+                                            updateCustomAnalyte(
+                                              index,
+                                              {
+                                                customReferenceHigh:
+                                                  event.target.value,
+                                              },
+                                            )
+                                          }
+                                          placeholder="Optional"
+                                        />
+                                      </label>
+
+                                      <label className="laboratory-custom-analyte-wide">
+                                        <span>
+                                          Reference text
+                                        </span>
+                                        <input
+                                          type="text"
+                                          value={
+                                            entry.customReferenceText ??
+                                            ''
+                                          }
+                                          onChange={event =>
+                                            updateCustomAnalyte(
+                                              index,
+                                              {
+                                                customReferenceText:
+                                                  event.target.value,
+                                              },
+                                            )
+                                          }
+                                          placeholder="Optional reference range or interpretation"
+                                        />
+                                      </label>
+
+                                      <label className="laboratory-custom-analyte-wide">
+                                        <span>
+                                          Result
+                                        </span>
+
+                                        {dataType ===
+                                        'BOOLEAN' ? (
+                                          <select
+                                            value={
+                                              entry.value
+                                            }
+                                            onChange={event =>
+                                              updateCustomAnalyte(
+                                                index,
+                                                {
+                                                  value:
+                                                    event.target.value,
+                                                },
+                                              )
+                                            }
+                                          >
+                                            <option value="">
+                                              Select result
+                                            </option>
+                                            <option value="true">
+                                              Yes
+                                            </option>
+                                            <option value="false">
+                                              No
+                                            </option>
+                                          </select>
+                                        ) : (
+                                          <input
+                                            type={
+                                              dataType ===
+                                              'NUMERIC'
+                                                ? 'number'
+                                                : 'text'
+                                            }
+                                            inputMode={
+                                              dataType ===
+                                              'NUMERIC'
+                                                ? 'decimal'
+                                                : 'text'
+                                            }
+                                            value={
+                                              entry.value
+                                            }
+                                            onChange={event =>
+                                              updateCustomAnalyte(
+                                                index,
+                                                {
+                                                  value:
+                                                    event.target.value,
+                                                },
+                                              )
+                                            }
+                                            placeholder={
+                                              dataType ===
+                                              'NUMERIC'
+                                                ? 'Enter numeric result'
+                                                : 'Enter result'
+                                            }
+                                          />
+                                        )}
+                                      </label>
+                                    </div>
+                                  </div>
+                                )
+                              },
+                            )}
+
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              onClick={addCustomAnalyte}
+                            >
+                              + Add Analyte
+                            </button>
+                          </>
                         )}
                       </div>
 

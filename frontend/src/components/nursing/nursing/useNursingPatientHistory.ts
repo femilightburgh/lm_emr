@@ -18,6 +18,11 @@ import {
   getPatient,
 } from '../../../api/patients'
 
+import {
+  listEncounterClinicalDocuments,
+  type ClinicalDocument,
+} from '../../../api/clinicalDocuments'
+
 import type {
   Episode,
 } from '../../../api/episodes'
@@ -35,6 +40,11 @@ export interface PreviousVisit {
   eventsByEncounter: Record<
     string,
     ClinicalEvent[]
+  >
+
+  nursingDocumentsByEncounter: Record<
+    string,
+    ClinicalDocument | null
   >
 }
 
@@ -157,10 +167,52 @@ export function useNursingPatientHistory({
                       timelineEntries,
                     )
 
+                    const documentEntries =
+                      await Promise.all(
+                        encounters.map(
+                          async encounter => {
+                            const documents =
+                              await listEncounterClinicalDocuments(
+                                accessToken,
+                                encounter.id,
+                              )
+
+                            const signedNursingDocument =
+                              documents
+                                .filter(
+                                  document =>
+                                    document.document_type ===
+                                      'NURSING_INTAKE' &&
+                                    (
+                                      document.status ===
+                                        'SIGNED' ||
+                                      document.status ===
+                                        'AMENDED'
+                                    ),
+                                )
+                                .sort(
+                                  (a, b) =>
+                                    b.version - a.version,
+                                )[0] ?? null
+
+                            return [
+                              encounter.id,
+                              signedNursingDocument,
+                            ] as const
+                          },
+                        ),
+                      )
+
+                    const nursingDocumentsByEncounter =
+                      Object.fromEntries(
+                        documentEntries,
+                      )
+
                   return {
                     episode,
                     encounters,
                     eventsByEncounter,
+                      nursingDocumentsByEncounter,
                   }
                 },
               ),

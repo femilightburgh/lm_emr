@@ -33,6 +33,16 @@ class CreateClinicalOrderItemRequest(BaseModel):
         description="Diagnostic catalogue investigation included in the order.",
     )
 
+    custom_name: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=255,
+        description=(
+            "Free-text investigation name when the requested investigation "
+            "is not available in the catalogue."
+        ),
+    )
+
 
 class CreateClinicalOrderRequest(BaseModel):
     """

@@ -27,11 +27,14 @@ import ClinicalOrdersPanel from './ClinicalOrdersPanel'
 import DiagnosisPanel from './DiagnosisPanel'
 import DoctorInvestigationResults from './DoctorInvestigationResults'
 import HistoricalEncounterPanel from './HistoricalEncounterPanel'
-import InitialClerkingPanel from './InitialClerkingPanel'
 import NursingHandoffPanel from './NursingHandoffPanel'
 import PatientHistoryPanel from './PatientHistoryPanel'
-import ProgressNotePanel from './ProgressNotePanel'
-import SignedClinicalDocumentSummary from './SignedClinicalDocumentSummary'
+import DoctorPatientBanner from './DoctorPatientBanner'
+import DoctorEncounterNavigation from './DoctorEncounterNavigation'
+import DoctorDocumentationPanel from './DoctorDocumentationPanel'
+import DoctorEncounterTimeline from './DoctorEncounterTimeline'
+import DoctorEncounterCompletionPanels from './DoctorEncounterCompletionPanels'
+import type { WardReviewDisposition } from './DoctorEncounterCompletionPanels'
 import VitalsPanel from './VitalsPanel'
 import DoctorMedicationTreatmentReview from './DoctorMedicationTreatmentReview'
 import type { useDoctorDocumentation } from './useDoctorDocumentation'
@@ -42,12 +45,6 @@ type StringChangeHandler = (
 
 type AsyncAction = () => Promise<void>
 
-type WardReviewDisposition =
-  | 'CONTINUE_ADMISSION'
-  | 'DISCHARGE'
-  | 'TRANSFER'
-  | 'REFERRAL'
-  | 'OTHER'
 
 type CompleteWardReviewAction = (
   disposition: WardReviewDisposition,
@@ -82,6 +79,9 @@ interface Props {
     episode: Episode,
   ) => Promise<void>
   closeHistoricalViewer: () => void
+  onSelectCurrentEncounter: (
+    encounter: Encounter,
+  ) => void
 
   nursingEncounter: Encounter | null
   nursingDocument: ClinicalDocument | null
@@ -97,64 +97,6 @@ interface Props {
   savingProgressNote: boolean
   signingProgressNote: boolean
   admittingEpisode: boolean
-
-  clerkingComplaint: string
-  clerkingComplaintDuration: string
-  clerkingHistory: string
-  clerkingReviewOfSystems: string
-  clerkingPastMedicalHistory: string
-  clerkingPastSurgicalHistory: string
-  clerkingDrugHistory: string
-  clerkingAllergies: string
-  clerkingFamilyHistory: string
-  clerkingSocialHistory: string
-  clerkingPersonalHistory: string
-  clerkingIdeas: string
-  clerkingConcerns: string
-  clerkingExpectations: string
-  clerkingExamGeneral: string
-  clerkingExamCardiovascular: string
-  clerkingExamRespiratory: string
-  clerkingExamAbdomen: string
-  clerkingExamNeurological: string
-  clerkingExamMusculoskeletal: string
-  clerkingExamGenitourinary: string
-  clerkingExamOther: string
-
-  noteSubjective: string
-  noteObjective: string
-  noteWorkingDiagnosis: string
-  noteDifferentials: string
-  notePlan: string
-
-  setClerkingComplaint: StringChangeHandler
-  setClerkingComplaintDuration: StringChangeHandler
-  setClerkingHistory: StringChangeHandler
-  setClerkingReviewOfSystems: StringChangeHandler
-  setClerkingPastMedicalHistory: StringChangeHandler
-  setClerkingPastSurgicalHistory: StringChangeHandler
-  setClerkingDrugHistory: StringChangeHandler
-  setClerkingAllergies: StringChangeHandler
-  setClerkingFamilyHistory: StringChangeHandler
-  setClerkingSocialHistory: StringChangeHandler
-  setClerkingPersonalHistory: StringChangeHandler
-  setClerkingIdeas: StringChangeHandler
-  setClerkingConcerns: StringChangeHandler
-  setClerkingExpectations: StringChangeHandler
-  setClerkingExamGeneral: StringChangeHandler
-  setClerkingExamCardiovascular: StringChangeHandler
-  setClerkingExamRespiratory: StringChangeHandler
-  setClerkingExamAbdomen: StringChangeHandler
-  setClerkingExamNeurological: StringChangeHandler
-  setClerkingExamMusculoskeletal: StringChangeHandler
-  setClerkingExamGenitourinary: StringChangeHandler
-  setClerkingExamOther: StringChangeHandler
-
-  setNoteSubjective: StringChangeHandler
-  setNoteObjective: StringChangeHandler
-  setNoteWorkingDiagnosis: StringChangeHandler
-  setNoteDifferentials: StringChangeHandler
-  setNotePlan: StringChangeHandler
 
   insertLatestVitals: () => void
   saveProgressNote: AsyncAction
@@ -219,8 +161,10 @@ interface Props {
   orderPriority: string
   laboratoryTests: LaboratoryTest[]
   selectedLaboratoryTestIds: string[]
+  customLaboratoryInvestigation: string
   diagnosticInvestigations: DiagnosticInvestigation[]
   selectedDiagnosticInvestigationId: string
+  customDiagnosticInvestigation: string
   orderMedicationId: string
   orderDose: string
   prescriptionMedicine: string
@@ -240,7 +184,9 @@ interface Props {
   ) => void
   setOrderPriority: StringChangeHandler
   handleLaboratoryTestChange: StringChangeHandler
+  setCustomLaboratoryInvestigation: StringChangeHandler
   handleDiagnosticInvestigationChange: StringChangeHandler
+  setCustomDiagnosticInvestigation: StringChangeHandler
   setOrderMedicationId: StringChangeHandler
   setOrderDose: StringChangeHandler
   setPrescriptionMedicine: StringChangeHandler
@@ -272,34 +218,6 @@ interface Props {
   >
 }
 
-const EVENT_LABELS: Record<string, string> = {
-  VITALS_RECORDED: 'Vital signs recorded',
-  CLINICAL_NOTE_RECORDED: 'Clinical note recorded',
-  DIAGNOSIS_RECORDED: 'Diagnosis recorded',
-  MEDICATION_PRESCRIBED: 'Medication prescribed',
-  MEDICATION_GIVEN: 'Medication administered',
-  INVESTIGATION_ORDERED: 'Investigation ordered',
-  CLINICAL_ORDER_CANCELLED: 'Clinical order cancelled',
-  RESULT_RECORDED: 'Result recorded',
-  PROCEDURE_PERFORMED: 'Procedure performed',
-  WOUND_DRESSED: 'Wound dressed',
-  EPISODE_ADMITTED: 'Episode admitted',
-}
-
-
-function formatEventLabel(
-  eventType: string,
-): string {
-  return (
-    EVENT_LABELS[eventType] ??
-    eventType
-      .toLowerCase()
-      .replaceAll('_', ' ')
-  )
-}
-
-
-
 export default function DoctorEncounterWorkspace({
   selectedEncounter,
   accessToken,
@@ -322,6 +240,7 @@ export default function DoctorEncounterWorkspace({
   openHistoricalEncounter,
   openHistoricalEpisode,
   closeHistoricalViewer,
+  onSelectCurrentEncounter,
   nursingEncounter,
   nursingDocument,
   loadingNursingHandoff,
@@ -333,60 +252,6 @@ export default function DoctorEncounterWorkspace({
   savingProgressNote,
   signingProgressNote,
   admittingEpisode,
-  clerkingComplaint,
-  clerkingComplaintDuration,
-  clerkingHistory,
-  clerkingReviewOfSystems,
-  clerkingPastMedicalHistory,
-  clerkingPastSurgicalHistory,
-  clerkingDrugHistory,
-  clerkingAllergies,
-  clerkingFamilyHistory,
-  clerkingSocialHistory,
-  clerkingPersonalHistory,
-  clerkingIdeas,
-  clerkingConcerns,
-  clerkingExpectations,
-  clerkingExamGeneral,
-  clerkingExamCardiovascular,
-  clerkingExamRespiratory,
-  clerkingExamAbdomen,
-  clerkingExamNeurological,
-  clerkingExamMusculoskeletal,
-  clerkingExamGenitourinary,
-  clerkingExamOther,
-  noteSubjective,
-  noteObjective,
-  noteWorkingDiagnosis,
-  noteDifferentials,
-  notePlan,
-  setClerkingComplaint,
-  setClerkingComplaintDuration,
-  setClerkingHistory,
-  setClerkingReviewOfSystems,
-  setClerkingPastMedicalHistory,
-  setClerkingPastSurgicalHistory,
-  setClerkingDrugHistory,
-  setClerkingAllergies,
-  setClerkingFamilyHistory,
-  setClerkingSocialHistory,
-  setClerkingPersonalHistory,
-  setClerkingIdeas,
-  setClerkingConcerns,
-  setClerkingExpectations,
-  setClerkingExamGeneral,
-  setClerkingExamCardiovascular,
-  setClerkingExamRespiratory,
-  setClerkingExamAbdomen,
-  setClerkingExamNeurological,
-  setClerkingExamMusculoskeletal,
-  setClerkingExamGenitourinary,
-  setClerkingExamOther,
-  setNoteSubjective,
-  setNoteObjective,
-  setNoteWorkingDiagnosis,
-  setNoteDifferentials,
-  setNotePlan,
   insertLatestVitals,
   saveProgressNote,
   signProgressNote,
@@ -440,8 +305,10 @@ export default function DoctorEncounterWorkspace({
   orderPriority,
   laboratoryTests,
   selectedLaboratoryTestIds,
+  customLaboratoryInvestigation,
   diagnosticInvestigations,
   selectedDiagnosticInvestigationId,
+  customDiagnosticInvestigation,
   orderMedicationId,
   orderDose,
   prescriptionMedicine,
@@ -459,7 +326,9 @@ export default function DoctorEncounterWorkspace({
   setOrderType,
   setOrderPriority,
   handleLaboratoryTestChange,
+  setCustomLaboratoryInvestigation,
   handleDiagnosticInvestigationChange,
+  setCustomDiagnosticInvestigation,
   setOrderMedicationId,
   setOrderDose,
   setPrescriptionMedicine,
@@ -605,222 +474,21 @@ export default function DoctorEncounterWorkspace({
 
 
   const renderDocumentation = () => (
-<div className="doctor-documentation-section">
-  <div className="doctor-section-heading">
-    <p className="eyebrow">
-      DOCUMENTATION
-    </p>
-
-    <h2>
-      Clinical Documentation
-    </h2>
-
-    <p>
-      Record and review the current clinical documentation.
-    </p>
-  </div>
-
-{documentation.doctorNoteDocumentType() === 'INITIAL_CLERKING' ? (
-  <InitialClerkingPanel
-    document={progressNote}
-    loading={loadingProgressNote}
-    saving={savingProgressNote}
-    signing={signingProgressNote}
-
-    complaint={clerkingComplaint}
-    complaintDuration={
-      clerkingComplaintDuration
-    }
-    history={clerkingHistory}
-    reviewOfSystems={
-      clerkingReviewOfSystems
-    }
-    pastMedicalHistory={
-      clerkingPastMedicalHistory
-    }
-    pastSurgicalHistory={
-      clerkingPastSurgicalHistory
-    }
-    drugHistory={clerkingDrugHistory}
-    allergies={clerkingAllergies}
-    familyHistory={clerkingFamilyHistory}
-    socialHistory={clerkingSocialHistory}
-    personalHistory={clerkingPersonalHistory}
-
-    ideas={clerkingIdeas}
-    concerns={clerkingConcerns}
-    expectations={
-      clerkingExpectations
-    }
-
-    examGeneral={clerkingExamGeneral}
-    examCardiovascular={
-      clerkingExamCardiovascular
-    }
-    examRespiratory={
-      clerkingExamRespiratory
-    }
-    examAbdomen={clerkingExamAbdomen}
-    examNeurological={
-      clerkingExamNeurological
-    }
-    examMusculoskeletal={
-      clerkingExamMusculoskeletal
-    }
-    examGenitourinary={
-      clerkingExamGenitourinary
-    }
-    examOther={clerkingExamOther}
-
-    onComplaintChange={
-      setClerkingComplaint
-    }
-    onComplaintDurationChange={
-      setClerkingComplaintDuration
-    }
-    onHistoryChange={
-      setClerkingHistory
-    }
-    onReviewOfSystemsChange={
-      setClerkingReviewOfSystems
-    }
-    onPastMedicalHistoryChange={
-      setClerkingPastMedicalHistory
-    }
-    onPastSurgicalHistoryChange={
-      setClerkingPastSurgicalHistory
-    }
-    onDrugHistoryChange={
-      setClerkingDrugHistory
-    }
-    onAllergiesChange={
-      setClerkingAllergies
-    }
-    onFamilyHistoryChange={
-      setClerkingFamilyHistory
-    }
-    onSocialHistoryChange={
-      setClerkingSocialHistory
-    }
-    onPersonalHistoryChange={
-      setClerkingPersonalHistory
-    }
-
-    onIdeasChange={
-      setClerkingIdeas
-    }
-    onConcernsChange={
-      setClerkingConcerns
-    }
-    onExpectationsChange={
-      setClerkingExpectations
-    }
-
-    onExamGeneralChange={
-      setClerkingExamGeneral
-    }
-    onExamCardiovascularChange={
-      setClerkingExamCardiovascular
-    }
-    onExamRespiratoryChange={
-      setClerkingExamRespiratory
-    }
-    onExamAbdomenChange={
-      setClerkingExamAbdomen
-    }
-    onExamNeurologicalChange={
-      setClerkingExamNeurological
-    }
-    onExamMusculoskeletalChange={
-      setClerkingExamMusculoskeletal
-    }
-    onExamGenitourinaryChange={
-      setClerkingExamGenitourinary
-    }
-    onExamOtherChange={
-      setClerkingExamOther
-    }
-
-    onSave={() =>
-      void saveProgressNote()
-    }
-    onSign={() =>
-      void signProgressNote()
-    }
-
-    admitting={admittingEpisode}
-    canAdmit={
-      Boolean(
-        progressNote &&
-        progressNote.document_type ===
-          'INITIAL_CLERKING' &&
-        progressNote.status === 'SIGNED' &&
-        selectedEpisode?.status === 'OPEN',
-      )
-    }
-    onAdmit={() =>
-      void admitSelectedEpisode()
-    }
-  />
-) : (
-  <ProgressNotePanel
-    noteTitle="Progress Note"
-
-    progressNote={progressNote}
-    encounterClosed={
-      selectedEncounter.status === 'CLOSED'
-    }
-    loading={loadingProgressNote}
-    saving={savingProgressNote}
-    signing={signingProgressNote}
-
-    subjective={noteSubjective}
-    objective={noteObjective}
-    workingDiagnosis={
-      noteWorkingDiagnosis
-    }
-    differentials={
-      noteDifferentials
-    }
-    plan={notePlan}
-
-    onSubjectiveChange={
-      setNoteSubjective
-    }
-    onObjectiveChange={
-      setNoteObjective
-    }
-    onWorkingDiagnosisChange={
-      setNoteWorkingDiagnosis
-    }
-    onDifferentialsChange={
-      setNoteDifferentials
-    }
-    onPlanChange={
-      setNotePlan
-    }
-
-    onInsertLatestVitals={
-      insertLatestVitals
-    }
-    hasVitals={
-      vitals.length > 0
-    }
-
-    onSave={() =>
-      void saveProgressNote()
-    }
-    onSign={() =>
-      void signProgressNote()
-    }
-  />
-)}
-
-<SignedClinicalDocumentSummary
-  document={progressNote}
-/>
-
-</div>
+    <DoctorDocumentationPanel
+      documentation={documentation}
+      progressNote={progressNote}
+      selectedEncounter={selectedEncounter}
+      selectedEpisode={selectedEpisode}
+      loadingProgressNote={loadingProgressNote}
+      savingProgressNote={savingProgressNote}
+      signingProgressNote={signingProgressNote}
+      admittingEpisode={admittingEpisode}
+      vitalsCount={vitals.length}
+      insertLatestVitals={insertLatestVitals}
+      saveProgressNote={saveProgressNote}
+      signProgressNote={signProgressNote}
+      admitSelectedEpisode={admitSelectedEpisode}
+    />
   )
 
 
@@ -946,8 +614,20 @@ export default function DoctorEncounterWorkspace({
   onLaboratoryTestChange={
     handleLaboratoryTestChange
   }
+  customLaboratoryInvestigation={
+    customLaboratoryInvestigation
+  }
+  onCustomLaboratoryInvestigationChange={
+    setCustomLaboratoryInvestigation
+  }
   onDiagnosticInvestigationChange={
     handleDiagnosticInvestigationChange
+  }
+  customDiagnosticInvestigation={
+    customDiagnosticInvestigation
+  }
+  onCustomDiagnosticInvestigationChange={
+    setCustomDiagnosticInvestigation
   }
   onOrderMedicationIdChange={
     setOrderMedicationId
@@ -999,89 +679,17 @@ export default function DoctorEncounterWorkspace({
 
 
   const renderTimeline = () => (
-<section className="workspace-panel doctor-timeline-panel">
-  <details>
-    <summary className="doctor-context-summary">
-      <div>
-        <p className="eyebrow">
-          CARE CONTEXT
-        </p>
-
-        <h2>
-          Timeline
-        </h2>
-
-        <p>
-          Clinical events recorded for this encounter.
-        </p>
-      </div>
-
-      <div className="doctor-context-summary-meta">
-        <span>
-          {timeline.length}
-          {' '}
-          event
-          {timeline.length === 1
-            ? ''
-            : 's'}
-        </span>
-      </div>
-    </summary>
-
-    <div className="doctor-context-body">
-      {loadingTimeline && (
-        <p>
-          Loading clinical timeline...
-        </p>
-      )}
-
-      {!loadingTimeline &&
-        timeline.length === 0 && (
-          <p>
-            No clinical events recorded yet.
-          </p>
-        )}
-
-      {!loadingTimeline &&
-        timeline.length > 0 && (
-          <div className="doctor-timeline-list">
-            {timeline.map(event => (
-              <div
-                key={event.id}
-                className="doctor-timeline-item"
-              >
-                <strong>
-                  {formatEventLabel(
-                    event.event_type,
-                  )}
-                </strong>
-
-                <span>
-                  {new Date(
-                    event.occurred_at,
-                  ).toLocaleString()}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-    </div>
-  </details>
-</section>
+    <DoctorEncounterTimeline
+      timeline={timeline}
+      loadingTimeline={loadingTimeline}
+    />
   )
 
   return (
     <>
-<section className="doctor-encounter-navigation">
-  <button
-    type="button"
-    className="secondary-button doctor-back-to-queue"
-    onClick={onBackToQueue}
-  >
-    <span aria-hidden="true">←</span>
-    Back to Doctor Queue
-  </button>
-</section>
+<DoctorEncounterNavigation
+  onBackToQueue={onBackToQueue}
+/>
 
 <section
   className={`doctor-encounter-mode ${encounterMode.className}`}
@@ -1107,82 +715,12 @@ export default function DoctorEncounterWorkspace({
   </span>
 </section>
 
-<section className={`doctor-patient-banner ${
-  isWardReview
-    ? 'doctor-patient-banner--ward'
-    : 'doctor-patient-banner--clinic'
-}`}>
-  {loadingPatientContext ? (
-    <div className="doctor-patient-banner-loading">
-      Loading patient information...
-    </div>
-  ) : patient ? (
-    <>
-      <div className="doctor-patient-identity">
-        <div className="doctor-patient-avatar">
-          {patient.first_name.charAt(0)}
-          {patient.last_name.charAt(0)}
-        </div>
-
-        <div>
-          <p className="eyebrow">
-            PATIENT
-          </p>
-
-          <h2>
-            {patient.first_name}{' '}
-            {patient.middle_name
-              ? `${patient.middle_name} `
-              : ''}
-            {patient.last_name}
-          </h2>
-
-          <p>
-            {patient.hospital_number}
-          </p>
-        </div>
-      </div>
-
-      <div className="doctor-patient-details">
-        <div>
-          <span>Date of birth</span>
-          <strong>
-            {patient.date_of_birth}
-          </strong>
-        </div>
-
-        <div>
-          <span>Sex</span>
-          <strong>
-            {patient.sex}
-          </strong>
-        </div>
-
-        {selectedEpisode && (
-          <div>
-            <span>Episode</span>
-            <strong>
-              {selectedEpisode.episode_number}
-            </strong>
-          </div>
-        )}
-
-        {selectedEpisode && (
-          <div>
-            <span>Status</span>
-            <strong>
-              {selectedEpisode.status}
-            </strong>
-          </div>
-        )}
-      </div>
-    </>
-  ) : (
-    <div className="doctor-patient-banner-loading">
-      Patient information unavailable.
-    </div>
-  )}
-</section>
+<DoctorPatientBanner
+  patient={patient}
+  loadingPatientContext={loadingPatientContext}
+  selectedEpisode={selectedEpisode}
+  isWardReview={isWardReview}
+/>
 
 <div className="doctor-workspace-tabs" role="tablist" aria-label="Patient chart sections">
   {([
@@ -1272,8 +810,7 @@ export default function DoctorEncounterWorkspace({
         loadingPreviousEpisodes={loadingPreviousEpisodes}
         loadingHistorical={loadingHistorical}
         onSelectCurrentEncounter={encounter => {
-          if (encounter.id === selectedEncounter?.id || !selectedEpisode) return
-          void openHistoricalEncounter(selectedEpisode, encounter)
+          onSelectCurrentEncounter(encounter)
         }}
         onSelectPreviousEpisode={episode => void openHistoricalEpisode(episode)}
         onSelectHistoricalEncounter={encounter => {
@@ -1297,57 +834,24 @@ export default function DoctorEncounterWorkspace({
   )}
 </div>
 
-{isWardReview && selectedEncounter.status === 'OPEN' && (
-  <section className="workspace-panel doctor-completion-panel">
-    <div className="panel-header">
-      <div>
-        <p className="eyebrow">DISPOSITION</p>
-        <h2>Complete Ward Review</h2>
-        <p>Finalize today's inpatient review after documentation and clinical actions are complete.</p>
-      </div>
-    </div>
-    <div className="doctor-completion-controls">
-      <label>
-        <span>Disposition</span>
-        <select value={wardReviewDisposition} disabled={closingEncounter} onChange={event => {
-          const disposition = event.target.value as WardReviewDisposition
-          setWardReviewDisposition(disposition)
-          if (!['TRANSFER', 'REFERRAL', 'OTHER'].includes(disposition)) setWardReviewDetails('')
-        }}>
-          <option value="CONTINUE_ADMISSION">Continue admission</option>
-          <option value="DISCHARGE">Discharge</option>
-          <option value="TRANSFER">Transfer</option>
-          <option value="REFERRAL">Referral</option>
-          <option value="OTHER">Other</option>
-        </select>
-      </label>
-      {wardReviewDetailsRequired && (
-        <label className="doctor-completion-details">
-          <span>Details</span>
-          <textarea rows={3} value={wardReviewDetails} disabled={closingEncounter} onChange={event => setWardReviewDetails(event.target.value)} />
-        </label>
-      )}
-      <button type="button" disabled={closingEncounter || !wardReviewReady} onClick={() => void completeWardReview(wardReviewDisposition, wardReviewDetailsRequired ? wardReviewDetails.trim() : null)}>
-        {closingEncounter ? 'Completing...' : 'Complete Ward Review'}
-      </button>
-    </div>
-  </section>
-)}
-
-{selectedEncounter.title === 'Doctor Consultation' && selectedEncounter.status === 'OPEN' && selectedEpisode?.status === 'OPEN' && progressNote?.document_type === 'INITIAL_CLERKING' && progressNote.status === 'SIGNED' && (
-  <section className="workspace-panel doctor-completion-panel">
-    <div className="panel-header"><div><p className="eyebrow">DISPOSITION</p><h2>Consultation ready to complete</h2><p>The initial clerking is signed. Complete the consultation while keeping the episode open for investigations and review.</p></div></div>
-    <button type="button" disabled={completingConsultation} onClick={() => void handleCompleteConsultation()}>{completingConsultation ? 'Completing...' : 'Complete Consultation'}</button>
-  </section>
-)}
-
-{selectedEncounter.title === 'Doctor Review' && selectedEncounter.status === 'OPEN' && selectedEpisode?.status === 'OPEN' && (
-  <section className="workspace-panel doctor-completion-panel">
-    <div className="panel-header"><div><p className="eyebrow">DISPOSITION</p><h2>Doctor review ready to complete</h2><p>Complete the review after documenting the assessment, results, and clinical plan.</p></div></div>
-    <button type="button" disabled={completingDoctorReview} onClick={() => void handleCompleteDoctorReview()}>{completingDoctorReview ? 'Completing...' : 'Complete Doctor Review'}</button>
-  </section>
-)}
-
+<DoctorEncounterCompletionPanels
+  isWardReview={isWardReview}
+  selectedEncounter={selectedEncounter}
+  selectedEpisode={selectedEpisode}
+  progressNote={progressNote}
+  closingEncounter={closingEncounter}
+  wardReviewDisposition={wardReviewDisposition}
+  setWardReviewDisposition={setWardReviewDisposition}
+  wardReviewDetails={wardReviewDetails}
+  setWardReviewDetails={setWardReviewDetails}
+  wardReviewDetailsRequired={wardReviewDetailsRequired}
+  wardReviewReady={wardReviewReady}
+  completeWardReview={completeWardReview}
+  completingConsultation={completingConsultation}
+  handleCompleteConsultation={handleCompleteConsultation}
+  completingDoctorReview={completingDoctorReview}
+  handleCompleteDoctorReview={handleCompleteDoctorReview}
+/>
 
 
     </>

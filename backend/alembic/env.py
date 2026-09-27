@@ -83,9 +83,10 @@ def run_migrations_offline() -> None:
     SQL directly against a database.
     """
 
-    url = os.environ.get(
-        "TEST_DATABASE_URL",
-        config.get_main_option("sqlalchemy.url"),
+    url = (
+        os.environ.get("TEST_DATABASE_URL")
+        or os.environ.get("DATABASE_URL")
+        or config.get_main_option("sqlalchemy.url")
     )
 
     context.configure(
@@ -110,29 +111,23 @@ def run_migrations_online() -> None:
     """
     Execute migrations against a live database connection.
 
-    When TEST_DATABASE_URL is provided, migrations are directed to the
-    test database. Otherwise, Alembic uses the database configured in
-    alembic.ini.
+    Database URL priority:
+      1. TEST_DATABASE_URL, when provided.
+      2. DATABASE_URL, when provided.
+      3. sqlalchemy.url from alembic.ini as a fallback.
     """
 
-    test_database_url = os.environ.get(
-        "TEST_DATABASE_URL",
+    database_url = (
+        os.environ.get("TEST_DATABASE_URL")
+        or os.environ.get("DATABASE_URL")
+        or config.get_main_option("sqlalchemy.url")
     )
 
-    if test_database_url:
-        connectable = engine_from_config(
-            {
-                "sqlalchemy.url": test_database_url,
-            },
-            prefix="sqlalchemy.",
-            poolclass=pool.NullPool,
-        )
-    else:
-        connectable = engine_from_config(
-            config.get_section(config.config_ini_section),
-            prefix="sqlalchemy.",
-            poolclass=pool.NullPool,
-        )
+    connectable = engine_from_config(
+        {"sqlalchemy.url": database_url},
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
 
     with connectable.connect() as connection:
 

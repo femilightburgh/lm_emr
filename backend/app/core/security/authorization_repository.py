@@ -32,6 +32,7 @@ from app.modules.identity.models import (
     Permission,
     Role,
     RolePermission,
+    UserAccount,
     UserRole,
 )
 
@@ -61,6 +62,11 @@ class AuthorizationRepository:
             exists().where(
                 UserRole.user_account_id == user_id,
                 UserRole.role_id == Role.id,
+                Role.hospital_id == (
+                    select(UserAccount.hospital_id)
+                    .where(UserAccount.id == user_id)
+                    .scalar_subquery()
+                ),
                 Role.name == role_name,
                 self._active_assignment_clause(),
             )
@@ -82,6 +88,11 @@ class AuthorizationRepository:
             exists().where(
                 UserRole.user_account_id == user_id,
                 UserRole.role_id == Role.id,
+                Role.hospital_id == (
+                    select(UserAccount.hospital_id)
+                    .where(UserAccount.id == user_id)
+                    .scalar_subquery()
+                ),
                 RolePermission.role_id == Role.id,
                 RolePermission.permission_id == Permission.id,
                 Permission.code == permission_code,

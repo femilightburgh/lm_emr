@@ -9,7 +9,7 @@ import {
 } from '../../api/clinicalDocuments'
 
 import {
-  listEncounterDiagnoses,
+  listEpisodeDiagnoses,
   type ClinicalDiagnosis,
 } from '../../api/diagnoses'
 
@@ -63,9 +63,9 @@ export async function loadHistoricalEncounterContext(
       accessToken,
       encounter.id,
     ),
-    listEncounterDiagnoses(
+    listEpisodeDiagnoses(
       accessToken,
-      encounter.id,
+      encounter.episode_id,
     ),
     listEncounterClinicalOrders(
       accessToken,

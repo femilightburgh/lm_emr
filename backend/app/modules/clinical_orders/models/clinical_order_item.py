@@ -107,6 +107,11 @@ class ClinicalOrderItem(BaseEntity):
         index=True,
     )
 
+    custom_name: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
     display_order: Mapped[int] = mapped_column(
         nullable=False,
         default=0,

@@ -45,7 +45,7 @@ class DiagnosticReportCreateRequest(BaseModel):
 
     order_id: UUID
 
-    investigation_id: UUID
+    investigation_id: UUID | None = None
 
     category: DiagnosticCategory
 

@@ -43,6 +43,9 @@ from app.modules.events.services.event_service import (
 from app.modules.episode.repositories.episode_repository import (
     EpisodeRepository,
 )
+from app.modules.episode.services.episode_clinical_workflow_service import (
+    EpisodeClinicalWorkflowService,
+)
 from app.modules.staff.repository import StaffRepository
 from app.storage import LocalStorage
 
@@ -61,6 +64,7 @@ class DiagnosticService:
         staff_repository: StaffRepository,
         event_service: ClinicalEventService,
         storage: LocalStorage,
+        episode_clinical_workflow_service: EpisodeClinicalWorkflowService,
     ) -> None:
         self.repository = repository
         self.clinical_order_repository = clinical_order_repository
@@ -68,6 +72,9 @@ class DiagnosticService:
         self.staff_repository = staff_repository
         self.event_service = event_service
         self.storage = storage
+        self.episode_clinical_workflow_service = (
+            episode_clinical_workflow_service
+        )
 
     def list_investigations(
         self,
@@ -92,6 +99,89 @@ class DiagnosticService:
         if investigation is None:
             raise DiagnosticInvestigationNotFoundError(
                 "Diagnostic investigation not found.",
+            )
+
+        return investigation
+
+    def _resolve_report_investigation(
+        self,
+        *,
+        context: RequestContext,
+        order,
+        investigation_id: UUID,
+    ) -> DiagnosticInvestigation:
+        """
+        Resolve the investigation used by a diagnostic report.
+
+        Structured DIAGNOSTIC orders provide an explicit investigation ID.
+        Legacy RADIOLOGY orders may only contain a study_code in their
+        details payload. Legacy aliases are resolved here so the frontend
+        does not need to understand historical order formats.
+        """
+
+        investigation = self.get_investigation(
+            hospital_id=context.hospital_id,
+            investigation_id=investigation_id,
+        )
+
+        if order.order_type.value != "RADIOLOGY":
+            return investigation
+
+        if investigation.category != DiagnosticCategory.RADIOLOGY:
+            raise DiagnosticCategoryMismatchError(
+                "Radiology reports must reference a RADIOLOGY investigation.",
+            )
+
+        return investigation
+
+    def _resolve_legacy_radiology_investigation(
+        self,
+        *,
+        context: RequestContext,
+        order,
+    ) -> DiagnosticInvestigation:
+        """
+        Resolve a legacy RADIOLOGY order to the hospital catalogue.
+
+        Legacy radiology orders predate ClinicalOrderItem support and store
+        the requested study as details.study_code. CXR is the historical
+        alias for the current XRAY catalogue investigation.
+        """
+
+        details = order.details or {}
+        study_code = details.get("study_code")
+
+        if not isinstance(study_code, str) or not study_code.strip():
+            raise DiagnosticInvestigationNotFoundError(
+                "Legacy radiology order does not specify a study code.",
+            )
+
+        normalized_code = study_code.strip().upper()
+
+        legacy_aliases = {
+            "CXR": "XRAY",
+        }
+
+        catalogue_code = legacy_aliases.get(
+            normalized_code,
+            normalized_code,
+        )
+
+        investigation = self.repository.get_investigation_by_code(
+            hospital_id=context.hospital_id,
+            code=catalogue_code,
+        )
+
+        if investigation is None or not investigation.active:
+            raise DiagnosticInvestigationNotFoundError(
+                f"Radiology investigation '{catalogue_code}' "
+                "is not available in the hospital catalogue.",
+            )
+
+        if investigation.category != DiagnosticCategory.RADIOLOGY:
+            raise DiagnosticCategoryMismatchError(
+                "Legacy radiology study does not resolve to a "
+                "RADIOLOGY investigation.",
             )
 
         return investigation
@@ -168,7 +258,7 @@ class DiagnosticService:
         *,
         context: RequestContext,
         order_id: UUID,
-        investigation_id: UUID,
+        investigation_id: UUID | None,
         category: DiagnosticCategory,
         findings: str | None,
         impression: str | None,
@@ -197,9 +287,13 @@ class DiagnosticService:
                 "a diagnostic report can be created.",
             )
 
-        if order.order_type.value != "DIAGNOSTIC":
+        if order.order_type.value not in (
+            "DIAGNOSTIC",
+            "RADIOLOGY",
+        ):
             raise ValueError(
-                "Diagnostic reports require a DIAGNOSTIC clinical order.",
+                "Diagnostic reports require a DIAGNOSTIC or "
+                "RADIOLOGY clinical order.",
             )
 
         existing = self.repository.get_report_by_order(
@@ -213,10 +307,25 @@ class DiagnosticService:
                 "for this clinical order.",
             )
 
-        investigation = self.get_investigation(
-            hospital_id=context.hospital_id,
-            investigation_id=investigation_id,
-        )
+        if order.order_type.value == "RADIOLOGY":
+            investigation = (
+                self._resolve_legacy_radiology_investigation(
+                    context=context,
+                    order=order,
+                )
+            )
+        else:
+            if investigation_id is None:
+                raise DiagnosticInvestigationNotFoundError(
+                    "Diagnostic investigation is required for "
+                    "DIAGNOSTIC clinical orders.",
+                )
+
+            investigation = self._resolve_report_investigation(
+                context=context,
+                order=order,
+                investigation_id=investigation_id,
+            )
 
         if investigation.category != category:
             raise DiagnosticCategoryMismatchError(
@@ -389,6 +498,22 @@ class DiagnosticService:
                     "status": ClinicalResultStatus.FINAL.value,
                 },
                 commit=False,
+            )
+
+            episode = self.episode_repository.get_by_id(
+                hospital_id=context.hospital_id,
+                episode_id=order.encounter.episode_id,
+            )
+
+            if episode is None:
+                raise RuntimeError(
+                    "Episode could not be loaded for diagnostic "
+                    "workflow finalization.",
+                )
+
+            self.episode_clinical_workflow_service.queue_doctor_review_if_ready(
+                context=context,
+                episode=episode,
             )
 
             self.repository.db.commit()

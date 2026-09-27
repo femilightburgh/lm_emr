@@ -76,6 +76,7 @@ import NursingQueue from './NursingQueue'
 import NursingPatientSummary from './NursingPatientSummary'
 import NursingVitalsForm from './NursingVitalsForm'
 import NursingIntakeForm from './NursingIntakeForm'
+import NursingClinicalSummary from './NursingClinicalSummary'
 import NursingRoutingSection from './NursingRoutingSection'
 import InpatientNursingWorkspace from './InpatientNursingWorkspace'
 
@@ -166,6 +167,7 @@ export default function NursingWorkspace({
 
   const {
     recordedVitals,
+      latestVitals,
     loadingVitals,
     savingVitals,
     loadRecordedVitals,
@@ -418,7 +420,7 @@ export default function NursingWorkspace({
       // ----------------------------------------------------------------------
 
       await loadRecordedVitals(
-        encounter.id,
+          episode.id,
       )
 
       if (
@@ -1044,6 +1046,113 @@ export default function NursingWorkspace({
             {/* Clinic Nursing Intake                                        */}
             {/* ============================================================ */}
 
+            <section className="workspace-section nursing-recorded-vitals">
+
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">
+                    CLINICAL OBSERVATIONS
+                  </p>
+
+                  <h3>
+                    Latest recorded vital signs
+                  </h3>
+
+                  <p>
+                    Most recent observations recorded for this nursing encounter.
+                  </p>
+                </div>
+
+                {latestVitals && (
+                  <span className="nursing-vitals-time">
+                    {new Date(
+                      latestVitals.occurred_at,
+                    ).toLocaleString([], {
+                      day: '2-digit',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                )}
+              </div>
+
+              {loadingVitals && (
+                <div className="admin-empty-state">
+                  Loading recorded vital signs...
+                </div>
+              )}
+
+              {!loadingVitals && !latestVitals && (
+                <div className="admin-empty-state">
+                  No vital signs have been recorded for this encounter yet.
+                </div>
+              )}
+
+              {!loadingVitals && latestVitals && (
+                <div className="nursing-latest-vitals">
+
+                  <div className="nursing-vital-card">
+                    <span>Temperature</span>
+                    <strong>
+                      {latestVitals.payload.temperature != null
+                        ? `${latestVitals.payload.temperature} °C`
+                        : '—'}
+                    </strong>
+                  </div>
+
+                  <div className="nursing-vital-card">
+                    <span>Heart rate</span>
+                    <strong>
+                      {latestVitals.payload.heart_rate != null
+                        ? `${latestVitals.payload.heart_rate} bpm`
+                        : '—'}
+                    </strong>
+                  </div>
+
+                  <div className="nursing-vital-card">
+                    <span>Respiratory rate</span>
+                    <strong>
+                      {latestVitals.payload.respiratory_rate != null
+                        ? `${latestVitals.payload.respiratory_rate} /min`
+                        : '—'}
+                    </strong>
+                  </div>
+
+                  <div className="nursing-vital-card">
+                    <span>Blood pressure</span>
+                    <strong>
+                      {latestVitals.payload.systolic_bp != null &&
+                      latestVitals.payload.diastolic_bp != null
+                        ? `${latestVitals.payload.systolic_bp}/${latestVitals.payload.diastolic_bp} mmHg`
+                        : '—'}
+                    </strong>
+                  </div>
+
+                  <div className="nursing-vital-card">
+                    <span>SpO₂</span>
+                    <strong>
+                      {latestVitals.payload.spo2 != null
+                        ? `${latestVitals.payload.spo2}%`
+                        : '—'}
+                    </strong>
+                  </div>
+
+                  <div className="nursing-vital-card">
+                    <span>Weight</span>
+                    <strong>
+                      {latestVitals.payload.weight != null
+                        ? `${latestVitals.payload.weight} kg`
+                        : '—'}
+                    </strong>
+                  </div>
+
+                </div>
+              )}
+
+            </section>
+
+
             <NursingVitalsForm
               vitals={vitals}
               disabled={false}
@@ -1053,6 +1162,14 @@ export default function NursingWorkspace({
                 void handleSaveVitals()
               }
             />
+
+
+            {documentSigned && (
+              <NursingClinicalSummary
+                intake={intake}
+                signedAt={nursingDocument?.signed_at}
+              />
+            )}
 
 
             <NursingIntakeForm

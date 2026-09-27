@@ -1059,3 +1059,143 @@ def test_grouped_laboratory_item_cannot_be_accessed_across_hospitals(
     assert response.status_code == 404
     assert response.json()["detail"] == "Clinical Order Item not found."
 
+
+
+def test_doctor_can_create_custom_laboratory_order(client, db):
+    hospital = create_hospital(db)
+
+    doctor_user = create_user(
+        db,
+        hospital=hospital,
+        email=f"custom-lab-doctor-{uuid4()}@example.com",
+        role_name="Doctor",
+    )
+
+    _, encounter = create_doctor_encounter(
+        db,
+        hospital,
+        doctor_user,
+    )
+
+    token = authenticate(
+        db,
+        hospital=hospital,
+        email=doctor_user.email,
+    )
+
+    response = client.post(
+        "/api/v1/clinical-orders",
+        headers=auth_headers(token),
+        json={
+            "encounter_id": str(encounter.id),
+            "order_type": "LABORATORY",
+            "priority": "ROUTINE",
+            "details": {},
+            "items": [
+                {
+                    "custom_name": "Serum Magnesium",
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 201
+
+    body = response.json()
+
+    assert body["order_type"] == "LABORATORY"
+    assert len(body["items"]) == 1
+
+    item = body["items"][0]
+
+    assert item["item_type"] == "LABORATORY"
+    assert item["laboratory_test_id"] is None
+    assert item["diagnostic_investigation_id"] is None
+    assert item["custom_name"] == "Serum Magnesium"
+    assert item["details"]["test_name"] == "Serum Magnesium"
+    assert item["details"]["custom"] is True
+
+
+def test_doctor_can_create_custom_diagnostic_order_and_queue_returns_it(
+    client,
+    db,
+):
+    hospital = create_hospital(db)
+
+    doctor_user = create_user(
+        db,
+        hospital=hospital,
+        email=f"custom-diagnostic-doctor-{uuid4()}@example.com",
+        role_name="Doctor",
+    )
+
+    _, encounter = create_doctor_encounter(
+        db,
+        hospital,
+        doctor_user,
+    )
+
+    token = authenticate(
+        db,
+        hospital=hospital,
+        email=doctor_user.email,
+    )
+
+    response = client.post(
+        "/api/v1/clinical-orders",
+        headers=auth_headers(token),
+        json={
+            "encounter_id": str(encounter.id),
+            "order_type": "DIAGNOSTIC",
+            "priority": "ROUTINE",
+            "details": {},
+            "items": [
+                {
+                    "custom_name": "CT Pulmonary Angiography",
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 201
+
+    body = response.json()
+
+    assert body["order_type"] == "DIAGNOSTIC"
+    assert len(body["items"]) == 1
+
+    item = body["items"][0]
+
+    assert item["item_type"] == "DIAGNOSTIC"
+    assert item["diagnostic_investigation_id"] is None
+    assert item["laboratory_test_id"] is None
+    assert item["custom_name"] == "CT Pulmonary Angiography"
+    assert item["details"]["investigation_name"] == (
+        "CT Pulmonary Angiography"
+    )
+    assert item["details"]["custom"] is True
+
+    queue_response = client.get(
+        "/api/v1/clinical-orders/queue/diagnostics",
+        headers=auth_headers(token),
+    )
+
+    assert queue_response.status_code == 200
+
+    queue_body = queue_response.json()
+
+    queue_item = next(
+        item
+        for item in queue_body
+        if item["id"] == body["id"]
+    )
+
+    assert queue_item["order_type"] == "DIAGNOSTIC"
+    assert queue_item["status"] == "REQUESTED"
+    assert len(queue_item["items"]) == 1
+    assert queue_item["items"][0]["custom_name"] == (
+        "CT Pulmonary Angiography"
+    )
+    assert queue_item["items"][0]["details"]["investigation_name"] == (
+        "CT Pulmonary Angiography"
+    )

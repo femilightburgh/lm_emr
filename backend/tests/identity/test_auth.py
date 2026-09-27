@@ -442,3 +442,39 @@ def test_refresh_uses_current_user_roles(
         "Receptionist"
         in access_payload["roles"]
     )
+
+def test_refresh_token_cannot_authenticate_current_user_endpoint(db):
+    """A refresh token must not be accepted as a bearer access token."""
+    from fastapi.testclient import TestClient
+
+    from app.db.session import get_db
+    from app.main import app
+
+    _, user = create_receptionist(db)
+    token_service = TokenService()
+
+    refresh_token = token_service.create_refresh_token(
+        user_id=user.id,
+    )
+
+    def override_get_db():
+        yield db
+
+    previous_get_db_override = app.dependency_overrides.get(get_db)
+    app.dependency_overrides[get_db] = override_get_db
+
+    try:
+        with TestClient(app) as client:
+            response = client.get(
+                "/api/v1/auth/me",
+                headers={
+                    "Authorization": f"Bearer {refresh_token}",
+                },
+            )
+
+        assert response.status_code == 401
+    finally:
+        if previous_get_db_override is None:
+            app.dependency_overrides.pop(get_db, None)
+        else:
+            app.dependency_overrides[get_db] = previous_get_db_override

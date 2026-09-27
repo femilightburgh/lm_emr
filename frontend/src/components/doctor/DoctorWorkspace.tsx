@@ -38,6 +38,9 @@ import {
 } from '../../api/vitals'
 
 import DoctorEncounterWorkspace from './DoctorEncounterWorkspace'
+import DoctorQueuePanel from './DoctorQueuePanel'
+import DoctorCurrentEncounterCard from './DoctorCurrentEncounterCard'
+
 import { useDoctorDocumentation } from './useDoctorDocumentation'
 import {
   useDoctorClinicalDocumentation,
@@ -286,7 +289,11 @@ export default function DoctorWorkspace({
     prescriptionIndication,
     setPrescriptionIndication,
 
+    customLaboratoryInvestigation,
+    setCustomLaboratoryInvestigation,
     handleLaboratoryTestChange,
+    customDiagnosticInvestigation,
+    setCustomDiagnosticInvestigation,
     handleDiagnosticInvestigationChange,
     saveOrder,
     cancelOrder,
@@ -375,8 +382,6 @@ export default function DoctorWorkspace({
 
   const {
     progressNote,
-    initialClerking,
-    progressNoteForm,
   } = documentation
 
   const {
@@ -388,275 +393,7 @@ export default function DoctorWorkspace({
   } = clinicalDocumentation
 
 
-  const noteSubjective =
-    progressNoteForm.subjective
 
-  const noteObjective =
-    progressNoteForm.objective
-
-  const noteWorkingDiagnosis =
-    progressNoteForm.workingDiagnosis
-
-  const noteDifferentials =
-    progressNoteForm.differentials
-
-  const notePlan =
-    progressNoteForm.plan
-
-  const clerkingComplaint =
-    initialClerking.complaint
-
-  const clerkingComplaintDuration =
-    initialClerking.complaintDuration
-
-  const clerkingHistory =
-    initialClerking.history
-
-  const clerkingReviewOfSystems =
-    initialClerking.reviewOfSystems
-
-  const clerkingPastMedicalHistory =
-    initialClerking.pastMedicalHistory
-
-  const clerkingPastSurgicalHistory =
-    initialClerking.pastSurgicalHistory
-
-  const clerkingDrugHistory =
-    initialClerking.drugHistory
-
-  const clerkingAllergies =
-    initialClerking.allergies
-
-  const clerkingFamilyHistory =
-    initialClerking.familyHistory
-
-  const clerkingSocialHistory =
-    initialClerking.socialHistory
-
-  const clerkingPersonalHistory =
-    initialClerking.personalHistory
-
-  const clerkingIdeas =
-    initialClerking.ideas
-
-  const clerkingConcerns =
-    initialClerking.concerns
-
-  const clerkingExpectations =
-    initialClerking.expectations
-
-  const clerkingExamGeneral =
-    initialClerking.examGeneral
-
-  const clerkingExamCardiovascular =
-    initialClerking.examCardiovascular
-
-  const clerkingExamRespiratory =
-    initialClerking.examRespiratory
-
-  const clerkingExamAbdomen =
-    initialClerking.examAbdomen
-
-  const clerkingExamNeurological =
-    initialClerking.examNeurological
-
-  const clerkingExamMusculoskeletal =
-    initialClerking.examMusculoskeletal
-
-  const clerkingExamGenitourinary =
-    initialClerking.examGenitourinary
-
-  const clerkingExamOther =
-    initialClerking.examOther
-
-  const setClerkingComplaint =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'complaint',
-        value,
-      )
-
-  const setClerkingComplaintDuration =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'complaintDuration',
-        value,
-      )
-
-  const setClerkingHistory =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'history',
-        value,
-      )
-
-  const setClerkingReviewOfSystems =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'reviewOfSystems',
-        value,
-      )
-
-  const setClerkingPastMedicalHistory =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'pastMedicalHistory',
-        value,
-      )
-
-  const setClerkingPastSurgicalHistory =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'pastSurgicalHistory',
-        value,
-      )
-
-  const setClerkingDrugHistory =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'drugHistory',
-        value,
-      )
-
-  const setClerkingAllergies =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'allergies',
-        value,
-      )
-
-  const setClerkingFamilyHistory =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'familyHistory',
-        value,
-      )
-
-  const setClerkingSocialHistory =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'socialHistory',
-        value,
-      )
-
-  const setClerkingPersonalHistory =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'personalHistory',
-        value,
-      )
-
-  const setClerkingIdeas =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'ideas',
-        value,
-      )
-
-  const setClerkingConcerns =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'concerns',
-        value,
-      )
-
-  const setClerkingExpectations =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'expectations',
-        value,
-      )
-
-  const setClerkingExamGeneral =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'examGeneral',
-        value,
-      )
-
-  const setClerkingExamCardiovascular =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'examCardiovascular',
-        value,
-      )
-
-  const setClerkingExamRespiratory =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'examRespiratory',
-        value,
-      )
-
-  const setClerkingExamAbdomen =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'examAbdomen',
-        value,
-      )
-
-  const setClerkingExamNeurological =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'examNeurological',
-        value,
-      )
-
-  const setClerkingExamMusculoskeletal =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'examMusculoskeletal',
-        value,
-      )
-
-  const setClerkingExamGenitourinary =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'examGenitourinary',
-        value,
-      )
-
-  const setClerkingExamOther =
-    (value: string) =>
-      documentation.updateInitialClerking(
-        'examOther',
-        value,
-      )
-
-  const setNoteSubjective =
-    (value: string) =>
-      documentation.updateProgressNote(
-        'subjective',
-        value,
-      )
-
-  const setNoteObjective =
-    (value: string) =>
-      documentation.updateProgressNote(
-        'objective',
-        value,
-      )
-
-  const setNoteWorkingDiagnosis =
-    (value: string) =>
-      documentation.updateProgressNote(
-        'workingDiagnosis',
-        value,
-      )
-
-  const setNoteDifferentials =
-    (value: string) =>
-      documentation.updateProgressNote(
-        'differentials',
-        value,
-      )
-
-  const setNotePlan =
-    (value: string) =>
-      documentation.updateProgressNote(
-        'plan',
-        value,
-      )
 
 
 
@@ -739,6 +476,7 @@ export default function DoctorWorkspace({
 
       await loadPreviousPatientEpisodes(
         episode.patient_id,
+        episode.id,
       )
 
       const encounters =
@@ -900,7 +638,7 @@ export default function DoctorWorkspace({
     }
 
     const trimmed =
-      noteObjective.trim()
+      documentation.progressNoteForm.objective.trim()
 
     documentation.updateProgressNote(
       'objective',
@@ -1081,203 +819,19 @@ Vitals: ${formatted}`
       )}
 
       <div className="doctor-workspace-top">
-        <section
-          className={
-            selectedEpisode
-              ? 'workspace-panel doctor-queue-panel compact'
-              : 'workspace-panel doctor-queue-panel'
-          }
-        >
-          <details
-            open={!selectedEpisode}
-          >
-            <summary className="doctor-queue-summary">
-              <div>
-                <p className="eyebrow">
-                  MY QUEUE
-                </p>
+        <DoctorQueuePanel
+          clinicQueue={clinicQueue}
+          wardQueue={wardQueue}
+          selectedEpisodeId={selectedEpisode?.id ?? null}
+          onSelectQueueItem={(item, source) => {
+            void openDoctorQueueItem(item, source)
+          }}
+        />
 
-                <h2>
-                  Doctor Queue
-                </h2>
-
-                <p>
-                  Patients currently requiring your attention.
-                </p>
-              </div>
-
-              <span>
-                {clinicQueue.length + wardQueue.length}
-              </span>
-            </summary>
-
-            <div className="doctor-queue-sections">
-              <div className="doctor-queue-section">
-                <div className="doctor-queue-section-header">
-                  <strong>
-                    Clinic
-                  </strong>
-
-                  <span>
-                    {clinicQueue.length}
-                  </span>
-                </div>
-
-                {clinicQueue.length === 0 ? (
-                  <p className="doctor-queue-empty">
-                    No patients waiting for assessment.
-                  </p>
-                ) : (
-                  <div className="doctor-queue-list">
-                    {clinicQueue.map(item => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className={
-                          selectedEpisode?.id === item.id
-                            ? 'doctor-queue-item active'
-                            : 'doctor-queue-item'
-                        }
-                        onClick={() =>
-                          void openDoctorQueueItem(
-                            item,
-                            'CLINIC',
-                          )
-                        }
-                      >
-                        <span>
-                          <strong>
-                            {item.patient_name}
-                          </strong>
-
-                          <small>
-                            {item.hospital_number}
-                          </small>
-                        </span>
-
-                        <small>
-                          {item.title}
-                        </small>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="doctor-queue-divider" />
-
-              <div className="doctor-queue-section">
-                <div className="doctor-queue-section-header">
-                  <strong>
-                    Ward
-                  </strong>
-
-                  <span>
-                    {wardQueue.length}
-                  </span>
-                </div>
-
-                {wardQueue.length === 0 ? (
-                  <p className="doctor-queue-empty">
-                    No admitted patients assigned to you.
-                  </p>
-                ) : (
-                  <div className="doctor-queue-list">
-                    {wardQueue.map(item => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className={
-                          selectedEpisode?.id === item.id
-                            ? 'doctor-queue-item active'
-                            : 'doctor-queue-item'
-                        }
-                        onClick={() =>
-                          void openDoctorQueueItem(
-                            item,
-                            'WARD',
-                          )
-                        }
-                      >
-                        <span>
-                          <strong>
-                            {item.patient_name}
-                          </strong>
-
-                          <small>
-                            {item.hospital_number}
-                          </small>
-                        </span>
-
-                        <small>
-                          {item.title}
-                        </small>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </details>
-        </section>
-
-        <section className="workspace-panel doctor-current-encounter">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">
-                CURRENT ENCOUNTER
-              </p>
-
-              <h2>
-                {selectedEncounter
-                  ? selectedEncounter.title
-                  : 'No encounter selected'}
-              </h2>
-
-              <p>
-                {selectedEncounter
-                  ? 'Active clinical encounter.'
-                  : 'Select a patient from your queue to begin.'}
-              </p>
-            </div>
-
-            {selectedEncounter && (
-              <span>
-                {selectedEncounter.status}
-              </span>
-            )}
-          </div>
-
-          {selectedEncounter ? (
-            <div className="doctor-encounter-context">
-              <div>
-                <span>
-                  Episode
-                </span>
-
-                <strong>
-                  {selectedEpisode?.episode_number ?? '—'}
-                </strong>
-              </div>
-
-              <div>
-                <span>
-                  Episode status
-                </span>
-
-                <strong>
-                  {selectedEpisode?.status ?? '—'}
-                </strong>
-              </div>
-            </div>
-          ) : (
-            <div className="doctor-encounter-empty">
-              <p>
-                No encounter selected.
-              </p>
-            </div>
-          )}
-        </section>
+        <DoctorCurrentEncounterCard
+          selectedEncounter={selectedEncounter}
+          selectedEpisode={selectedEpisode}
+        />
       </div>
 
       {selectedEncounter && (
@@ -1303,6 +857,10 @@ Vitals: ${formatted}`
           openHistoricalEncounter={openHistoricalEncounter}
           openHistoricalEpisode={openHistoricalEpisode}
           closeHistoricalViewer={closeHistoricalViewer}
+          onSelectCurrentEncounter={encounter => {
+            closeHistoricalViewer()
+            void openEncounterView(encounter)
+          }}
           nursingEncounter={nursingEncounter}
           nursingDocument={nursingDocument}
           loadingNursingHandoff={loadingNursingHandoff}
@@ -1314,60 +872,6 @@ Vitals: ${formatted}`
           savingProgressNote={savingProgressNote}
           signingProgressNote={signingProgressNote}
           admittingEpisode={admittingEpisode}
-          clerkingComplaint={clerkingComplaint}
-          clerkingComplaintDuration={clerkingComplaintDuration}
-          clerkingHistory={clerkingHistory}
-          clerkingReviewOfSystems={clerkingReviewOfSystems}
-          clerkingPastMedicalHistory={clerkingPastMedicalHistory}
-          clerkingPastSurgicalHistory={clerkingPastSurgicalHistory}
-          clerkingDrugHistory={clerkingDrugHistory}
-          clerkingAllergies={clerkingAllergies}
-          clerkingFamilyHistory={clerkingFamilyHistory}
-          clerkingSocialHistory={clerkingSocialHistory}
-          clerkingPersonalHistory={clerkingPersonalHistory}
-          clerkingIdeas={clerkingIdeas}
-          clerkingConcerns={clerkingConcerns}
-          clerkingExpectations={clerkingExpectations}
-          clerkingExamGeneral={clerkingExamGeneral}
-          clerkingExamCardiovascular={clerkingExamCardiovascular}
-          clerkingExamRespiratory={clerkingExamRespiratory}
-          clerkingExamAbdomen={clerkingExamAbdomen}
-          clerkingExamNeurological={clerkingExamNeurological}
-          clerkingExamMusculoskeletal={clerkingExamMusculoskeletal}
-          clerkingExamGenitourinary={clerkingExamGenitourinary}
-          clerkingExamOther={clerkingExamOther}
-          noteSubjective={noteSubjective}
-          noteObjective={noteObjective}
-          noteWorkingDiagnosis={noteWorkingDiagnosis}
-          noteDifferentials={noteDifferentials}
-          notePlan={notePlan}
-          setClerkingComplaint={setClerkingComplaint}
-          setClerkingComplaintDuration={setClerkingComplaintDuration}
-          setClerkingHistory={setClerkingHistory}
-          setClerkingReviewOfSystems={setClerkingReviewOfSystems}
-          setClerkingPastMedicalHistory={setClerkingPastMedicalHistory}
-          setClerkingPastSurgicalHistory={setClerkingPastSurgicalHistory}
-          setClerkingDrugHistory={setClerkingDrugHistory}
-          setClerkingAllergies={setClerkingAllergies}
-          setClerkingFamilyHistory={setClerkingFamilyHistory}
-          setClerkingSocialHistory={setClerkingSocialHistory}
-          setClerkingPersonalHistory={setClerkingPersonalHistory}
-          setClerkingIdeas={setClerkingIdeas}
-          setClerkingConcerns={setClerkingConcerns}
-          setClerkingExpectations={setClerkingExpectations}
-          setClerkingExamGeneral={setClerkingExamGeneral}
-          setClerkingExamCardiovascular={setClerkingExamCardiovascular}
-          setClerkingExamRespiratory={setClerkingExamRespiratory}
-          setClerkingExamAbdomen={setClerkingExamAbdomen}
-          setClerkingExamNeurological={setClerkingExamNeurological}
-          setClerkingExamMusculoskeletal={setClerkingExamMusculoskeletal}
-          setClerkingExamGenitourinary={setClerkingExamGenitourinary}
-          setClerkingExamOther={setClerkingExamOther}
-          setNoteSubjective={setNoteSubjective}
-          setNoteObjective={setNoteObjective}
-          setNoteWorkingDiagnosis={setNoteWorkingDiagnosis}
-          setNoteDifferentials={setNoteDifferentials}
-          setNotePlan={setNotePlan}
           insertLatestVitals={insertLatestVitals}
           saveProgressNote={saveProgressNote}
           signProgressNote={signProgressNote}
@@ -1419,8 +923,14 @@ Vitals: ${formatted}`
           orderPriority={orderPriority}
           laboratoryTests={laboratoryTests}
           selectedLaboratoryTestIds={selectedLaboratoryTestIds}
+          customLaboratoryInvestigation={
+            customLaboratoryInvestigation
+          }
           diagnosticInvestigations={diagnosticInvestigations}
           selectedDiagnosticInvestigationId={selectedDiagnosticInvestigationId}
+          customDiagnosticInvestigation={
+            customDiagnosticInvestigation
+          }
           orderMedicationId={orderMedicationId}
           orderDose={orderDose}
           prescriptionMedicine={prescriptionMedicine}
@@ -1438,7 +948,13 @@ Vitals: ${formatted}`
           setOrderType={setOrderType}
           setOrderPriority={setOrderPriority}
           handleLaboratoryTestChange={handleLaboratoryTestChange}
+          setCustomLaboratoryInvestigation={
+            setCustomLaboratoryInvestigation
+          }
           handleDiagnosticInvestigationChange={handleDiagnosticInvestigationChange}
+          setCustomDiagnosticInvestigation={
+            setCustomDiagnosticInvestigation
+          }
           setOrderMedicationId={setOrderMedicationId}
           setOrderDose={setOrderDose}
           setPrescriptionMedicine={setPrescriptionMedicine}

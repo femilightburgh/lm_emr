@@ -281,23 +281,33 @@ class ClinicalOrderService:
                 diagnostic_investigation_id = item.get(
                     "diagnostic_investigation_id",
                 )
+                custom_name = item.get("custom_name")
 
-                if (
-                    laboratory_test_id is not None
-                    and diagnostic_investigation_id is not None
-                ):
+                if isinstance(custom_name, str):
+                    custom_name = custom_name.strip()
+                    if not custom_name:
+                        raise ValueError(
+                            "Custom investigation name cannot be empty."
+                        )
+                elif custom_name is not None:
                     raise ValueError(
-                        "A Clinical Order item cannot reference both "
-                        "a laboratory test and a diagnostic investigation."
+                        "Custom investigation name must be text."
                     )
 
-                if (
-                    laboratory_test_id is None
-                    and diagnostic_investigation_id is None
-                ):
+                references = [
+                    value is not None
+                    for value in (
+                        laboratory_test_id,
+                        diagnostic_investigation_id,
+                        custom_name,
+                    )
+                ]
+
+                if sum(references) != 1:
                     raise ValueError(
-                        "A Clinical Order item must reference either "
-                        "a laboratory test or a diagnostic investigation."
+                        "A Clinical Order item must reference exactly one "
+                        "catalogue investigation or provide one custom "
+                        "investigation name."
                     )
 
                 if order_type == ClinicalOrderType.LABORATORY:
@@ -305,6 +315,23 @@ class ClinicalOrderService:
                         raise ValueError(
                             "Laboratory orders can only contain laboratory tests."
                         )
+
+                    if custom_name is not None:
+                        clinical_order_items.append(
+                            ClinicalOrderItem(
+                                item_type=ClinicalOrderItemType.LABORATORY,
+                                status=ClinicalOrderStatus.REQUESTED,
+                                laboratory_test_id=None,
+                                diagnostic_investigation_id=None,
+                                display_order=display_order,
+                                custom_name=custom_name,
+                                details={
+                                    "test_name": custom_name,
+                                    "custom": True,
+                                },
+                            )
+                        )
+                        continue
 
                     laboratory_test = (
                         self.laboratory_test_repository.get_by_id(
@@ -348,6 +375,23 @@ class ClinicalOrderService:
                             "Diagnostic orders can only contain "
                             "diagnostic investigations."
                         )
+
+                    if custom_name is not None:
+                        clinical_order_items.append(
+                            ClinicalOrderItem(
+                                item_type=ClinicalOrderItemType.DIAGNOSTIC,
+                                status=ClinicalOrderStatus.REQUESTED,
+                                laboratory_test_id=None,
+                                diagnostic_investigation_id=None,
+                                display_order=display_order,
+                                custom_name=custom_name,
+                                details={
+                                    "investigation_name": custom_name,
+                                    "custom": True,
+                                },
+                            )
+                        )
+                        continue
 
                     investigation = self.diagnostic_repository.get_investigation(
                         hospital_id=context.hospital_id,

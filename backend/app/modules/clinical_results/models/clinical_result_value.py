@@ -25,10 +25,40 @@ class ClinicalResultValue(BaseEntity):
         index=True,
     )
 
-    analyte_id: Mapped[UUID] = mapped_column(
+    analyte_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("laboratory_test_analytes.id"),
-        nullable=False,
+        nullable=True,
         index=True,
+    )
+
+    custom_analyte_name: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    custom_analyte_code: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    custom_unit: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
+    custom_reference_low: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    custom_reference_high: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    custom_reference_text: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
     )
 
     value_numeric: Mapped[float | None] = mapped_column(
@@ -71,36 +101,48 @@ class ClinicalResultValue(BaseEntity):
     )
 
     @property
-    def analyte_code(self) -> str:
-        return self.analyte.code
+    def analyte_code(self) -> str | None:
+        if self.analyte is not None:
+            return self.analyte.code
+        return self.custom_analyte_code
 
     @property
     def analyte_name(self) -> str:
-        return self.analyte.name
+        if self.analyte is not None:
+            return self.analyte.name
+        return self.custom_analyte_name or "Custom analyte"
 
     @property
     def unit(self) -> str | None:
-        return self.analyte.unit
+        if self.analyte is not None:
+            return self.analyte.unit
+        return self.custom_unit
 
     @property
     def reference_low(self) -> float | None:
-        return (
-            float(self.analyte.reference_low)
-            if self.analyte.reference_low is not None
-            else None
-        )
+        if self.analyte is not None:
+            return (
+                float(self.analyte.reference_low)
+                if self.analyte.reference_low is not None
+                else None
+            )
+        return self.custom_reference_low
 
     @property
     def reference_high(self) -> float | None:
-        return (
-            float(self.analyte.reference_high)
-            if self.analyte.reference_high is not None
-            else None
-        )
+        if self.analyte is not None:
+            return (
+                float(self.analyte.reference_high)
+                if self.analyte.reference_high is not None
+                else None
+            )
+        return self.custom_reference_high
 
     @property
     def reference_text(self) -> str | None:
-        return self.analyte.reference_text
+        if self.analyte is not None:
+            return self.analyte.reference_text
+        return self.custom_reference_text
 
     @property
     def value(self):

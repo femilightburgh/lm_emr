@@ -6,6 +6,8 @@ Grouped Investigation Order Tests
 ==============================================================================
 """
 
+import pytest
+
 from sqlalchemy import select
 
 from app.core.context import RequestContext
@@ -363,3 +365,233 @@ def test_grouped_laboratory_items_can_start_independently(
     }
 
     assert updated_order.status.value == "REQUESTED"
+
+
+def test_custom_laboratory_investigation_can_be_created(db):
+    from tests.laboratory.test_laboratory_router import (
+        create_hospital,
+        create_user,
+    )
+    from tests.clinical_orders.test_router import create_doctor_encounter
+
+    hospital = create_hospital(db)
+
+    doctor_user = create_user(
+        db,
+        hospital=hospital,
+        role_name="Doctor",
+    )
+
+    _, encounter = create_doctor_encounter(
+        db,
+        hospital,
+        doctor_user,
+    )
+
+    context = RequestContext(
+        user_id=doctor_user.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
+    service = build_service(db)
+
+    order = service.create_order(
+        context=context,
+        encounter_id=encounter.id,
+        order_type=ClinicalOrderType.LABORATORY,
+        priority="ROUTINE",
+        details={},
+        items=[
+            {
+                "custom_name": "Serum Magnesium",
+            }
+        ],
+    )
+
+    db.refresh(order)
+
+    assert order.order_type == ClinicalOrderType.LABORATORY
+    assert len(order.items) == 1
+
+    item = order.items[0]
+
+    assert item.item_type == ClinicalOrderItemType.LABORATORY
+    assert item.laboratory_test_id is None
+    assert item.diagnostic_investigation_id is None
+    assert item.custom_name == "Serum Magnesium"
+    assert item.details["test_name"] == "Serum Magnesium"
+    assert item.details["custom"] is True
+
+
+def test_custom_diagnostic_investigation_can_be_created(db):
+    from tests.laboratory.test_laboratory_router import (
+        create_hospital,
+        create_user,
+    )
+    from tests.clinical_orders.test_router import create_doctor_encounter
+
+    hospital = create_hospital(db)
+
+    doctor_user = create_user(
+        db,
+        hospital=hospital,
+        role_name="Doctor",
+    )
+
+    _, encounter = create_doctor_encounter(
+        db,
+        hospital,
+        doctor_user,
+    )
+
+    context = RequestContext(
+        user_id=doctor_user.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
+    service = build_service(db)
+
+    order = service.create_order(
+        context=context,
+        encounter_id=encounter.id,
+        order_type=ClinicalOrderType.DIAGNOSTIC,
+        priority="ROUTINE",
+        details={},
+        items=[
+            {
+                "custom_name": "CT Pulmonary Angiography",
+            }
+        ],
+    )
+
+    db.refresh(order)
+
+    assert order.order_type == ClinicalOrderType.DIAGNOSTIC
+    assert len(order.items) == 1
+
+    item = order.items[0]
+
+    assert item.item_type == ClinicalOrderItemType.DIAGNOSTIC
+    assert item.laboratory_test_id is None
+    assert item.diagnostic_investigation_id is None
+    assert item.custom_name == "CT Pulmonary Angiography"
+    assert item.details["investigation_name"] == (
+        "CT Pulmonary Angiography"
+    )
+    assert item.details["custom"] is True
+
+
+def test_custom_laboratory_investigation_item_can_be_received_and_started(
+    db,
+):
+    from tests.laboratory.test_laboratory_router import (
+        create_hospital,
+        create_user,
+    )
+    from tests.clinical_orders.test_router import create_doctor_encounter
+
+    hospital = create_hospital(db)
+
+    doctor_user = create_user(
+        db,
+        hospital=hospital,
+        role_name="Doctor",
+    )
+
+    _, encounter = create_doctor_encounter(
+        db,
+        hospital,
+        doctor_user,
+    )
+
+    context = RequestContext(
+        user_id=doctor_user.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
+    service = build_service(db)
+
+    order = service.create_order(
+        context=context,
+        encounter_id=encounter.id,
+        order_type=ClinicalOrderType.LABORATORY,
+        priority="ROUTINE",
+        details={},
+        items=[
+            {
+                "custom_name": "Serum Magnesium",
+            }
+        ],
+    )
+
+    item = order.items[0]
+
+    received_order = service.receive_order_item(
+        context=context,
+        order_item_id=item.id,
+    )
+
+    received_item = received_order.items[0]
+
+    assert received_item.status.value == "RECEIVED"
+    assert received_item.custom_name == "Serum Magnesium"
+
+    started_order = service.start_order_item(
+        context=context,
+        order_item_id=item.id,
+    )
+
+    started_item = started_order.items[0]
+
+    assert started_item.status.value == "IN_PROGRESS"
+    assert started_item.custom_name == "Serum Magnesium"
+
+
+def test_custom_investigation_name_cannot_be_whitespace_only(db):
+    from tests.laboratory.test_laboratory_router import (
+        create_hospital,
+        create_user,
+    )
+    from tests.clinical_orders.test_router import create_doctor_encounter
+
+    hospital = create_hospital(db)
+
+    doctor_user = create_user(
+        db,
+        hospital=hospital,
+        role_name="Doctor",
+    )
+
+    _, encounter = create_doctor_encounter(
+        db,
+        hospital,
+        doctor_user,
+    )
+
+    context = RequestContext(
+        user_id=doctor_user.id,
+        hospital_id=hospital.id,
+        permissions=frozenset(),
+    )
+
+    service = build_service(db)
+
+    with pytest.raises(
+        ValueError,
+        match="cannot be empty",
+    ):
+        service.create_order(
+            context=context,
+            encounter_id=encounter.id,
+            order_type=ClinicalOrderType.LABORATORY,
+            priority="ROUTINE",
+            details={},
+            items=[
+                {
+                    "custom_name": "   ",
+                }
+            ],
+        )

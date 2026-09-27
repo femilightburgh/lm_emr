@@ -22,11 +22,12 @@ from contextlib import asynccontextmanager
 import os
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 
 import app.models
+from sqlalchemy import text
 from app.api.router import api_router
 from app.bootstrap.startup import bootstrap_application
 from app.core.config import settings
@@ -156,9 +157,12 @@ def health_db():
         from app.db.session import engine
 
         with engine.connect() as conn:
-            conn.execute("SELECT 1")
+            conn.execute(text("SELECT 1"))
 
         return {"status": "ok", "db": "reachable"}
     except Exception as exc:  # pragma: no cover - runtime check
         logging.getLogger(__name__).exception("DB health check failed")
-        return {"status": "error", "db": "unreachable", "error": str(exc)}
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "error", "db": "unreachable"},
+        ) from exc

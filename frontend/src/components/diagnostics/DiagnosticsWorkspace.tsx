@@ -5,6 +5,7 @@ import {
 } from 'react'
 
 import {
+  type DiagnosticCategory,
   createDiagnosticReport,
   downloadDiagnosticAttachment,
   finalizeDiagnosticReport,
@@ -46,6 +47,73 @@ function getInvestigation(
       item => item.id === value,
     ) ?? null
   )
+}
+
+function getOrderInvestigationName(
+  order: DiagnosticQueueItem | null,
+  investigation: DiagnosticInvestigation | null,
+): string {
+  if (investigation) {
+    return investigation.name
+  }
+
+  if (!order) {
+    return 'Diagnostic Investigation'
+  }
+
+  const investigationName =
+    order.details.investigation_name
+
+  if (typeof investigationName === 'string' &&
+      investigationName.trim()) {
+    return investigationName
+  }
+
+  const studyCode =
+    order.details.study_code
+
+  if (typeof studyCode === 'string' &&
+      studyCode.trim()) {
+    return studyCode.trim()
+  }
+
+  return order.order_type === 'RADIOLOGY'
+    ? 'Radiology Investigation'
+    : 'Diagnostic Investigation'
+}
+
+function getOrderCategory(
+  order: DiagnosticQueueItem | null,
+  investigation: DiagnosticInvestigation | null,
+): DiagnosticCategory | null {
+  if (investigation) {
+    return investigation.category
+  }
+
+  if (
+    order?.order_type === 'RADIOLOGY'
+  ) {
+    return 'RADIOLOGY'
+  }
+
+  const category =
+    order?.details.diagnostic_category
+
+  if (
+    typeof category === 'string' &&
+    [
+      'RADIOLOGY',
+      'CARDIOLOGY',
+      'NEUROPHYSIOLOGY',
+      'RESPIRATORY',
+      'AUDIOLOGY',
+      'ENDOSCOPY',
+    ].includes(category)
+  ) {
+    return category as DiagnosticCategory
+  }
+
+  return null
 }
 
 function getTemplateFields(
@@ -257,16 +325,18 @@ export default function DiagnosticsWorkspace({
     setMeasurements(
       report.measurements ?? {},
     )
-  }, [report?.id])
+  }, [report])
+
+  const reportId = report?.id
 
   useEffect(() => {
-    if (!report) {
+    if (!reportId) {
       return
     }
 
     void listDiagnosticAttachments(
       accessToken,
-      report.id,
+      reportId,
     )
       .then(setAttachments)
       .catch(err => {
@@ -276,7 +346,7 @@ export default function DiagnosticsWorkspace({
             : 'Unable to load attachments.',
         )
       })
-  }, [accessToken, report?.id])
+  }, [accessToken, reportId])
 
   async function handleReceive() {
     if (!selectedOrder) {
@@ -343,9 +413,15 @@ export default function DiagnosticsWorkspace({
       )
     }
 
-    if (!selectedInvestigation) {
+    const category =
+      getOrderCategory(
+        selectedOrder,
+        selectedInvestigation,
+      )
+
+    if (!category) {
       throw new Error(
-        'Investigation definition could not be found.',
+        'Diagnostic category could not be determined.',
       )
     }
 
@@ -354,10 +430,13 @@ export default function DiagnosticsWorkspace({
         accessToken,
         {
           order_id: selectedOrder.id,
-          investigation_id:
-            selectedInvestigation.id,
-          category:
-            selectedInvestigation.category,
+          ...(selectedInvestigation
+            ? {
+                investigation_id:
+                  selectedInvestigation.id,
+              }
+            : {}),
+          category,
           findings,
           impression,
           interpretation,
@@ -599,11 +678,10 @@ export default function DiagnosticsWorkspace({
                   }
                 >
                   <strong>
-                    {investigation?.name ??
-                      String(
-                        order.details.investigation_name ??
-                          'Diagnostic Investigation',
-                      )}
+                    {getOrderInvestigationName(
+                      order,
+                      investigation,
+                    )}
                   </strong>
 
                   <span>
@@ -650,20 +728,20 @@ export default function DiagnosticsWorkspace({
                 <div>
                   <span>Investigation</span>
                   <strong>
-                    {selectedInvestigation?.name ??
-                      'Diagnostic Investigation'}
+                    {getOrderInvestigationName(
+                      selectedOrder,
+                      selectedInvestigation,
+                    )}
                   </strong>
                 </div>
 
                 <div>
                   <span>Category</span>
                   <strong>
-                    {selectedInvestigation?.category ??
-                      String(
-                        selectedOrder.details
-                          .diagnostic_category ??
-                          '',
-                      )}
+                    {getOrderCategory(
+                      selectedOrder,
+                      selectedInvestigation,
+                    ) ?? '—'}
                   </strong>
                 </div>
 
@@ -722,8 +800,10 @@ export default function DiagnosticsWorkspace({
                       </span>
 
                       <h2>
-                        {selectedInvestigation?.name ??
-                          'Diagnostic Report'}
+                        {getOrderInvestigationName(
+                          selectedOrder,
+                          selectedInvestigation,
+                        )}
                       </h2>
                     </div>
 

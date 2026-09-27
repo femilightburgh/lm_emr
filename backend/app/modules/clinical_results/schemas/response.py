@@ -30,9 +30,16 @@ class ClinicalResultValueResponse(BaseModel):
     id: UUID
     clinical_result_id: UUID
 
-    analyte_id: UUID
-    analyte_code: str
+    analyte_id: UUID | None
+    analyte_code: str | None
     analyte_name: str
+
+    custom_analyte_name: str | None
+    custom_analyte_code: str | None
+    custom_unit: str | None
+    custom_reference_low: float | None
+    custom_reference_high: float | None
+    custom_reference_text: str | None
 
     value: float | str | bool | None
 

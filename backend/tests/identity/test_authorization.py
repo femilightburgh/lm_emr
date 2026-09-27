@@ -29,14 +29,17 @@ authorization dependencies instead of bypassing them.
 ========================================================================
 """
 
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.core.context.provider import RequestContextProvider
 from app.db.session import get_db
 from app.main import app
+from app.core.security.authorization_repository import AuthorizationRepository
 from app.modules.identity.auth_service import AuthService
 from app.modules.identity.repository import IdentityRepository
 from app.modules.identity.role_permission_repository import (
@@ -50,6 +53,8 @@ from app.modules.identity.user_service import UserService
 from app.modules.identity.models import (
     Permission,
     Role,
+    UserAccount,
+    UserRole,
 )
 from app.modules.identity.permission_repository import (
     PermissionRepository,
@@ -1593,3 +1598,149 @@ def test_staff_activation_completes_onboarding(
     )
 
     assert reuse_response.status_code == 400
+
+# ============================================================================
+# Tenant and Expiry Authorization Regression Tests
+# ============================================================================
+
+
+def _assign_permission_to_role(db, role_id, permission_code):
+    service = RolePermissionService(
+        repository=RolePermissionRepository(db),
+        permission_repository=PermissionRepository(db),
+    )
+    service.assign_permission(
+        role_id=role_id,
+        permission_code=permission_code,
+    )
+    db.commit()
+
+
+def test_cross_hospital_role_assignment_grants_no_access(db):
+    """
+    A malformed cross-hospital UserRole assignment must not grant
+    role or permission access through any effective-permission path.
+    """
+    hospital_one = create_hospital(
+        db, code=f"AUTHZ-XA-{uuid4().hex[:6].upper()}"
+    )
+    hospital_two = create_hospital(
+        db, code=f"AUTHZ-XB-{uuid4().hex[:6].upper()}"
+    )
+
+    user = create_user(
+        db,
+        hospital=hospital_one,
+        email=f"cross-user-{uuid4().hex[:8]}@example.com",
+        role_name="Receptionist",
+    )
+
+    foreign_role = create_role(
+        db,
+        hospital=hospital_two,
+        name=f"ForeignRole-{uuid4().hex[:8]}",
+        description="Cross-hospital authorization regression role",
+    )
+
+    _assign_permission_to_role(db, foreign_role.id, "vitals.create")
+
+    # Deliberately create an invalid cross-hospital assignment to verify
+    # runtime defenses even if bad data enters the database.
+    db.add(
+        UserRole(
+            user_account_id=user.id,
+            role_id=foreign_role.id,
+            is_active=True,
+        )
+    )
+    db.commit()
+    db.expire_all()
+
+    identity_repository = IdentityRepository(db)
+    authorization_repository = AuthorizationRepository(db)
+
+    assert not authorization_repository.role_exists_for_user(
+        user_id=user.id,
+        role_name=foreign_role.name,
+    )
+    assert not authorization_repository.permission_exists_for_user(
+        user_id=user.id,
+        permission_code="vitals.create",
+    )
+
+    assert foreign_role.name not in identity_repository.get_user_role_names(
+        user.id
+    )
+    assert not identity_repository.user_has_role(
+        user_id=user.id,
+        role_name=foreign_role.name,
+    )
+    assert "vitals.create" not in identity_repository.get_user_permission_codes(
+        user.id
+    )
+
+    reloaded_user = db.get(UserAccount, user.id)
+    assert reloaded_user is not None
+    context = RequestContextProvider().build(user=reloaded_user)
+    assert "vitals.create" not in context.permissions
+
+
+def test_expired_role_assignment_grants_no_permission(db):
+    """
+    An expired role assignment must not grant permissions through
+    authorization queries or request-context construction.
+    """
+    hospital = create_hospital(
+        db, code=f"AUTHZ-EX-{uuid4().hex[:8].upper()}"
+    )
+
+    user = create_user(
+        db,
+        hospital=hospital,
+        email=f"expired-user-{uuid4().hex[:8]}@example.com",
+        role_name="Receptionist",
+    )
+
+    role = create_role(
+        db,
+        hospital=hospital,
+        name=f"ExpiredRole-{uuid4().hex[:8]}",
+        description="Expired authorization regression role",
+    )
+
+    _assign_permission_to_role(db, role.id, "vitals.create")
+
+    assignment = UserRole(
+        user_account_id=user.id,
+        role_id=role.id,
+        is_active=True,
+        expires_at=datetime.now(UTC) - timedelta(minutes=5),
+    )
+    db.add(assignment)
+    db.commit()
+    db.expire_all()
+
+    identity_repository = IdentityRepository(db)
+    authorization_repository = AuthorizationRepository(db)
+
+    assert not authorization_repository.role_exists_for_user(
+        user_id=user.id,
+        role_name=role.name,
+    )
+    assert not authorization_repository.permission_exists_for_user(
+        user_id=user.id,
+        permission_code="vitals.create",
+    )
+
+    assert not identity_repository.user_has_role(
+        user_id=user.id,
+        role_name=role.name,
+    )
+    assert "vitals.create" not in identity_repository.get_user_permission_codes(
+        user.id
+    )
+
+    reloaded_user = db.get(UserAccount, user.id)
+    assert reloaded_user is not None
+    context = RequestContextProvider().build(user=reloaded_user)
+    assert "vitals.create" not in context.permissions

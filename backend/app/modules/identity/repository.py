@@ -16,6 +16,8 @@ HTTP concerns belong in routers.
 ========================================================================
 """
 
+from datetime import UTC, datetime
+from sqlalchemy import and_, or_
 from uuid import UUID
 
 from sqlalchemy import select
@@ -412,6 +414,11 @@ class IdentityRepository:
             )
             .where(
                 UserRole.user_account_id == user_id,
+                Role.hospital_id == (
+                    select(UserAccount.hospital_id)
+                    .where(UserAccount.id == user_id)
+                    .scalar_subquery()
+                ),
             )
         )
 
@@ -438,6 +445,15 @@ class IdentityRepository:
             .where(
                 UserRole.user_account_id == user_id,
                 UserRole.is_active.is_(True),
+                or_(
+                    UserRole.expires_at.is_(None),
+                    UserRole.expires_at > datetime.now(UTC),
+                ),
+                Role.hospital_id == (
+                    select(UserAccount.hospital_id)
+                    .where(UserAccount.id == user_id)
+                    .scalar_subquery()
+                ),
                 Role.name == role_name,
             )
         )
@@ -475,6 +491,15 @@ class IdentityRepository:
             .where(
                 UserRole.user_account_id == user_id,
                 UserRole.is_active.is_(True),
+                or_(
+                    UserRole.expires_at.is_(None),
+                    UserRole.expires_at > datetime.now(UTC),
+                ),
+                Role.hospital_id == (
+                    select(UserAccount.hospital_id)
+                    .where(UserAccount.id == user_id)
+                    .scalar_subquery()
+                ),
             )
             .distinct()
         )

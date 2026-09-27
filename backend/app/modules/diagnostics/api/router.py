@@ -52,6 +52,15 @@ from app.modules.diagnostics.services import (
 from app.modules.episode.repositories.episode_repository import (
     EpisodeRepository,
 )
+from app.modules.episode.services.episode_clinical_workflow_service import (
+    EpisodeClinicalWorkflowService,
+)
+from app.modules.encounter.repositories.encounter_repository import (
+    EncounterRepository,
+)
+from app.modules.encounter.services.encounter_service import (
+    EncounterService,
+)
 from app.modules.events.repositories import (
     ClinicalEventRepository,
 )
@@ -87,6 +96,16 @@ def get_diagnostic_service(
         ),
         storage=LocalStorage(
             settings.storage_path,
+        ),
+        episode_clinical_workflow_service=(
+            EpisodeClinicalWorkflowService(
+                clinical_order_repository=ClinicalOrderRepository(db),
+                encounter_service=EncounterService(
+                    repository=EncounterRepository(db),
+                    episode_repository=EpisodeRepository(db),
+                    staff_repository=StaffRepository(db),
+                ),
+            )
         ),
     )
 

@@ -170,3 +170,39 @@ def list_encounter_vitals(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Encounter not found.",
         ) from exc
+
+# ============================================================================
+# List Episode Vitals
+# ============================================================================
+
+
+@router.get(
+    "/episodes/{episode_id}",
+    response_model=list[VitalsResponse],
+    summary="List Episode Vitals",
+)
+def list_episode_vitals(
+    episode_id: UUID,
+    context: RequestContext = Depends(
+        get_request_context,
+    ),
+    service: VitalsService = Depends(
+        get_vitals_service,
+    ),
+):
+    """
+    Return all recorded vital-sign observations across every
+    Encounter belonging to an Episode.
+    """
+
+    events = service.list_episode_vitals(
+        context=context,
+        episode_id=episode_id,
+    )
+
+    return [
+        VitalsResponse.model_validate(
+            event,
+        )
+        for event in events
+    ]

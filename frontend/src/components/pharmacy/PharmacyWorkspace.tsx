@@ -322,7 +322,7 @@ export default function PharmacyWorkspace({
       selectedItem.quantity ?? '',
     )
     setDispenseNotes('')
-  }, [selectedId])
+  }, [selectedItem])
 
 
   const counts = {

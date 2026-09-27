@@ -167,3 +167,32 @@ class VitalsService:
             for event in events
             if event.event_type == EventType.VITALS_RECORDED
         ]
+
+    # ------------------------------------------------------------------
+    # List Episode Vitals
+    # ------------------------------------------------------------------
+
+    def list_episode_vitals(
+        self,
+        *,
+        context: RequestContext,
+        episode_id: UUID,
+    ) -> list[ClinicalEvent]:
+        """
+        Return all VITALS_RECORDED events belonging to an Episode
+        within the authenticated Hospital.
+
+        Observations from every Encounter in the Episode are included
+        and returned in clinical occurrence order.
+        """
+
+        events = self.event_service.list_episode_events(
+            context=context,
+            episode_id=episode_id,
+        )
+
+        return [
+            event
+            for event in events
+            if event.event_type == EventType.VITALS_RECORDED
+        ]

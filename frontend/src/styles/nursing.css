@@ -1993,593 +1993,9 @@
   color: #17212b;
 }
 
-/* ----------------------------- PHARMACY -------------------------------- */
-
-.pharmacy-workspace {
-  background: #f3f6f8;
-}
-
-.pharmacy-command-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 62px;
-  padding: 9px 20px;
-  background: #fff;
-  border-bottom: 1px solid #dce5e9;
-}
-
-.pharmacy-command-header h1 {
-  font-size: 18px;
-  color: #17212b;
-}
-
-.pharmacy-command-header p:not(.eyebrow) {
-  margin-top: 3px;
-  font-size: 9px;
-  color: #667783;
-}
-
-.pharmacy-command-header .secondary-button {
-  min-height: 31px;
-  border-radius: 6px;
-  font-size: 8px;
-}
-
-.pharmacy-message {
-  margin: 8px 20px;
-}
-
-.pharmacy-metrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0,1fr));
-  gap: 8px;
-  margin: 8px 20px;
-}
-
-.pharmacy-metric {
-  min-height: 60px;
-  padding: 9px 12px;
-  border: 1px solid #d9e3e8;
-  border-radius: 9px;
-  background: #fff;
-}
-
-.pharmacy-metric strong {
-  display: block;
-  font-size: 20px;
-  line-height: 1;
-  color: #17212b;
-}
-
-.pharmacy-metric span {
-  display: block;
-  margin-top: 6px;
-  font-size: 8px;
-  font-weight: 800;
-  color: #667783;
-  text-transform: uppercase;
-  letter-spacing: .045em;
-}
-
-.pharmacy-metric-primary {
-  border-left: 3px solid #315d73;
-}
-
-.pharmacy-workbench {
-  display: grid;
-  grid-template-columns: minmax(350px,.72fr) minmax(0,1.75fr);
-  gap: 8px;
-  margin: 0 20px 20px;
-  align-items: start;
-}
-
-.pharmacy-queue-panel,
-.pharmacy-detail-panel {
-  min-width: 0;
-  border: 1px solid #d9e3e8;
-  border-radius: 9px;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(23,33,43,.03);
-}
-
-.pharmacy-queue-panel {
-  position: sticky;
-  top: 8px;
-  max-height: calc(100vh - 145px);
-  overflow: auto;
-}
-
-.pharmacy-queue-header {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 13px;
-  background: rgba(255,255,255,.97);
-  border-bottom: 1px solid #e6ecef;
-  backdrop-filter: blur(8px);
-}
-
-.pharmacy-queue-header h2 {
-  margin-top: 2px;
-  font-size: 14px;
-  color: #17212b;
-}
-
-.pharmacy-queue-count {
-  min-width: 26px;
-  height: 26px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: #eaf2f5;
-  color: #315d73;
-  font-size: 9px;
-  font-weight: 900;
-}
-
-.pharmacy-queue-tools {
-  padding: 9px;
-  border-bottom: 1px solid #edf1f3;
-  background: #fbfcfc;
-}
-
-.pharmacy-queue-tools > input {
-  width: 100%;
-  min-height: 33px;
-  padding: 0 10px;
-  border: 1px solid #ccdbe2;
-  border-radius: 6px;
-  font-size: 9px;
-  outline: none;
-}
-
-.pharmacy-queue-tools > input:focus {
-  border-color: #315d73;
-  box-shadow: 0 0 0 2px #eaf2f5;
-}
-
-.pharmacy-filter-row {
-  display: flex;
-  gap: 4px;
-  margin-top: 7px;
-  overflow-x: auto;
-}
-
-.pharmacy-filter-row button {
-  flex: 0 0 auto;
-  min-height: 26px;
-  padding: 0 8px;
-  border: 1px solid #d8e2e6;
-  border-radius: 999px;
-  background: #fff;
-  color: #657681;
-  font-size: 7px;
-  font-weight: 900;
-}
-
-.pharmacy-filter-row button.active {
-  border-color: #bcd2dc;
-  background: #eaf2f5;
-  color: #315d73;
-}
-
-.pharmacy-queue-row {
-  width: 100%;
-  min-height: 57px;
-  display: grid;
-  grid-template-columns: minmax(0,1fr) auto;
-  gap: 8px;
-  align-items: center;
-  padding: 8px 10px;
-  border: 0;
-  border-bottom: 1px solid #edf1f3;
-  background: #fff;
-  text-align: left;
-  cursor: pointer;
-}
-
-.pharmacy-queue-row:hover {
-  background: #f8fafb;
-}
-
-.pharmacy-queue-row.active {
-  background: #eaf2f5;
-  box-shadow: inset 3px 0 0 #315d73;
-}
-
-.pharmacy-queue-row-main {
-  min-width: 0;
-}
-
-.pharmacy-queue-row-main strong {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 9px;
-  color: #17212b;
-}
-
-.pharmacy-queue-row-main small {
-  display: block;
-  margin-top: 3px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 7px;
-  color: #71818b;
-}
-
-.pharmacy-queue-row-side {
-  display: grid;
-  justify-items: end;
-  gap: 3px;
-}
-
-.pharmacy-queue-row-side > span {
-  font-size: 6px;
-  font-weight: 900;
-  color: #82909a;
-  text-transform: uppercase;
-}
-
-.pharmacy-queue-row-side em {
-  padding: 3px 6px;
-  border: 1px solid #d5e0e5;
-  border-radius: 999px;
-  background: #fff;
-  color: #60737e;
-  font-size: 6px;
-  font-style: normal;
-  font-weight: 800;
-}
-
-.pharmacy-empty-state {
-  padding: 25px 14px;
-  text-align: center;
-  color: #7a8992;
-  font-size: 9px;
-}
-
-/* Pharmacy detail */
-.pharmacy-detail-panel {
-  min-height: calc(100vh - 145px);
-  overflow: hidden;
-}
-
-.pharmacy-detail-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 15px;
-  padding: 14px 16px;
-  background: #fbfcfc;
-  border-bottom: 1px solid #e2e9ec;
-}
-
-.pharmacy-detail-header h2 {
-  margin-top: 3px;
-  font-size: 17px;
-  color: #17212b;
-}
-
-.pharmacy-detail-header p:not(.eyebrow) {
-  margin-top: 3px;
-  font-size: 9px;
-  color: #657681;
-}
-
-.pharmacy-status-badge {
-  padding: 5px 8px;
-  border: 1px solid #cbdde4;
-  border-radius: 999px;
-  background: #eaf2f5;
-  color: #315d73;
-  font-size: 7px;
-  font-weight: 900;
-  white-space: nowrap;
-}
-
-.pharmacy-patient-context {
-  display: grid;
-  grid-template-columns: repeat(4,minmax(0,1fr));
-  gap: 6px;
-  padding: 9px 16px;
-  border-bottom: 1px solid #e7edef;
-}
-
-.pharmacy-patient-context > div {
-  min-width: 0;
-  padding: 7px 8px;
-  border: 1px solid #e1e8eb;
-  border-radius: 6px;
-  background: #fff;
-}
-
-.pharmacy-patient-context span,
-.pharmacy-prescription-grid span,
-.pharmacy-directions > span {
-  display: block;
-  font-size: 6px;
-  font-weight: 900;
-  color: #84919a;
-  text-transform: uppercase;
-  letter-spacing: .045em;
-}
-
-.pharmacy-patient-context strong {
-  display: block;
-  margin-top: 3px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 8px;
-  color: #263944;
-}
-
-.pharmacy-patient-context small {
-  display: block;
-  margin-top: 2px;
-  font-size: 7px;
-  color: #75848d;
-}
-
-.pharmacy-prescription-card,
-.pharmacy-lifecycle,
-.pharmacy-action-panel {
-  margin: 9px 16px;
-  border: 1px solid #dfe7ea;
-  border-radius: 8px;
-  background: #fff;
-}
-
-.pharmacy-section-heading {
-  padding: 10px 12px;
-  border-bottom: 1px solid #e8edef;
-}
-
-.pharmacy-section-heading h3 {
-  margin-top: 2px;
-  font-size: 11px;
-  color: #253742;
-}
-
-.pharmacy-prescription-grid {
-  display: grid;
-  grid-template-columns: repeat(3,minmax(0,1fr));
-  gap: 0;
-}
-
-.pharmacy-prescription-grid > div {
-  min-height: 49px;
-  padding: 9px 11px;
-  border-right: 1px solid #edf1f3;
-  border-bottom: 1px solid #edf1f3;
-}
-
-.pharmacy-prescription-grid strong {
-  display: block;
-  margin-top: 5px;
-  font-size: 9px;
-  color: #263944;
-}
-
-.pharmacy-directions {
-  padding: 9px 11px;
-}
-
-.pharmacy-directions p {
-  margin-top: 5px;
-  font-size: 9px;
-  line-height: 1.5;
-  color: #526570;
-}
-
-.pharmacy-lifecycle-steps {
-  display: grid;
-  grid-template-columns: repeat(4,1fr);
-  padding: 11px 12px;
-  gap: 5px;
-}
-
-.pharmacy-lifecycle-step {
-  position: relative;
-  display: grid;
-  justify-items: center;
-  gap: 5px;
-  text-align: center;
-  color: #8a979e;
-}
-
-.pharmacy-lifecycle-step span {
-  width: 23px;
-  height: 23px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  border: 1px solid #d9e2e6;
-  background: #fff;
-  font-size: 7px;
-  font-weight: 900;
-}
-
-.pharmacy-lifecycle-step strong {
-  font-size: 7px;
-}
-
-.pharmacy-lifecycle-step.current span {
-  border-color: #315d73;
-  background: #315d73;
-  color: #fff;
-}
-
-.pharmacy-lifecycle-step.current strong,
-.pharmacy-lifecycle-step.complete strong {
-  color: #315d73;
-}
-
-.pharmacy-lifecycle-step.complete span {
-  border-color: #bcd2dc;
-  background: #eaf2f5;
-  color: #315d73;
-}
-
-.pharmacy-action-panel {
-  padding: 11px 12px;
-}
-
-.pharmacy-action-panel > div:first-child h3,
-.pharmacy-dispense-area > div:first-child h3 {
-  margin-top: 2px;
-  font-size: 12px;
-  color: #253742;
-}
-
-.pharmacy-action-panel > div:first-child p:not(.eyebrow),
-.pharmacy-dispense-area > div:first-child p:not(.eyebrow) {
-  margin-top: 4px;
-  font-size: 8px;
-  color: #657681;
-}
-
-.pharmacy-primary-action {
-  min-height: 34px;
-  margin-top: 10px;
-  border-radius: 6px;
-  font-size: 8px;
-  font-weight: 900;
-}
-
-.pharmacy-dispense-area {
-  display: grid;
-  grid-template-columns: minmax(180px,.65fr) minmax(260px,1.35fr) auto;
-  align-items: end;
-  gap: 12px;
-}
-
-.pharmacy-dispense-fields {
-  display: grid;
-  grid-template-columns: .7fr 1.3fr;
-  gap: 7px;
-}
-
-.pharmacy-dispense-fields label {
-  display: grid;
-  gap: 4px;
-}
-
-.pharmacy-dispense-fields label span {
-  font-size: 7px;
-  font-weight: 800;
-  color: #657681;
-}
-
-.pharmacy-dispense-fields input,
-.pharmacy-dispense-fields textarea {
-  width: 100%;
-  border: 1px solid #ccdbe2;
-  border-radius: 6px;
-  padding: 7px 8px;
-  font-size: 8px;
-  outline: none;
-}
-
-.pharmacy-detail-empty {
-  min-height: calc(100vh - 145px);
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 6px;
-  color: #7a8992;
-}
-
-.pharmacy-detail-empty strong {
-  color: #344853;
-  font-size: 12px;
-}
-
-.pharmacy-detail-empty span {
-  font-size: 9px;
-}
-
-/* --------------------------- DOCTOR REFINEMENT -------------------------- */
-
-.doctor-workspace .doctor-tab-content {
-  margin-top: 0;
-}
-
-.doctor-workspace .doctor-overview-grid {
-  grid-template-columns: minmax(0,1.25fr) minmax(320px,.75fr);
-  gap: 8px;
-  margin: 8px 20px 0;
-}
-
-.doctor-workspace .doctor-overview-grid > .doctor-vitals-section {
-  margin: 0;
-}
-
-.doctor-workspace .doctor-overview-grid > .workspace-panel,
-.doctor-workspace .doctor-overview-grid > section {
-  min-width: 0;
-}
-
-.doctor-workspace .doctor-overview-grid .workspace-panel {
-  min-height: 0;
-}
-
-.doctor-workspace .doctor-overview-grid .doctor-timeline-panel {
-  grid-column: 1 / -1;
-}
-
-.doctor-workspace .doctor-completion,
-.doctor-workspace .doctor-completion-panel {
-  margin-top: 8px;
-}
-
-/* Remove forced blankness from common empty/summary panels. */
-.doctor-workspace .doctor-assessment-empty {
-  min-height: 90px;
-}
-
-.doctor-workspace .doctor-recorded-diagnoses {
-  max-height: 190px;
-}
-
-.doctor-workspace .doctor-vitals-section .doctor-vitals-panel {
-  min-height: 0;
-}
-
-/* -------------------------- LABORATORY REFINEMENT ----------------------- */
-
-.laboratory-workspace .laboratory-investigation-header {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-}
-
-.laboratory-workspace .laboratory-result-form {
-  max-width: none;
-}
-
 /* ----------------------------- RESPONSIVE ------------------------------- */
 
 @media (max-width: 1050px) {
-  .pharmacy-workbench {
-    grid-template-columns: minmax(300px,.8fr) minmax(0,1.4fr);
-  }
-
-  .pharmacy-patient-context {
-    grid-template-columns: repeat(2,minmax(0,1fr));
-  }
-
-  .pharmacy-dispense-area {
-    grid-template-columns: 1fr;
-  }
-
   .nursing-workload-metrics {
     grid-template-columns: repeat(2,minmax(0,1fr));
   }
@@ -2590,35 +2006,6 @@
 }
 
 @media (max-width: 800px) {
-  .pharmacy-workbench {
-    grid-template-columns: 1fr;
-    margin-left: 12px;
-    margin-right: 12px;
-  }
-
-  .pharmacy-metrics {
-    margin-left: 12px;
-    margin-right: 12px;
-  }
-
-  .pharmacy-command-header {
-    padding-left: 12px;
-    padding-right: 12px;
-  }
-
-  .pharmacy-queue-panel {
-    position: static;
-    max-height: 420px;
-  }
-
-  .pharmacy-detail-panel {
-    min-height: auto;
-  }
-
-  .pharmacy-detail-empty {
-    min-height: 280px;
-  }
-
   .nursing-command-centre {
     padding-left: 12px;
     padding-right: 12px;
@@ -2640,35 +2027,9 @@
     grid-column: 2;
     grid-row: 1 / span 2;
   }
-
-  .doctor-workspace .doctor-overview-grid {
-    grid-template-columns: 1fr;
-    margin-left: 12px;
-    margin-right: 12px;
-  }
-
-  .doctor-workspace .doctor-overview-grid .doctor-timeline-panel {
-    grid-column: auto;
-  }
 }
 
 @media (max-width: 560px) {
-  .pharmacy-metrics {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .pharmacy-patient-context {
-    grid-template-columns: 1fr;
-  }
-
-  .pharmacy-prescription-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .pharmacy-dispense-fields {
-    grid-template-columns: 1fr;
-  }
-
   .nursing-workload-metrics {
     grid-template-columns: 1fr 1fr;
   }
@@ -2682,7 +2043,8 @@
 /* ==========================================================================
    Nursing v6 — patient clinical cockpit
    ========================================================================== */
-.nursing-patient-cockpit {
+
+nursing-patient-cockpit {
   margin: 18px 0 24px;
   border: 1px solid #dbe4ea;
   border-radius: 12px;
@@ -2934,4 +2296,258 @@
     grid-row: auto;
   }
 
+}
+
+/* ==========================================================================
+   Nursing clinical continuity
+   ========================================================================== */
+
+.nursing-recorded-vitals {
+  margin-top: 20px;
+}
+
+.nursing-recorded-vitals .section-heading {
+  margin-bottom: 14px;
+}
+
+.nursing-clinical-summary {
+  margin-top: 20px;
+}
+
+.nursing-clinical-summary-meta {
+  margin-top: -4px;
+  margin-bottom: 18px;
+  color: var(--lm-color-text-muted);
+  font-size: var(--lm-font-size-sm);
+}
+
+.nursing-clinical-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.nursing-clinical-summary-group {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--lm-color-border-subtle);
+  border-radius: var(--lm-radius-md);
+  background: var(--lm-color-surface-subtle);
+}
+
+.nursing-clinical-summary-group > .eyebrow {
+  margin: 0 0 2px;
+}
+
+.nursing-clinical-summary-wide {
+  grid-column: 1 / -1;
+}
+
+.nursing-clinical-summary-field {
+  display: grid;
+  gap: 4px;
+}
+
+.nursing-clinical-summary-field span {
+  color: var(--lm-color-text-muted);
+  font-size: var(--lm-font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.nursing-clinical-summary-field strong {
+  color: var(--lm-color-text);
+  font-size: var(--lm-font-size-md);
+  font-weight: 500;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 700px) {
+  .nursing-clinical-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .nursing-clinical-summary-wide {
+    grid-column: auto;
+  }
+}
+
+
+
+/* ==========================================================================
+   Nursing historical assessment document
+   ========================================================================== */
+
+.nursing-history-visit {
+  margin: 0;
+}
+
+.nursing-history-visit + .nursing-history-visit {
+  margin-top: 10px;
+}
+
+.nursing-history-visit > summary {
+  list-style: none;
+}
+
+.nursing-history-visit > summary::-webkit-details-marker {
+  display: none;
+}
+
+.nursing-history-visit-body {
+  padding: 10px 0 4px;
+}
+
+.nursing-history-document {
+  margin: 0;
+  border: 1px solid #e1e8ed;
+  border-radius: 8px;
+  background: #fbfcfd;
+  overflow: hidden;
+}
+
+.nursing-history-document + .nursing-history-document {
+  margin-top: 8px;
+}
+
+.nursing-history-document-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.nursing-history-document-summary::-webkit-details-marker {
+  display: none;
+}
+
+.nursing-history-document-title {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.nursing-history-document-title strong {
+  color: #263844;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.nursing-history-document-title small {
+  color: #71818c;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.nursing-history-document-title > span {
+  overflow: hidden;
+  color: #42525d;
+  font-size: 10px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nursing-history-document-action {
+  flex: 0 0 auto;
+  color: #285d78;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.nursing-history-document[open] .nursing-history-document-action {
+  color: #71818c;
+}
+
+.nursing-history-document-body {
+  padding: 0 12px 14px;
+  border-top: 1px solid #e8edf0;
+}
+
+.nursing-history-document-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 0;
+  border-bottom: 1px solid #edf1f3;
+}
+
+.nursing-history-document-meta span {
+  padding: 4px 7px;
+  border: 1px solid #dfe7ec;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #61727d;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.nursing-history-clinical-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.nursing-history-clinical-group {
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid #e5ebef;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.nursing-history-clinical-group > .eyebrow {
+  margin: 0 0 9px;
+}
+
+.nursing-history-clinical-group > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.nursing-history-clinical-group > div + div {
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid #edf1f3;
+}
+
+.nursing-history-clinical-group > div > span {
+  color: #7a8993;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.nursing-history-clinical-group > div > strong {
+  display: block;
+  margin: 0;
+  color: #263844;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.nursing-history-clinical-wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 900px) {
+  .nursing-history-clinical-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .nursing-history-clinical-wide {
+    grid-column: auto;
+  }
 }

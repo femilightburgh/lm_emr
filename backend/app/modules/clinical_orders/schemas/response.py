@@ -66,6 +66,8 @@ class ClinicalOrderItemResponse(BaseModel):
 
     diagnostic_investigation_id: UUID | None
 
+    custom_name: str | None
+
     display_order: int
 
     details: dict[str, Any]

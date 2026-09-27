@@ -69,71 +69,36 @@ router = APIRouter(
 # ============================================================================
 
 
-@router.post(
-    "/users",
-    response_model=UserResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Create a user",
-)
-def create_user(
-    request: CreateUserRequest,
-    db: Session = Depends(get_db),
-):
-    """
-    Create a new user account and assign an initial role.
-    """
-
-    repository = IdentityRepository(db)
-
-    service = UserService(
-        repository,
-    )
-
-    user = service.create_user(
-        hospital_code=request.hospital_code,
-        email=request.email,
-        password=request.password,
-        role_name=request.role_name,
-    )
-
-    repository.save()
-    repository.refresh(user)
-
-    return UserResponse.model_validate(
-        user,
-    )
+# ============================================================================
+# User Activation
+# ============================================================================
 
 
 @router.post(
     "/activate",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Activate a user account",
+    summary="Activate a pending user account",
 )
 def activate_user(
     request: ActivateUserRequest,
     db: Session = Depends(get_db),
 ):
     """
-    Activate a pending user account using a valid invitation.
+    Activate a pending account using a valid invitation token.
     """
 
     repository = IdentityRepository(db)
-
-    service = InvitationService(
-        repository=repository,
-    )
+    service = InvitationService(repository)
 
     try:
         service.activate_user(
             token=request.token,
             password=request.password,
         )
-
         db.commit()
 
     except InvalidInvitationError as exc:
         db.rollback()
-
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
@@ -141,7 +106,6 @@ def activate_user(
 
     except ExpiredInvitationError as exc:
         db.rollback()
-
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
@@ -149,11 +113,11 @@ def activate_user(
 
     except InvitationAlreadyUsedError as exc:
         db.rollback()
-
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+
 
 # ============================================================================
 # Login

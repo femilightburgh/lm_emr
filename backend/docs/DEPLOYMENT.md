@@ -12,9 +12,8 @@ docker push myrepo/lm_emr:latest
 2. Run database migrations (using Alembic) as a separate step before switching traffic:
 
 ```bash
-# Run from a machine with DB access and alembic configured
-cd backend
-alembic upgrade head
+# Run from backend/ with production environment variables configured
+docker compose -f docker-compose.prod.yml run --rm api alembic upgrade head
 ```
 
 3. Health checks

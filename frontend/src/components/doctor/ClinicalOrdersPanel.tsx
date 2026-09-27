@@ -34,9 +34,11 @@ interface Props {
 
   laboratoryTests: LaboratoryTest[]
   selectedLaboratoryTestIds: string[]
+  customLaboratoryInvestigation: string
 
   diagnosticInvestigations: DiagnosticInvestigation[]
   selectedDiagnosticInvestigationId: string
+  customDiagnosticInvestigation: string
 
   orderMedicationId: string
   orderDose: string
@@ -75,10 +77,15 @@ interface Props {
     value: string,
   ) => void
 
-
-
+  onCustomLaboratoryInvestigationChange: (
+    value: string,
+  ) => void
 
   onDiagnosticInvestigationChange: (
+    value: string,
+  ) => void
+
+  onCustomDiagnosticInvestigationChange: (
     value: string,
   ) => void
 onOrderTestCodeChange?: (
@@ -383,10 +390,11 @@ export default function ClinicalOrdersPanel({
 
   laboratoryTests,
   selectedLaboratoryTestIds,
-
+  customLaboratoryInvestigation,
 
   diagnosticInvestigations,
   selectedDiagnosticInvestigationId,
+  customDiagnosticInvestigation,
   orderDose,
 
   prescriptionMedicine,
@@ -409,7 +417,9 @@ export default function ClinicalOrdersPanel({
   onOrderTypeChange,
   onOrderPriorityChange,
   onLaboratoryTestChange,
+  onCustomLaboratoryInvestigationChange,
   onDiagnosticInvestigationChange,
+  onCustomDiagnosticInvestigationChange,
   onOrderDoseChange,
 
   onPrescriptionMedicineChange,
@@ -434,9 +444,15 @@ export default function ClinicalOrdersPanel({
     !saving &&
     (
       orderType === 'LABORATORY'
-        ? selectedLaboratoryTestIds.length > 0
+        ? (
+            selectedLaboratoryTestIds.length > 0 ||
+            customLaboratoryInvestigation.trim()
+          )
         : orderType === 'DIAGNOSTIC'
-          ? selectedDiagnosticInvestigationId
+          ? (
+              selectedDiagnosticInvestigationId ||
+              customDiagnosticInvestigation.trim()
+            )
           : (
               prescriptionMedicine.trim() &&
               orderDose.trim() &&
@@ -589,6 +605,24 @@ export default function ClinicalOrdersPanel({
               </div>
             </label>
 
+            <label>
+              <span>
+                Custom laboratory investigation
+              </span>
+
+              <input
+                type="text"
+                disabled={encounterClosed}
+                value={customLaboratoryInvestigation}
+                onChange={event =>
+                  onCustomLaboratoryInvestigationChange(
+                    event.target.value,
+                  )
+                }
+                placeholder="Enter investigation not in catalogue"
+              />
+            </label>
+
             {selectedLaboratoryTestIds.length > 0 && (
               <div className="doctor-selected-order-preview">
                 <span>
@@ -653,6 +687,24 @@ export default function ClinicalOrdersPanel({
                   ),
                 )}
               </select>
+            </label>
+
+            <label>
+              <span>
+                Custom diagnostic investigation
+              </span>
+
+              <input
+                type="text"
+                disabled={encounterClosed}
+                value={customDiagnosticInvestigation}
+                onChange={event =>
+                  onCustomDiagnosticInvestigationChange(
+                    event.target.value,
+                  )
+                }
+                placeholder="Enter investigation not in catalogue"
+              />
             </label>
 
             {selectedDiagnosticInvestigationId && (

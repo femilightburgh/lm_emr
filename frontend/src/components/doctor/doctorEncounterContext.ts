@@ -90,14 +90,14 @@ export async function loadDoctorEncounterContext(
   const clinicalResultOrders =
     orders.filter(
       order =>
-        order.order_type === 'LABORATORY' ||
-        order.order_type === 'RADIOLOGY',
+        order.order_type === 'LABORATORY',
     )
 
   const diagnosticOrders =
     orders.filter(
       order =>
-        order.order_type === 'DIAGNOSTIC',
+        order.order_type === 'DIAGNOSTIC' ||
+        order.order_type === 'RADIOLOGY',
     )
 
   const resultGroups =

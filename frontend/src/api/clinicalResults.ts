@@ -9,10 +9,17 @@ export type ClinicalResultType =
 export interface ClinicalResultValue {
   id: string
   clinical_result_id: string
-  analyte_id: string
+  analyte_id: string | null
 
-  analyte_code: string
+  analyte_code: string | null
   analyte_name: string
+
+  custom_analyte_name: string | null
+  custom_analyte_code: string | null
+  custom_unit: string | null
+  custom_reference_low: number | null
+  custom_reference_high: number | null
+  custom_reference_text: string | null
 
   value: number | string | boolean | null
 
@@ -49,7 +56,13 @@ export interface ClinicalResult {
 
 
 export interface CreateClinicalResultValueRequest {
-  analyte_id: string
+  analyte_id?: string
+  custom_analyte_name?: string
+  custom_analyte_code?: string
+  custom_unit?: string
+  custom_reference_low?: number
+  custom_reference_high?: number
+  custom_reference_text?: string
   value_numeric?: number
   value_text?: string
   value_boolean?: boolean

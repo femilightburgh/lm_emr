@@ -23,9 +23,36 @@ class ClinicalResultValueRequest(BaseModel):
     One analyte value within a laboratory result.
     """
 
-    analyte_id: UUID = Field(
-        ...,
-        description="Laboratory analyte being reported.",
+    analyte_id: UUID | None = Field(
+        default=None,
+        description="Catalogue laboratory analyte being reported.",
+    )
+
+    custom_analyte_name: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=255,
+        description="Name of an analyte entered for a custom investigation.",
+    )
+
+    custom_analyte_code: str | None = Field(
+        default=None,
+        max_length=255,
+        description="Optional code for a custom analyte.",
+    )
+
+    custom_unit: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Optional unit for a custom analyte.",
+    )
+
+    custom_reference_low: float | None = None
+    custom_reference_high: float | None = None
+
+    custom_reference_text: str | None = Field(
+        default=None,
+        max_length=500,
     )
 
     value_numeric: float | None = None

@@ -54,3 +54,12 @@ htmlcov/
 .backup/
 backend/storage/
 *.bak
+
+# Frontend build output
+/frontend/dist/
+
+# Frontend deps
+/frontend/node_modules/
+
+# Local emergency/editor backups
+*.backup-*

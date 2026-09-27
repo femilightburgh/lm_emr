@@ -273,8 +273,12 @@ class ClinicalOrderRepository:
             )
             .where(
                 Episode.hospital_id == hospital_id,
-                ClinicalOrder.order_type
-                == ClinicalOrderType.DIAGNOSTIC,
+                ClinicalOrder.order_type.in_(
+                    (
+                        ClinicalOrderType.DIAGNOSTIC,
+                        ClinicalOrderType.RADIOLOGY,
+                    ),
+                ),
                 ClinicalOrder.status.in_(
                     (
                         ClinicalOrderStatus.REQUESTED,

@@ -6,7 +6,6 @@ export type ClinicalOrderType =
   | 'RADIOLOGY'
   | 'MEDICATION'
   | 'DIAGNOSTIC'
-  | 'DIAGNOSTIC'
 
 
 export type ClinicalOrderStatus =
@@ -24,6 +23,7 @@ export interface ClinicalOrderItem {
   status: ClinicalOrderStatus
   laboratory_test_id: string | null
   diagnostic_investigation_id: string | null
+  custom_name: string | null
   display_order: number
   details: Record<string, unknown>
   created_at: string
@@ -52,6 +52,7 @@ export interface ClinicalOrder {
 export interface CreateClinicalOrderItemRequest {
   laboratory_test_id?: string
   diagnostic_investigation_id?: string
+  custom_name?: string
 }
 
 export interface CreateClinicalOrderRequest {

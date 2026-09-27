@@ -207,3 +207,26 @@ class ClinicalEventService:
             hospital_id=context.hospital_id,
             encounter_id=encounter_id,
         )
+
+    # ------------------------------------------------------------------
+    # List Episode Events
+    # ------------------------------------------------------------------
+
+    def list_episode_events(
+        self,
+        *,
+        context: RequestContext,
+        episode_id: UUID,
+    ) -> list[ClinicalEvent]:
+        """
+        Return all Clinical Events belonging to an Episode
+        within the authenticated Hospital.
+
+        Events are returned in clinical occurrence order.
+        Hospital tenancy is enforced by the repository.
+        """
+
+        return self.repository.list_by_episode(
+            hospital_id=context.hospital_id,
+            episode_id=episode_id,
+        )

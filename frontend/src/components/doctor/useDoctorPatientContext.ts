@@ -52,6 +52,7 @@ export function useDoctorPatientContext({
 
   async function loadPreviousPatientEpisodes(
     patientId: string,
+    currentEpisodeId: string,
   ) {
     setLoadingPreviousEpisodes(true)
 
@@ -62,7 +63,12 @@ export function useDoctorPatientContext({
           patientId,
         )
 
-      setPreviousEpisodes(episodes)
+      setPreviousEpisodes(
+   episodes.filter(
+     episode =>
+       episode.id !== currentEpisodeId,
+   ),
+ )
     } catch (err) {
       setPreviousEpisodes([])
 

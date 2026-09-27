@@ -198,16 +198,6 @@ def cleanup_hospital(db: Session, hospital_id) -> None:
         {"hospital_id": hospital_id},
     )
 
-    db.execute(
-        text(
-            '''
-            DELETE FROM diagnostic_investigations
-            WHERE hospital_id = :hospital_id
-            '''
-        ),
-        {"hospital_id": hospital_id},
-    )
-
     # ------------------------------------------------------------------
     # Clinical Results
     # ------------------------------------------------------------------
@@ -293,6 +283,17 @@ def cleanup_hospital(db: Session, hospital_id) -> None:
         ),
         {"hospital_id": hospital_id},
     )
+
+    db.execute(
+        text(
+            '''
+            DELETE FROM diagnostic_investigations
+            WHERE hospital_id = :hospital_id
+            '''
+        ),
+        {"hospital_id": hospital_id},
+    )
+
 
     # ------------------------------------------------------------------
     # Clinical Orders

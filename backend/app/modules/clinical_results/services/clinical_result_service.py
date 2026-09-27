@@ -55,6 +55,9 @@ from app.modules.episode.models import (
 from app.modules.episode.repositories.episode_repository import (
     EpisodeRepository,
 )
+from app.modules.episode.services.episode_clinical_workflow_service import (
+    EpisodeClinicalWorkflowService,
+)
 from app.modules.encounter.models import (
     EncounterStatus,
 )
@@ -85,6 +88,7 @@ class ClinicalResultService:
         repository: ClinicalResultRepository,
         clinical_order_repository: ClinicalOrderRepository,
         episode_repository: EpisodeRepository,
+        episode_clinical_workflow_service: EpisodeClinicalWorkflowService | None = None,
         encounter_service: EncounterService | None = None,
         event_service: ClinicalEventService | None = None,
         staff_repository: StaffRepository | None = None,
@@ -94,6 +98,32 @@ class ClinicalResultService:
             clinical_order_repository
         )
         self.episode_repository = episode_repository
+
+        if episode_clinical_workflow_service is None:
+            episode_clinical_workflow_service = (
+                EpisodeClinicalWorkflowService(
+                    clinical_order_repository=clinical_order_repository,
+                    encounter_service=(
+                        encounter_service
+                        if encounter_service is not None
+                        else EncounterService(
+                            repository=EncounterRepository(
+                                episode_repository.db,
+                            ),
+                            episode_repository=episode_repository,
+                            staff_repository=(
+                                staff_repository
+                                if staff_repository is not None
+                                else StaffRepository(episode_repository.db)
+                            ),
+                        )
+                    ),
+                )
+            )
+
+        self.episode_clinical_workflow_service = (
+            episode_clinical_workflow_service
+        )
 
         if encounter_service is None:
             encounter_service = EncounterService(
@@ -199,11 +229,6 @@ class ClinicalResultService:
                         "Clinical Order Item is not a laboratory item.",
                     )
 
-                if item.laboratory_test is None:
-                    raise ClinicalResultLaboratoryTestNotFoundError(
-                        "Laboratory Clinical Order Item has no laboratory test.",
-                    )
-
                 return item
 
         raise ClinicalResultLaboratoryTestNotFoundError(
@@ -306,36 +331,47 @@ class ClinicalResultService:
     @staticmethod
     def _calculate_abnormal_flag(
         *,
-        analyte,
         value_numeric,
-        supplied_flag=None,
+        reference_low=None,
+        reference_high=None,
     ) -> str | None:
         """
-        Derive an abnormal flag from the configured numeric
-        reference interval unless the caller supplied one.
-        """
+        Automatically derive the laboratory flag from the configured
+        numeric reference interval.
 
-        if supplied_flag:
-            return supplied_flag
+        LOW:
+            result is below the lower reference limit.
+
+        HIGH:
+            result is above the upper reference limit.
+
+        NORMAL:
+            result falls within the configured reference interval.
+
+        No flag:
+            no numeric result or no numeric reference interval exists.
+        """
 
         if value_numeric is None:
             return None
 
         if (
-            analyte.reference_low is not None
-            and value_numeric < float(
-                analyte.reference_low,
-            )
+            reference_low is not None
+            and value_numeric < float(reference_low)
         ):
             return "LOW"
 
         if (
-            analyte.reference_high is not None
-            and value_numeric > float(
-                analyte.reference_high,
-            )
+            reference_high is not None
+            and value_numeric > float(reference_high)
         ):
             return "HIGH"
+
+        if (
+            reference_low is not None
+            or reference_high is not None
+        ):
+            return "NORMAL"
 
         return None
 
@@ -348,15 +384,19 @@ class ClinicalResultService:
         legacy_result_data,
         require_all_required: bool = True,
     ) -> list[dict]:
-        analytes_by_id = {
-            analyte.id: analyte
-            for analyte in laboratory_test.analytes
-        }
+        analytes_by_id = {}
+        analytes_by_code = {}
 
-        analytes_by_code = {
-            analyte.code: analyte
-            for analyte in laboratory_test.analytes
-        }
+        if laboratory_test is not None:
+            analytes_by_id = {
+                analyte.id: analyte
+                for analyte in laboratory_test.analytes
+            }
+
+            analytes_by_code = {
+                analyte.code: analyte
+                for analyte in laboratory_test.analytes
+            }
 
         normalized_values = []
 
@@ -374,6 +414,108 @@ class ClinicalResultService:
                     )
 
                 analyte_id = get_value("analyte_id")
+                custom_analyte_name = get_value("custom_analyte_name")
+
+                if analyte_id is not None and custom_analyte_name:
+                    raise ClinicalResultInvalidValueError(
+                        "A result value cannot contain both a catalogue "
+                        "analyte and a custom analyte."
+                    )
+
+                if analyte_id is None and not custom_analyte_name:
+                    raise ClinicalResultInvalidValueError(
+                        "Each result value must specify either analyte_id "
+                        "or custom_analyte_name."
+                    )
+
+                value_numeric = get_value("value_numeric")
+                value_text = get_value("value_text")
+                value_boolean = get_value("value_boolean")
+                value_code = get_value("value_code")
+                abnormal_flag = get_value("abnormal_flag")
+                comment = get_value("comment")
+
+                if custom_analyte_name:
+                    custom_analyte_name = str(
+                        custom_analyte_name
+                    ).strip()
+
+                    if not custom_analyte_name:
+                        raise ClinicalResultInvalidValueError(
+                            "Custom analyte name cannot be empty."
+                        )
+
+                    custom_analyte_code = get_value(
+                        "custom_analyte_code"
+                    )
+                    custom_unit = get_value("custom_unit")
+                    custom_reference_low = get_value(
+                        "custom_reference_low"
+                    )
+                    custom_reference_high = get_value(
+                        "custom_reference_high"
+                    )
+                    custom_reference_text = get_value(
+                        "custom_reference_text"
+                    )
+
+                    if (
+                        custom_reference_low is not None
+                        and custom_reference_high is not None
+                        and custom_reference_low
+                        > custom_reference_high
+                    ):
+                        raise ClinicalResultInvalidValueError(
+                            "Custom reference low cannot be greater "
+                            "than custom reference high."
+                        )
+
+                    abnormal_flag = (
+                        self._calculate_abnormal_flag(
+                            value_numeric=value_numeric,
+                            reference_low=custom_reference_low,
+                            reference_high=custom_reference_high,
+                        )
+                    )
+
+                    normalized_values.append(
+                        {
+                            "analyte": None,
+                            "custom_analyte_name": custom_analyte_name,
+                            "custom_analyte_code": (
+                                str(custom_analyte_code).strip()
+                                if custom_analyte_code is not None
+                                else None
+                            ),
+                            "custom_unit": (
+                                str(custom_unit).strip()
+                                if custom_unit is not None
+                                else None
+                            ),
+                            "custom_reference_low": (
+                                float(custom_reference_low)
+                                if custom_reference_low is not None
+                                else None
+                            ),
+                            "custom_reference_high": (
+                                float(custom_reference_high)
+                                if custom_reference_high is not None
+                                else None
+                            ),
+                            "custom_reference_text": (
+                                str(custom_reference_text).strip()
+                                if custom_reference_text is not None
+                                else None
+                            ),
+                            "value_numeric": value_numeric,
+                            "value_text": value_text,
+                            "value_boolean": value_boolean,
+                            "value_code": value_code,
+                            "abnormal_flag": abnormal_flag,
+                            "comment": comment,
+                        }
+                    )
+                    continue
 
                 analyte = analytes_by_id.get(analyte_id)
 
@@ -390,13 +532,6 @@ class ClinicalResultService:
 
                 seen_analytes.add(analyte.id)
 
-                value_numeric = get_value("value_numeric")
-                value_text = get_value("value_text")
-                value_boolean = get_value("value_boolean")
-                value_code = get_value("value_code")
-                abnormal_flag = get_value("abnormal_flag")
-                comment = get_value("comment")
-
                 self._validate_value_shape(
                     analyte=analyte,
                     value_numeric=value_numeric,
@@ -407,15 +542,21 @@ class ClinicalResultService:
 
                 abnormal_flag = (
                     self._calculate_abnormal_flag(
-                        analyte=analyte,
                         value_numeric=value_numeric,
-                        supplied_flag=abnormal_flag,
+                        reference_low=analyte.reference_low,
+                        reference_high=analyte.reference_high,
                     )
                 )
 
                 normalized_values.append(
                     {
                         "analyte": analyte,
+                        "custom_analyte_name": None,
+                        "custom_analyte_code": None,
+                        "custom_unit": None,
+                        "custom_reference_low": None,
+                        "custom_reference_high": None,
+                        "custom_reference_text": None,
                         "value_numeric": value_numeric,
                         "value_text": value_text,
                         "value_boolean": value_boolean,
@@ -426,6 +567,12 @@ class ClinicalResultService:
                 )
 
         elif legacy_result_data:
+            if laboratory_test is None:
+                raise ClinicalResultInvalidValueError(
+                    "Legacy laboratory result data requires a catalogue "
+                    "laboratory test.",
+                )
+
             for code, raw_value in legacy_result_data.items():
                 # Legacy clients historically embedded report-level
                 # metadata inside result_data. Keep that payload
@@ -484,14 +631,21 @@ class ClinicalResultService:
 
                 abnormal_flag = (
                     self._calculate_abnormal_flag(
-                        analyte=analyte,
                         value_numeric=value_numeric,
+                        reference_low=analyte.reference_low,
+                        reference_high=analyte.reference_high,
                     )
                 )
 
                 normalized_values.append(
                     {
                         "analyte": analyte,
+                        "custom_analyte_name": None,
+                        "custom_analyte_code": None,
+                        "custom_unit": None,
+                        "custom_reference_low": None,
+                        "custom_reference_high": None,
+                        "custom_reference_text": None,
                         "value_numeric": value_numeric,
                         "value_text": value_text,
                         "value_boolean": value_boolean,
@@ -504,14 +658,18 @@ class ClinicalResultService:
         submitted_ids = {
             item["analyte"].id
             for item in normalized_values
+            if item["analyte"] is not None
         }
 
-        missing_required = [
-            analyte.code
-            for analyte in laboratory_test.analytes
-            if analyte.required
-            and analyte.id not in submitted_ids
-        ]
+        missing_required = []
+
+        if laboratory_test is not None:
+            missing_required = [
+                analyte.code
+                for analyte in laboratory_test.analytes
+                if analyte.required
+                and analyte.id not in submitted_ids
+            ]
 
         if require_all_required and missing_required:
             raise ClinicalResultMissingRequiredAnalyteError(
@@ -520,63 +678,6 @@ class ClinicalResultService:
             )
 
         return normalized_values
-
-    def _queue_doctor_review_if_ready(
-        self,
-        *,
-        context: RequestContext,
-        episode,
-    ) -> None:
-        """
-        Move an Episode to AWAITING_REVIEW and create its open
-        Doctor Review Encounter once all investigations are complete.
-
-        The caller owns the surrounding database transaction.
-        """
-
-        if episode.flow_status != EpisodeFlowStatus.AWAITING_INVESTIGATIONS:
-            return
-
-        outstanding_orders = (
-            self.clinical_order_repository
-            .list_outstanding_investigation_orders_for_episode(
-                hospital_id=context.hospital_id,
-                episode_id=episode.id,
-            )
-        )
-
-        if outstanding_orders:
-            return
-
-        if episode.managing_doctor_id is None:
-            raise ClinicalResultOrderNotFoundError(
-                "Episode has no managing doctor assigned for Doctor Review.",
-            )
-
-        existing_encounters = (
-            self.encounter_service.list_episode_encounters(
-                context=context,
-                episode_id=episode.id,
-            )
-        )
-
-        has_open_doctor_review = any(
-            encounter.title == "Doctor Review"
-            and encounter.status == EncounterStatus.OPEN
-            for encounter in existing_encounters
-        )
-
-        if not has_open_doctor_review:
-            self.encounter_service.create_encounter(
-                context=context,
-                episode_id=episode.id,
-                staff_id=episode.managing_doctor_id,
-                title="Doctor Review",
-                commit=False,
-            )
-
-        episode.flow_status = EpisodeFlowStatus.AWAITING_REVIEW
-
 
     def record_result(
         self,
@@ -661,17 +762,31 @@ class ClinicalResultService:
 
             laboratory_test = laboratory_order_item.laboratory_test
 
-            structured_values = self._build_structured_result_values(
-                laboratory_test=laboratory_test,
-                values=values,
-                legacy_result_data=result_data,
-                require_all_required=(
-                    status == ClinicalResultStatus.FINAL
-                ),
-            )
+            if laboratory_test is None:
+                if result_data:
+                    raise ClinicalResultInvalidValueError(
+                        "Custom laboratory results must use structured "
+                        "custom analyte values.",
+                    )
 
-            if specimen is None:
-                specimen = laboratory_test.specimen
+                structured_values = self._build_structured_result_values(
+                    laboratory_test=None,
+                    values=values,
+                    legacy_result_data=None,
+                    require_all_required=False,
+                )
+            else:
+                structured_values = self._build_structured_result_values(
+                    laboratory_test=laboratory_test,
+                    values=values,
+                    legacy_result_data=result_data,
+                    require_all_required=(
+                        status == ClinicalResultStatus.FINAL
+                    ),
+                )
+
+                if specimen is None and laboratory_test is not None:
+                    specimen = laboratory_test.specimen
 
         legacy_interpretation = None
 
@@ -705,7 +820,17 @@ class ClinicalResultService:
         for item in structured_values:
             result.values.append(
                 ClinicalResultValue(
-                    analyte_id=item["analyte"].id,
+                    analyte_id=(
+                        item["analyte"].id
+                        if item["analyte"] is not None
+                        else None
+                    ),
+                    custom_analyte_name=item["custom_analyte_name"],
+                    custom_analyte_code=item["custom_analyte_code"],
+                    custom_unit=item["custom_unit"],
+                    custom_reference_low=item["custom_reference_low"],
+                    custom_reference_high=item["custom_reference_high"],
+                    custom_reference_text=item["custom_reference_text"],
                     value_numeric=item["value_numeric"],
                     value_text=item["value_text"],
                     value_boolean=item["value_boolean"],
@@ -749,7 +874,7 @@ class ClinicalResultService:
             )
 
             if status == ClinicalResultStatus.FINAL:
-                self._queue_doctor_review_if_ready(
+                self.episode_clinical_workflow_service.queue_doctor_review_if_ready(
                     context=context,
                     episode=episode,
                 )
@@ -834,7 +959,7 @@ class ClinicalResultService:
                 require_all_required=False,
             )
 
-            if specimen is None:
+            if specimen is None and laboratory_test is not None:
                 specimen = laboratory_test.specimen
 
         legacy_interpretation = None
@@ -861,7 +986,17 @@ class ClinicalResultService:
         for item in structured_values:
             result.values.append(
                 ClinicalResultValue(
-                    analyte_id=item["analyte"].id,
+                    analyte_id=(
+                        item["analyte"].id
+                        if item["analyte"] is not None
+                        else None
+                    ),
+                    custom_analyte_name=item["custom_analyte_name"],
+                    custom_analyte_code=item["custom_analyte_code"],
+                    custom_unit=item["custom_unit"],
+                    custom_reference_low=item["custom_reference_low"],
+                    custom_reference_high=item["custom_reference_high"],
+                    custom_reference_text=item["custom_reference_text"],
                     value_numeric=item["value_numeric"],
                     value_text=item["value_text"],
                     value_boolean=item["value_boolean"],
@@ -977,7 +1112,7 @@ class ClinicalResultService:
                 commit=False,
             )
 
-            self._queue_doctor_review_if_ready(
+            self.episode_clinical_workflow_service.queue_doctor_review_if_ready(
                 context=context,
                 episode=episode,
             )

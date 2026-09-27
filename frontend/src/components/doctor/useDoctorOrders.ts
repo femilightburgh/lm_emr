@@ -142,6 +142,12 @@ const [selectedLaboratoryTestIds, setSelectedLaboratoryTestIds] =
 const [selectedDiagnosticInvestigationId, setSelectedDiagnosticInvestigationId] =
   useState('')
 
+const [customLaboratoryInvestigation, setCustomLaboratoryInvestigation] =
+  useState('')
+
+const [customDiagnosticInvestigation, setCustomDiagnosticInvestigation] =
+  useState('')
+
 async function cancelOrder(
   orderId: string,
 ) {
@@ -349,9 +355,15 @@ async function saveOrder() {
     let details: Record<string, unknown>
 
     if (orderType === 'LABORATORY') {
-      if (selectedLaboratoryTestIds.length === 0) {
+      const customName =
+        customLaboratoryInvestigation.trim()
+
+      if (
+        selectedLaboratoryTestIds.length === 0 &&
+        !customName
+      ) {
         onError?.(
-          'Select at least one laboratory investigation from the catalogue.',
+          'Select at least one laboratory investigation or enter a custom investigation.',
         )
         return
       }
@@ -370,6 +382,25 @@ async function saveOrder() {
         return
       }
 
+      const items = [
+        ...selectedTests
+          .filter(
+            (
+              selectedTest,
+            ): selectedTest is LaboratoryTest =>
+              selectedTest !== undefined,
+          )
+          .map(
+            selectedTest => ({
+              laboratory_test_id:
+                selectedTest.id,
+            }),
+          ),
+        ...(customName
+          ? [{ custom_name: customName }]
+          : []),
+      ]
+
       await createClinicalOrder(
         accessToken,
         {
@@ -384,20 +415,7 @@ async function saveOrder() {
 
           details: {},
 
-          items:
-            selectedTests
-              .filter(
-                (
-                  selectedTest,
-                ): selectedTest is LaboratoryTest =>
-                  selectedTest !== undefined,
-              )
-              .map(
-                selectedTest => ({
-                  laboratory_test_id:
-                    selectedTest.id,
-                }),
-              ),
+          items,
         },
       )
 
@@ -408,40 +426,96 @@ async function saveOrder() {
       setOrderTestCode('')
       setOrderTestName('')
       setSelectedLaboratoryTestIds([])
+      setCustomLaboratoryInvestigation('')
 
       onSuccess?.(
-        selectedTests.length === 1
+        items.length === 1
           ? 'Clinical order created.'
-          : `Clinical order created with ${selectedTests.length} investigations.`,
+          : `Clinical order created with ${items.length} investigations.`,
       )
 
       return
     } else if (orderType === 'DIAGNOSTIC') {
-      if (!selectedDiagnosticInvestigationId) {
+      const customName =
+        customDiagnosticInvestigation.trim()
+
+      if (
+        !selectedDiagnosticInvestigationId &&
+        !customName
+      ) {
         onError?.(
-          'Select a diagnostic investigation from the catalogue.',
+          'Select a diagnostic investigation or enter a custom investigation.',
         )
         return
       }
 
       const selectedInvestigation =
-        diagnosticInvestigations.find(
-          investigation =>
-            investigation.id ===
-            selectedDiagnosticInvestigationId,
-        )
+        selectedDiagnosticInvestigationId
+          ? diagnosticInvestigations.find(
+              investigation =>
+                investigation.id ===
+                selectedDiagnosticInvestigationId,
+            )
+          : undefined
 
-      if (!selectedInvestigation) {
+      if (
+        selectedDiagnosticInvestigationId &&
+        !selectedInvestigation
+      ) {
         onError?.(
           'Selected diagnostic investigation could not be found.',
         )
         return
       }
 
-      details = {
-        investigation_id:
-          selectedInvestigation.id,
-      }
+      details = {}
+
+      const items = [
+        ...(selectedInvestigation
+          ? [
+              {
+                diagnostic_investigation_id:
+                  selectedInvestigation.id,
+              },
+            ]
+          : []),
+        ...(customName
+          ? [{ custom_name: customName }]
+          : []),
+      ]
+
+      await createClinicalOrder(
+        accessToken,
+        {
+          encounter_id:
+            selectedEncounter.id,
+
+          order_type:
+            orderType,
+
+          priority:
+            orderPriority,
+
+          details,
+
+          items,
+        },
+      )
+
+      await refreshEncounterContext(
+        selectedEncounter.id,
+      )
+
+      setSelectedDiagnosticInvestigationId('')
+      setCustomDiagnosticInvestigation('')
+
+      onSuccess?.(
+        items.length === 1
+          ? 'Clinical order created.'
+          : `Clinical order created with ${items.length} investigations.`,
+      )
+
+      return
     } else {
       details = {
         study_code:
@@ -503,6 +577,11 @@ async function saveOrder() {
     setSelectedLaboratoryTestIds,
     selectedDiagnosticInvestigationId,
     setSelectedDiagnosticInvestigationId,
+
+    customLaboratoryInvestigation,
+    setCustomLaboratoryInvestigation,
+    customDiagnosticInvestigation,
+    setCustomDiagnosticInvestigation,
 
     orderTestCode,
     setOrderTestCode,

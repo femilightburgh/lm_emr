@@ -33,7 +33,7 @@ export interface DiagnosticQueueItem {
   hospital_number: string
   episode_number: string
   ordering_clinician_name: string
-  order_type: 'DIAGNOSTIC'
+  order_type: 'DIAGNOSTIC' | 'RADIOLOGY'
   status:
     | 'REQUESTED'
     | 'RECEIVED'
@@ -47,7 +47,7 @@ export interface DiagnosticQueueItem {
 export interface DiagnosticReport {
   id: string
   order_id: string
-  investigation_id: string
+  investigation_id?: string
   category: DiagnosticCategory
   status: DiagnosticReportStatus
   findings: string | null
@@ -74,7 +74,7 @@ export interface DiagnosticReportAttachment {
 
 export interface CreateDiagnosticReportRequest {
   order_id: string
-  investigation_id: string
+  investigation_id?: string
   category: DiagnosticCategory
   findings?: string | null
   impression?: string | null

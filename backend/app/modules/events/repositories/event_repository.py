@@ -127,6 +127,46 @@ class ClinicalEventRepository:
         )
 
     # ------------------------------------------------------------------
+    # Episode Events
+    # ------------------------------------------------------------------
+
+    def list_by_episode(
+        self,
+        *,
+        hospital_id: UUID,
+        episode_id: UUID,
+    ) -> list[ClinicalEvent]:
+        """
+        Return all Clinical Events belonging to an Episode
+        within the authenticated Hospital.
+
+        Events are returned in clinical occurrence order.
+        """
+
+        statement = (
+            select(ClinicalEvent)
+            .join(
+                Encounter,
+                ClinicalEvent.encounter_id == Encounter.id,
+            )
+            .join(
+                Episode,
+                Encounter.episode_id == Episode.id,
+            )
+            .where(
+                Encounter.episode_id == episode_id,
+                Episode.hospital_id == hospital_id,
+            )
+            .order_by(
+                ClinicalEvent.occurred_at.asc(),
+            )
+        )
+
+        return list(
+            self.db.scalars(statement),
+        )
+
+    # ------------------------------------------------------------------
     # Persistence
     # ------------------------------------------------------------------
 

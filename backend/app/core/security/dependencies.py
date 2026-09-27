@@ -56,6 +56,12 @@ def get_current_user(
     try:
         payload = token_service.decode_token(token)
 
+        if payload.get("type") != "access":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired access token.",
+            )
+
         user_id = payload["sub"]
 
         repository = IdentityRepository(db)
